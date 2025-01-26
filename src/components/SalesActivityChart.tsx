@@ -37,10 +37,10 @@ const SalesActivityChart = () => {
         
         return {
           name: format(date, 'MMM d'),
-          Outbound: dayActivities.filter(a => a.type === 'outbound').length,
-          Meetings: dayActivities.filter(a => a.type === 'meeting').length,
-          Proposals: dayActivities.filter(a => a.type === 'proposal').length,
-          Sales: dayActivities.filter(a => a.type === 'sale').length,
+          Outbound: dayActivities.filter(a => a.type === 'outbound').length || 0.1,
+          Meetings: dayActivities.filter(a => a.type === 'meeting').length || 0.1,
+          Proposals: dayActivities.filter(a => a.type === 'proposal').length || 0.1,
+          Sales: dayActivities.filter(a => a.type === 'sale').length || 0.1,
         };
       }).reverse();
       return data;
@@ -63,10 +63,10 @@ const SalesActivityChart = () => {
         
         return {
           name: `WC ${format(date, 'MMM d')}`,
-          Outbound: weekActivities.filter(a => a.type === 'outbound').length,
-          Meetings: weekActivities.filter(a => a.type === 'meeting').length,
-          Proposals: weekActivities.filter(a => a.type === 'proposal').length,
-          Sales: weekActivities.filter(a => a.type === 'sale').length,
+          Outbound: weekActivities.filter(a => a.type === 'outbound').length || 0.1,
+          Meetings: weekActivities.filter(a => a.type === 'meeting').length || 0.1,
+          Proposals: weekActivities.filter(a => a.type === 'proposal').length || 0.1,
+          Sales: weekActivities.filter(a => a.type === 'sale').length || 0.1,
         };
       }).reverse();
       return data;
@@ -87,10 +87,10 @@ const SalesActivityChart = () => {
       
       data.push({
         name: format(date, 'MMM'),
-        Outbound: monthActivities.filter(a => a.type === 'outbound').length,
-        Meetings: monthActivities.filter(a => a.type === 'meeting').length,
-        Proposals: monthActivities.filter(a => a.type === 'proposal').length,
-        Sales: monthActivities.filter(a => a.type === 'sale').length,
+        Outbound: monthActivities.filter(a => a.type === 'outbound').length || 0.1,
+        Meetings: monthActivities.filter(a => a.type === 'meeting').length || 0.1,
+        Proposals: monthActivities.filter(a => a.type === 'proposal').length || 0.1,
+        Sales: monthActivities.filter(a => a.type === 'sale').length || 0.1,
       });
     }
     return data;
@@ -103,7 +103,7 @@ const SalesActivityChart = () => {
     { value: 'monthly', label: 'Monthly' },
   ];
 
-  // Custom tooltip component
+  // Custom tooltip to show actual values (not log values)
   const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null;
 
@@ -113,7 +113,9 @@ const SalesActivityChart = () => {
         {payload.map((entry, index) => (
           <div key={index} className="flex items-center justify-between gap-4 text-sm">
             <span style={{ color: entry.color }}>{entry.name}:</span>
-            <span className="text-white font-medium">{entry.value}</span>
+            <span className="text-white font-medium">
+              {entry.value > 0.1 ? Math.round(entry.value) : 0}
+            </span>
           </div>
         ))}
       </div>
@@ -209,10 +211,10 @@ const SalesActivityChart = () => {
               tickLine={false}
               tick={{ fill: '#9CA3AF', fontSize: 12 }}
               dx={-10}
-              scale="linear"
-              domain={[0, 'auto']}
+              scale="log"
+              domain={[0.1, 'auto']}
               allowDataOverflow={false}
-              tickFormatter={(value) => value.toLocaleString()}
+              tickFormatter={(value) => value <= 0.1 ? 0 : Math.round(value)}
             >
               <Label
                 value="Count (log scale)"
@@ -240,6 +242,7 @@ const SalesActivityChart = () => {
               isAnimationActive={true}
               animationDuration={1000}
               animationBegin={0}
+              minPointSize={2}
             />
             <Bar
               dataKey="Meetings"
@@ -248,6 +251,7 @@ const SalesActivityChart = () => {
               isAnimationActive={true}
               animationDuration={1000}
               animationBegin={200}
+              minPointSize={2}
             />
             <Bar
               dataKey="Proposals"
@@ -256,6 +260,7 @@ const SalesActivityChart = () => {
               isAnimationActive={true}
               animationDuration={1000}
               animationBegin={400}
+              minPointSize={2}
             />
             <Bar
               dataKey="Sales"
@@ -264,6 +269,7 @@ const SalesActivityChart = () => {
               isAnimationActive={true}
               animationDuration={1000}
               animationBegin={600}
+              minPointSize={2}
             />
           </ComposedChart>
         </ResponsiveContainer>

@@ -31,7 +31,6 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   const navigate = useNavigate();
 
   const reloadPage = () => {
-    // Force a reload by navigating to the same route
     navigate(location.pathname, { replace: true });
   };
 
@@ -48,7 +47,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
         saleType: formData.saleType as 'one-off' | 'subscription' | 'lifetime',
         details: formData.saleType === 'subscription' 
           ? `Subscription Sale - Monthly` 
-          : `${formData.saleType} Sale`
+          : `${formData.saleType} Sale`,
+        date: selectedDate.toISOString()
       });
     } else {
       addActivity({
@@ -67,7 +67,6 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
       });
     }
 
-    toast.success('Activity added successfully');
     reloadPage();
     onClose();
     setSelectedAction(null);
@@ -78,7 +77,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
       saleType: 'one-off',
       meetingType: 'discovery',
       contactMethod: 'phone',
-      proposalValue: ''
+      proposalValue: '',
+      outboundCount: '1'
     });
   };
 
@@ -89,10 +89,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
       clientName: 'Quick Outbound',
       details: 'Quick outbound call',
       priority: 'low',
-      date: selectedDate.toISOString(),
-      count
+      date: selectedDate.toISOString()
     });
-    toast.success('Quick call logged successfully');
     reloadPage();
     onClose();
     setSelectedDate(new Date());

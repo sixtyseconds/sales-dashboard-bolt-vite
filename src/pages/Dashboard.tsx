@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/lib/hooks/useUser';
-import { useSalesData } from '@/lib/hooks/useSalesData';
 import { useTargets } from '@/lib/hooks/useTargets';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { useNavigate } from 'react-router-dom';
 import { useActivities } from '@/lib/hooks/useActivities';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, subMonths } from 'date-fns';
 import {
   DollarSign,
   PoundSterling,
@@ -152,6 +151,18 @@ export default function Dashboard() {
       return activityDate >= currentMonth.start && activityDate <= currentMonth.end;
     }), [activities, currentMonth]);
 
+  // Get previous month's activities for trend calculation
+  const previousMonth = useMemo(() => ({
+    start: startOfMonth(subMonths(new Date(), 1)),
+    end: subMonths(new Date(), 1),
+  }), []);
+
+  const previousMonthActivities = useMemo(() => 
+    activities.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate >= previousMonth.start && activityDate <= previousMonth.end;
+    }), [activities, previousMonth]);
+
   const { data: targets } = useTargets(userData?.id);
 
   if (!targets) return null;
@@ -169,12 +180,30 @@ export default function Dashboard() {
       .filter(a => a.type === 'proposal').length
   };
 
-  // Calculate trends (default to 0% if no previous data)
+  // Calculate metrics for previous month
+  const previousMetrics = {
+    revenue: previousMonthActivities
+      .filter(a => a.type === 'sale')
+      .reduce((sum, a) => sum + (a.amount || 0), 0),
+    outbound: previousMonthActivities
+      .filter(a => a.type === 'outbound').length,
+    meetings: previousMonthActivities
+      .filter(a => a.type === 'meeting').length,
+    proposals: previousMonthActivities
+      .filter(a => a.type === 'proposal').length
+  };
+
+  // Calculate trends
+  const calculateTrend = (current: number, previous: number) => {
+    if (previous === 0) return 0;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+
   const trends = {
-    revenue: 0,
-    outbound: 0,
-    meetings: 0,
-    proposals: 0
+    revenue: calculateTrend(metrics.revenue, previousMetrics.revenue),
+    outbound: calculateTrend(metrics.outbound, previousMetrics.outbound),
+    meetings: calculateTrend(metrics.meetings, previousMetrics.meetings),
+    proposals: calculateTrend(metrics.proposals, previousMetrics.proposals)
   };
 
   // Filter deals based on search query

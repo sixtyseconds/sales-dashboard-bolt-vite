@@ -132,7 +132,10 @@ export default function SalesFunnel() {
         {/* Funnel Visualization */}
         <div className="relative max-w-4xl mx-auto">
           {funnelStages.map((stage, index) => {
-            const width = 100 - (index * 15);
+            // Calculate width based on the actual value relative to the maximum value
+            const maxValue = Math.max(...funnelStages.map(s => s.value));
+            const width = maxValue > 0 ? (stage.value / maxValue) * 100 : 0;
+            
             return (
               <motion.div
                 key={stage.id}

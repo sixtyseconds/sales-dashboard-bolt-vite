@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import confetti from 'canvas-confetti';
 
 export interface Activity {
   id: string;
@@ -32,6 +33,7 @@ async function createActivity(activity: {
   details?: string;
   amount?: number;
   priority?: Activity['priority'];
+  date?: string;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -54,7 +56,7 @@ async function createActivity(activity: {
       amount: activity.amount,
       priority: activity.priority || 'medium',
       sales_rep: `${profile.first_name} ${profile.last_name}`,
-      date: new Date().toISOString(),
+      date: activity.date || new Date().toISOString(),
       status: 'completed'
     })
     .select()
@@ -73,6 +75,7 @@ async function createSale(sale: {
   amount: number;
   details?: string;
   saleType: 'one-off' | 'subscription' | 'lifetime';
+  date?: string;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -95,7 +98,7 @@ async function createSale(sale: {
       amount: sale.amount,
       priority: 'high',
       sales_rep: `${profile.first_name} ${profile.last_name}`,
-      date: new Date().toISOString(),
+      date: sale.date || new Date().toISOString(),
       status: 'completed'
     })
     .select()
@@ -145,7 +148,10 @@ export function useActivities() {
           table: 'activities'
         },
         (payload) => {
+          // Invalidate all relevant queries
           queryClient.invalidateQueries({ queryKey: ['activities'] });
+          queryClient.invalidateQueries({ queryKey: ['salesData'] });
+          queryClient.invalidateQueries({ queryKey: ['targets'] });
         }
       )
       .subscribe();
@@ -164,7 +170,10 @@ export function useActivities() {
   const addActivityMutation = useMutation({
     mutationFn: createActivity,
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['salesData'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
       toast.success('Activity added successfully');
     },
     onError: (error: Error) => {
@@ -173,12 +182,23 @@ export function useActivities() {
     },
   });
 
-  // Add sale mutation with error handling
+  // Add sale mutation with error handling and confetti
   const addSaleMutation = useMutation({
     mutationFn: createSale,
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
-      toast.success('Sale added successfully');
+      queryClient.invalidateQueries({ queryKey: ['salesData'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
+      toast.success('Sale added successfully! 🎉');
+      
+      // Trigger confetti animation
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#10B981', '#34D399', '#6EE7B7']
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -191,7 +211,10 @@ export function useActivities() {
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Activity> }) =>
       updateActivity(id, updates),
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['salesData'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
       toast.success('Activity updated successfully');
     },
     onError: (error: Error) => {
@@ -204,7 +227,10 @@ export function useActivities() {
   const removeActivityMutation = useMutation({
     mutationFn: deleteActivity,
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['salesData'] });
+      queryClient.invalidateQueries({ queryKey: ['targets'] });
       toast.success('Activity deleted successfully');
     },
     onError: (error: Error) => {
