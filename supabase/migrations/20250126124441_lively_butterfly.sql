@@ -81,7 +81,8 @@ CREATE TABLE activities (
   amount decimal(12,2),
   date timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  avatar_url text
 );
 
 -- Create targets table

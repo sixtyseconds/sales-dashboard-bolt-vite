@@ -12,19 +12,29 @@ export interface Activity {
   amount?: number;
   user_id: string;
   sales_rep: string;
+  avatar_url?: string | null;
   status: 'completed' | 'pending' | 'cancelled';
   details: string;
   priority: 'high' | 'medium' | 'low';
 }
 
 async function fetchActivities() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
   const { data, error } = await supabase
     .from('activities')
     .select('*')
+    .eq('user_id', user.id)
     .order('date', { ascending: false });
 
-  if (error) throw error;
-  return data;
+  if (error) {
+    console.error('Error fetching activities:', error);
+    throw error;
+  }
+
+  // Ensure we only return activities that belong to the current user
+  return data?.filter(activity => activity.user_id === user.id) || [];
 }
 
 async function createActivity(activity: { 
@@ -138,27 +148,35 @@ export function useActivities() {
 
   // Set up real-time subscription for live updates
   useEffect(() => {
-    const subscription = supabase
-      .channel('activities_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'activities'
-        },
-        (payload) => {
-          // Invalidate all relevant queries
-          queryClient.invalidateQueries({ queryKey: ['activities'] });
-          queryClient.invalidateQueries({ queryKey: ['salesData'] });
-          queryClient.invalidateQueries({ queryKey: ['targets'] });
-        }
-      )
-      .subscribe();
+    async function setupSubscription() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      const subscription = supabase
+        .channel('activities_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'activities',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            // Invalidate all relevant queries
+            queryClient.invalidateQueries({ queryKey: ['activities'] });
+            queryClient.invalidateQueries({ queryKey: ['salesData'] });
+            queryClient.invalidateQueries({ queryKey: ['targets'] });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+
+    setupSubscription();
   }, [queryClient]);
 
   const { data: activities = [], isLoading } = useQuery({

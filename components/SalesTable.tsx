@@ -72,9 +72,6 @@ export default function SalesTable() {
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
-      // Only show Sarah's activities
-      if (activity.salesRep !== 'Sarah Johnson') return false;
-
       const matchesType = !filters.type || activity.type === filters.type;
       const matchesSalesRep = !filters.salesRep || activity.salesRep === filters.salesRep;
       const matchesSearch = !filters.searchQuery || 
@@ -598,9 +595,11 @@ export default function SalesTable() {
                       className="bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm"
                       value={filters.salesRep || 'all'}
                       onChange={(e) => setFilters({ salesRep: e.target.value === 'all' ? undefined : e.target.value })}
-                      disabled
                     >
-                      <option value="Sarah Johnson">Sarah Johnson</option>
+                      <option value="all">All Sales Reps</option>
+                      {Array.from(new Set(activities.map(a => a.salesRep))).sort().map(rep => (
+                        <option key={rep} value={rep}>{rep}</option>
+                      ))}
                     </select>
                     <DateRangePicker
                       dateRange={{ from: filters.dateRange.start, to: filters.dateRange.end }}

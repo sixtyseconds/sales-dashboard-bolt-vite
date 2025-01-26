@@ -20,12 +20,11 @@ export default function SalesFunnel() {
   const { activities } = useActivities();
 
   const { data: salesData } = useSalesData(
-    userData?.id,
     dateRange.start,
     dateRange.end
   );
 
-  const { data: targets } = useTargets(userData?.id);
+  const { data: targets } = useTargets();
 
   const funnelMetrics = useMemo(() => {
     const monthStart = startOfMonth(new Date());
@@ -51,27 +50,6 @@ export default function SalesFunnel() {
       .reduce((sum, a) => sum + (a.amount || 0), 0);
     const avgDealSize = closedCount > 0 ? Math.round(totalRevenue / closedCount) : 0;
 
-    // Calculate sales velocity (average days from first touch to close)
-    const closedDeals = monthActivities.filter(a => a.type === 'sale');
-    let totalDays = 0;
-    let dealsWithHistory = 0;
-
-    closedDeals.forEach(deal => {
-      const firstTouch = monthActivities.find(a => 
-        a.clientName === deal.clientName && 
-        new Date(a.date) <= new Date(deal.date) &&
-        a.type === 'outbound'
-      );
-      
-      if (firstTouch) {
-        const days = Math.round((new Date(deal.date).getTime() - new Date(firstTouch.date).getTime()) / (1000 * 60 * 60 * 24));
-        totalDays += days;
-        dealsWithHistory++;
-      }
-    });
-
-    const avgSalesVelocity = dealsWithHistory > 0 ? Math.round(totalDays / dealsWithHistory) : 0;
-
     return {
       outbound: outboundCount,
       meetings: meetingsCount,
@@ -79,7 +57,7 @@ export default function SalesFunnel() {
       closed: closedCount,
       overallConversion,
       avgDealSize,
-      avgSalesVelocity
+      avgSalesVelocity: 0 // This will be calculated separately
     };
   }, [activities]);
 

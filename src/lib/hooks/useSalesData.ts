@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { format, subMonths } from 'date-fns';
+import { useUser } from '@/lib/hooks/useUser';
 
 export interface SalesActivity {
   id: string;
@@ -15,14 +16,15 @@ export interface SalesActivity {
   date: string;
 }
 
-async function fetchSalesData(userId: string | undefined, startDate: Date, endDate: Date) {
-  if (!userId) return null;
+async function fetchSalesData(startDate: Date, endDate: Date) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
 
   // Get current month's activities
   const { data: currentActivities, error: currentError } = await supabase
     .from('activities')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', user.id)
     .gte('date', format(startDate, 'yyyy-MM-dd'))
     .lte('date', format(endDate, 'yyyy-MM-dd'))
     .order('date', { ascending: false });
@@ -36,7 +38,7 @@ async function fetchSalesData(userId: string | undefined, startDate: Date, endDa
   const { data: previousActivities, error: previousError } = await supabase
     .from('activities')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', user.id)
     .gte('date', format(previousMonthStart, 'yyyy-MM-dd'))
     .lte('date', format(previousMonthEnd, 'yyyy-MM-dd'));
 
@@ -48,11 +50,13 @@ async function fetchSalesData(userId: string | undefined, startDate: Date, endDa
   };
 }
 
-export function useSalesData(userId: string | undefined, startDate: Date, endDate: Date) {
+export function useSalesData(startDate: Date, endDate: Date) {
+  const { userData } = useUser();
+  
   return useQuery({
-    queryKey: ['salesData', userId, startDate, endDate],
-    queryFn: () => fetchSalesData(userId, startDate, endDate),
-    enabled: !!userId,
+    queryKey: ['salesData', userData?.id, startDate, endDate],
+    queryFn: () => fetchSalesData(startDate, endDate),
+    enabled: !!userData?.id,
   });
 }
 

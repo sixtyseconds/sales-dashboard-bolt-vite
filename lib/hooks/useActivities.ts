@@ -1,14 +1,21 @@
 import { create } from 'zustand';
 import { format, subDays } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
-const generateDummyData = () => {
+const generateDummyData = async () => {
   const activities = [];
   const companies = [
     'Tech Solutions', 'Global Systems', 'Innovate Inc', 'Digital Dynamics',
     'Future Corp', 'Smart Solutions', 'Cloud Nine', 'Peak Performance',
     'Elite Enterprises', 'Quantum Corp'
   ];
-  const salesRep = 'Sarah Johnson';
+  const { data: user } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('first_name, last_name')
+    .eq('id', user.id)
+    .single();
+  const salesRep = profile ? `${profile.first_name} ${profile.last_name}` : 'Unknown';
   const activityTypes = ['sale', 'outbound', 'meeting', 'proposal'];
   const priorities = ['high', 'medium', 'low'];
   const meetingTypes = ['Discovery Call', 'Product Demo', 'Follow-up'];

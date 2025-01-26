@@ -211,19 +211,30 @@ export function SalesTable() {
   const columns = useMemo(
     () => [
       {
-        accessorKey: 'sales_rep',
+        accessorKey: 'salesRep',
         header: 'Sales Rep',
         size: 200,
         cell: info => (
           <div className="flex items-center gap-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center">
-              <span className="text-xs sm:text-sm font-medium text-[#37bd7e]" suppressHydrationWarning>
-                {info.getValue()?.split(' ').map(n => n?.[0]).join('') || '??'}
-              </span>
+            <div 
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center group relative"
+              title={info.getValue() || 'Unknown'}
+            >
+              {info.row.original.avatar_url ? (
+                <img
+                  src={info.row.original.avatar_url}
+                  alt={info.getValue()}
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              ) : (
+                <span className="text-xs sm:text-sm font-medium text-[#37bd7e]" suppressHydrationWarning>
+                  {info.getValue()?.split(' ').map(n => n[0]).join('') || '??'}
+                </span>
+              )}
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900/95 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                {info.getValue() || 'Unknown'}
+              </div>
             </div>
-            <span className="text-sm sm:text-base text-white">
-              {info.getValue() || 'Unknown'}
-            </span>
           </div>
         ),
       },
