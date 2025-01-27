@@ -18,12 +18,11 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
   const [formData, setFormData] = useState({
-    clientName: '',
+    type: 'outbound',
+    client_name: '',
+    details: '',
     amount: '',
     saleType: 'one-off',
-    meetingType: 'discovery',
-    contactMethod: 'phone',
-    proposalValue: '',
     outboundCount: '1'
   });
 
@@ -37,64 +36,52 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   const { addActivity, addSale } = useActivities();
   const { userData } = useUser();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (selectedAction === 'sale') {
-      addSale({
-        clientName: formData.clientName,
-        amount: parseFloat(formData.amount),
-        saleType: formData.saleType as 'one-off' | 'subscription' | 'lifetime',
-        details: formData.saleType === 'subscription' 
-          ? `Subscription Sale - Monthly` 
-          : `${formData.saleType} Sale`,
-        date: selectedDate.toISOString()
+    try {
+      if (selectedAction === 'outbound') {
+        await addActivity({
+          type: 'outbound',
+          client_name: formData.client_name || 'Unknown',
+          details: formData.details,
+          quantity: parseInt(formData.outboundCount) || 1,
+          date: selectedDate.toISOString()
+        });
+      } else if (selectedAction === 'sale') {
+        const saleData = {
+          client_name: formData.client_name,
+          amount: parseFloat(formData.amount),
+          details: formData.details || `${formData.saleType} Sale`,
+          saleType: formData.saleType as 'one-off' | 'subscription' | 'lifetime',
+          date: selectedDate.toISOString()
+        };
+        
+        await addSale(saleData);
+      } else if (selectedAction) {
+        await addActivity({
+          type: selectedAction as 'meeting' | 'proposal',
+          client_name: formData.client_name,
+          details: formData.details,
+          amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
+          date: selectedDate.toISOString()
+        });
+      }
+      
+      // Reset form
+      setFormData({
+        type: 'outbound',
+        client_name: '',
+        details: '',
+        amount: '',
+        saleType: 'one-off',
+        outboundCount: '1'
       });
-    } else {
-      addActivity({
-        type: selectedAction,
-        clientName: formData.clientName,
-        details: selectedAction === 'meeting' 
-          ? formData.meetingType
-          : selectedAction === 'proposal'
-          ? `Proposal Value: £${formData.proposalValue}`
-          : formData.contactMethod || 'Phone Contact',
-        amount: selectedAction === 'proposal'
-          ? parseFloat(formData.proposalValue)
-          : null,
-        priority: 'medium',
-        date: selectedDate.toISOString()
-      });
+      setSelectedAction(null);
+      onClose();
+    } catch (error) {
+      toast.error('Failed to add activity');
     }
-
-    reloadPage();
-    onClose();
-    setSelectedAction(null);
-    setSelectedDate(new Date());
-    setFormData({
-      clientName: '',
-      amount: '',
-      saleType: 'one-off',
-      meetingType: 'discovery',
-      contactMethod: 'phone',
-      proposalValue: '',
-      outboundCount: '1'
-    });
-  };
-
-  const handleOutboundCall = () => {
-    const count = parseInt(formData.outboundCount) || 1;
-    addActivity({
-      type: 'outbound',
-      clientName: 'Quick Outbound',
-      details: 'Quick outbound call',
-      priority: 'low',
-      date: selectedDate.toISOString()
-    });
-    reloadPage();
-    onClose();
-    setSelectedDate(new Date());
-    setFormData(prev => ({ ...prev, outboundCount: '1' }));
   };
 
   const quickActions = [
@@ -182,13 +169,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                     }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      if (action.id === 'outbound') {
-                        handleOutboundCall();
-                      } else {
-                        setSelectedAction(action.id);
-                      }
-                    }}
+                    onClick={() => setSelectedAction(action.id)}
                     className={`flex flex-col items-center justify-center p-4 sm:p-6 rounded-xl ${
                       action.color === 'blue'
                         ? 'bg-blue-400/5'
@@ -263,127 +244,100 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                   </div>)}
                 </div>
 
-                {(selectedAction === 'sale' || selectedAction === 'outbound' || selectedAction === 'proposal') && (
-                  <>
+                {(selectedAction === 'sale' || selectedAction === 'meeting' || selectedAction === 'proposal') && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-400/90">
+                      {selectedAction === 'sale' ? 'Client Name' : 'Prospect Name'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                      value={formData.client_name}
+                      onChange={(e) => setFormData({...formData, client_name: e.target.value})}
+                    />
+                  </div>
+                )}
+                {selectedAction === 'sale' && <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-400/90">
+                    Sale Type
+                  </label>
+                  <select
+                    required
+                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                    value={formData.saleType}
+                    onChange={(e) => setFormData({...formData, saleType: e.target.value})}
+                  >
+                    <option value="one-off">One-off</option>
+                    <option value="subscription">Subscription</option>
+                    <option value="lifetime">Lifetime</option>
+                  </select>
+                </div>
+                }
+                {selectedAction === 'sale' && <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-400/90">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  />
+                </div>
+                }
+                {selectedAction === 'meeting' && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-400/90">
+                      Meeting Type
+                    </label>
+                    <select
+                      required
+                      className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                      value={formData.details}
+                      onChange={(e) => setFormData({...formData, details: e.target.value})}
+                    >
+                      <option value="discovery">Discovery</option>
+                      <option value="demo">Demo</option>
+                      <option value="follow-up">Follow-up</option>
+                    </select>
+                  </div>
+                )}
+                {selectedAction === 'proposal' && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-400/90">
+                      Proposal Value
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                    />
+                  </div>
+                )}
+                {selectedAction === 'outbound' && (
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-400/90">
-                        {selectedAction === 'sale' ? 'Client Name' : 'Prospect Name'}
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        value={formData.clientName}
-                        onChange={(e) => setFormData({...formData, clientName: e.target.value})}
-                      />
-                    </div>
-                    {selectedAction === 'sale' && <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-400/90">
-                        Sale Type
-                      </label>
-                      <select
-                        required
-                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        value={formData.saleType}
-                        onChange={(e) => setFormData({...formData, saleType: e.target.value})}
-                      >
-                        <option value="one-off">One-off</option>
-                        <option value="subscription">Subscription</option>
-                        <option value="lifetime">Lifetime</option>
-                      </select>
-                    </div>
-                    }
-                    {selectedAction === 'sale' && <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-400/90">
-                        Amount
+                        Number of Activities
                       </label>
                       <input
                         type="number"
                         required
-                        min="0"
-                        step="0.01"
+                        min="1"
                         className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        value={formData.amount}
-                        onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                        value={formData.outboundCount}
+                        onChange={(e) => setFormData({...formData, outboundCount: e.target.value})}
                       />
                     </div>
-                    }
-                    {selectedAction === 'outbound' && (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-400/90">
-                          Number of Calls
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          required
-                          value={formData.outboundCount}
-                          onChange={(e) => setFormData({...formData, outboundCount: e.target.value})}
-                          className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        />
-                        <label className="block text-sm font-medium text-gray-400/90">
-                          Contact Method
-                        </label>
-                        <select
-                          required
-                          className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                          value={formData.contactMethod}
-                          onChange={(e) => setFormData({...formData, contactMethod: e.target.value})}
-                        >
-                          <option value="phone">Phone</option>
-                          <option value="email">Email</option>
-                          <option value="linkedin">LinkedIn</option>
-                        </select>
-                      </div>
-                    )}
-                    {selectedAction === 'proposal' && (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-400/90">
-                          Proposal Value
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          step="0.01"
-                          className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                          value={formData.proposalValue}
-                          onChange={(e) => setFormData({...formData, proposalValue: e.target.value})}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-                {selectedAction === 'meeting' && (
-                  <>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-400/90">
-                        Prospect Name
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        value={formData.clientName}
-                        onChange={(e) => setFormData({...formData, clientName: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-400/90">
-                        Meeting Type
-                      </label>
-                      <select
-                        required
-                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
-                        value={formData.meetingType}
-                        onChange={(e) => setFormData({...formData, meetingType: e.target.value})}
-                      >
-                        <option value="discovery">Discovery</option>
-                        <option value="demo">Demo</option>
-                        <option value="follow-up">Follow-up</option>
-                      </select>
-                    </div>
-                  </>
+                  </div>
                 )}
 
                 <div className="flex justify-end gap-3 mt-6">

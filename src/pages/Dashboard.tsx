@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/lib/hooks/useUser';
 import { useTargets } from '@/lib/hooks/useTargets';
@@ -133,65 +133,136 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
   );
 };
 
+// Skeleton loader component for the dashboard
+function DashboardSkeleton() {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      {/* Header Skeleton */}
+      <div className="space-y-1 mt-12 lg:mt-0 mb-6 sm:mb-8">
+        <div className="h-9 w-64 bg-gray-800 rounded-lg" /> {/* Welcome back text */}
+        <div className="h-5 w-96 bg-gray-800 rounded-lg mt-2" /> {/* Month tracking text */}
+      </div>
+
+      {/* Metrics Grid - Matches the 2x2 layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50">
+            <div className="flex justify-between items-start mb-4">
+              <div className="h-6 w-32 bg-gray-800 rounded-lg" /> {/* Title */}
+              <div className="w-8 h-8 bg-gray-800 rounded-lg" /> {/* Icon */}
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-baseline gap-2">
+                <div className="h-8 w-32 bg-gray-800 rounded-lg" /> {/* Value */}
+                <div className="h-5 w-24 bg-gray-800 rounded-lg" /> {/* Target */}
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <div className="h-3 w-16 bg-gray-800 rounded-lg" /> {/* Progress text */}
+                  <div className="h-3 w-8 bg-gray-800 rounded-lg" /> {/* Percentage */}
+                </div>
+                <div className="h-2 w-full bg-gray-800/50 rounded-full" /> {/* Progress bar */}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sales Activity Chart Skeleton */}
+      <div className="mb-8">
+        <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50">
+          <div className="h-6 w-48 bg-gray-800 rounded-lg mb-4" /> {/* Chart title */}
+          <div className="h-[300px] bg-gray-800/50 rounded-lg" /> {/* Chart area */}
+        </div>
+      </div>
+
+      {/* Recent Deals Section Skeleton */}
+      <div className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-gray-800/50 mt-6 sm:mt-8">
+        <div className="flex justify-between items-center mb-6">
+          <div className="h-6 w-32 bg-gray-800 rounded-lg" /> {/* Section title */}
+          <div className="h-9 w-64 bg-gray-800 rounded-lg" /> {/* Search input */}
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-xl">
+              <div className="w-10 h-10 bg-gray-800 rounded-lg" /> {/* Deal icon */}
+              <div className="flex-1">
+                <div className="h-5 w-48 bg-gray-800 rounded-lg mb-1" /> {/* Deal title */}
+                <div className="h-4 w-32 bg-gray-800 rounded-lg" /> {/* Deal details */}
+              </div>
+              <div className="h-6 w-24 bg-gray-800 rounded-lg" /> {/* Deal amount */}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
+  // Move all hooks to the top
   const [searchQuery, setSearchQuery] = useState('');
+  const [showContent, setShowContent] = useState(false);
   const { userData } = useUser();
   const navigate = useNavigate();
-  const { activities } = useActivities();
+  const { activities, isLoadingActivities } = useActivities();
+  const { data: targets, isLoadingSales } = useTargets(userData?.id);
 
   const currentMonth = useMemo(() => ({
     start: startOfMonth(new Date()),
     end: new Date(),
   }), []);
 
-  // Filter activities for current month and calculate metrics
-  const currentMonthActivities = useMemo(() => 
-    activities.filter(activity => {
-      const activityDate = new Date(activity.date);
-      return activityDate >= currentMonth.start && activityDate <= currentMonth.end;
-    }), [activities, currentMonth]);
-
-  // Get previous month's activities for trend calculation
   const previousMonth = useMemo(() => ({
     start: startOfMonth(subMonths(new Date(), 1)),
     end: subMonths(new Date(), 1),
   }), []);
 
+  // Filter activities for current month and calculate metrics
+  const currentMonthActivities = useMemo(() => 
+    activities?.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate >= currentMonth.start && activityDate <= currentMonth.end;
+    }) || [], [activities, currentMonth]);
+
+  // Get previous month's activities for trend calculation
   const previousMonthActivities = useMemo(() => 
-    activities.filter(activity => {
+    activities?.filter(activity => {
       const activityDate = new Date(activity.date);
       return activityDate >= previousMonth.start && activityDate <= previousMonth.end;
-    }), [activities, previousMonth]);
-
-  const { data: targets } = useTargets(userData?.id);
-
-  if (!targets) return null;
+    }) || [], [activities, previousMonth]);
 
   // Calculate metrics for current month
-  const metrics = {
+  const metrics = useMemo(() => ({
     revenue: currentMonthActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0),
     outbound: currentMonthActivities
-      .filter(a => a.type === 'outbound').length,
+      .filter(a => a.type === 'outbound')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
     meetings: currentMonthActivities
-      .filter(a => a.type === 'meeting').length,
+      .filter(a => a.type === 'meeting')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
     proposals: currentMonthActivities
-      .filter(a => a.type === 'proposal').length
-  };
+      .filter(a => a.type === 'proposal')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0)
+  }), [currentMonthActivities]);
 
   // Calculate metrics for previous month
-  const previousMetrics = {
+  const previousMetrics = useMemo(() => ({
     revenue: previousMonthActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0),
     outbound: previousMonthActivities
-      .filter(a => a.type === 'outbound').length,
+      .filter(a => a.type === 'outbound')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
     meetings: previousMonthActivities
-      .filter(a => a.type === 'meeting').length,
+      .filter(a => a.type === 'meeting')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
     proposals: previousMonthActivities
-      .filter(a => a.type === 'proposal').length
-  };
+      .filter(a => a.type === 'proposal')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0)
+  }), [previousMonthActivities]);
 
   // Calculate trends
   const calculateTrend = (current: number, previous: number) => {
@@ -199,20 +270,49 @@ export default function Dashboard() {
     return Math.round(((current - previous) / previous) * 100);
   };
 
-  const trends = {
+  const trends = useMemo(() => ({
     revenue: calculateTrend(metrics.revenue, previousMetrics.revenue),
     outbound: calculateTrend(metrics.outbound, previousMetrics.outbound),
     meetings: calculateTrend(metrics.meetings, previousMetrics.meetings),
     proposals: calculateTrend(metrics.proposals, previousMetrics.proposals)
-  };
+  }), [metrics, previousMetrics]);
 
   // Filter deals based on search query
-  const filteredDeals = currentMonthActivities.filter(activity => 
-    activity.type === 'sale' &&
-    (activity.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     activity.amount?.toString().includes(searchQuery) ||
-     activity.details?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredDeals = useMemo(() => 
+    currentMonthActivities.filter(activity => 
+      activity.type === 'sale' &&
+      (activity.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+       activity.amount?.toString().includes(searchQuery) ||
+       activity.details?.toLowerCase().includes(searchQuery.toLowerCase()))
+    ), [currentMonthActivities, searchQuery]);
+
+  // Check if any data is loading
+  const isAnyLoading = isLoadingActivities || isLoadingSales || !userData;
+
+  // Use effect to handle stable loading state
+  useEffect(() => {
+    let timeout: number;
+    if (!isAnyLoading && !showContent) {
+      timeout = window.setTimeout(() => {
+        setShowContent(true);
+      }, 500);
+    }
+    return () => {
+      if (timeout) {
+        window.clearTimeout(timeout);
+      }
+    };
+  }, [isAnyLoading]);
+
+  // Early return for loading state
+  if (!showContent) {
+    return <DashboardSkeleton />;
+  }
+
+  // Early return for missing data
+  if (!targets) {
+    return null;
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">

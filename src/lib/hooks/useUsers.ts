@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
+import { supabase, supabaseAdmin } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 export interface User {
@@ -71,6 +71,57 @@ async function impersonateUser(userId: string) {
   toast.success('Impersonation not implemented in demo');
 }
 
+async function deleteUser(userId: string) {
+  try {
+    // Delete user's activities
+    const { error: activitiesError } = await supabase
+      .from('activities')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (activitiesError) {
+      console.error('Error deleting activities:', activitiesError);
+      throw activitiesError;
+    }
+
+    // Delete user's targets
+    const { error: targetsError } = await supabase
+      .from('targets')
+      .delete()
+      .eq('user_id', userId);
+    
+    if (targetsError) {
+      console.error('Error deleting targets:', targetsError);
+      throw targetsError;
+    }
+
+    // Delete user's profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+    
+    if (profileError) {
+      console.error('Error deleting profile:', profileError);
+      throw profileError;
+    }
+
+    // Delete auth user using admin client
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      console.error('Error deleting auth user:', authError);
+      throw authError;
+    }
+    
+    toast.success('User deleted successfully');
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    toast.error('Failed to delete user');
+    throw error;
+  }
+}
+
 export function useUsers() {
   const queryClient = useQueryClient();
 
@@ -92,6 +143,17 @@ export function useUsers() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: deleteUser,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete user');
+      console.error('Delete error:', error);
+    },
+  });
+
   const impersonateUserMutation = useMutation({
     mutationFn: impersonateUser,
     onSuccess: () => {
@@ -108,6 +170,7 @@ export function useUsers() {
     isLoading,
     updateUser: (userId: string, updates: any) =>
       updateUserMutation.mutate({ userId, updates }),
-    impersonateUser: impersonateUserMutation.mutate,
+    deleteUser: (userId: string) => deleteUserMutation.mutate(userId),
+    impersonateUser: (userId: string) => impersonateUserMutation.mutate(userId),
   };
 }

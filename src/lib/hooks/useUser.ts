@@ -99,30 +99,45 @@ export function useUser() {
   const [isImpersonating, setIsImpersonating] = useState(false);
 
   useEffect(() => {
+    console.log('Setting up auth listener...');
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
       setIsImpersonating(!!localStorage.getItem('originalUserId'));
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', { event, userId: session?.user?.id });
       setUser(session?.user ?? null);
       setIsImpersonating(!!localStorage.getItem('originalUserId'));
     });
 
     return () => {
+      console.log('Cleaning up auth listener');
       subscription.unsubscribe();
     };
   }, []);
 
   useEffect(() => {
     if (user) {
+      console.log('Fetching user profile for:', user.id);
       fetchUserProfile(user)
-        .then(setUserData)
-        .catch(setError)
-        .finally(() => setLoading(false));
+        .then(data => {
+          console.log('User profile loaded:', data?.id);
+          setUserData(data);
+        })
+        .catch(error => {
+          console.error('Error loading user profile:', error);
+          setError(error);
+        })
+        .finally(() => {
+          console.log('Finished loading user profile');
+          setLoading(false);
+        });
     } else {
+      console.log('No user, clearing user data');
       setUserData(null);
       setLoading(false);
     }

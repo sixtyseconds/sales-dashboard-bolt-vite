@@ -211,96 +211,108 @@ export function SalesTable() {
   const columns = useMemo(
     () => [
       {
-        accessorKey: 'salesRep',
+        accessorKey: 'sales_rep',
         header: 'Sales Rep',
         size: 200,
-        cell: info => (
-          <div className="flex items-center gap-3">
-            <div 
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center group relative"
-              title={info.getValue() || 'Unknown'}
-            >
-              {info.row.original.avatar_url ? (
-                <img
-                  src={info.row.original.avatar_url}
-                  alt={info.getValue()}
-                  className="w-full h-full object-cover rounded-lg"
-                />
-              ) : (
-                <span className="text-xs sm:text-sm font-medium text-[#37bd7e]" suppressHydrationWarning>
-                  {info.getValue()?.split(' ').map(n => n[0]).join('') || '??'}
+        cell: info => {
+          const salesRep = info.getValue();
+          const initials = salesRep?.split(' ').map(n => n[0]).join('');
+          
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center">
+                <span className="text-xs sm:text-sm font-medium text-[#37bd7e]">
+                  {initials || '??'}
                 </span>
-              )}
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900/95 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                {info.getValue() || 'Unknown'}
               </div>
+              <span className="text-sm sm:text-base text-white">
+                {salesRep || 'Loading...'}
+              </span>
             </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         accessorKey: 'type',
         header: 'Activity Type',
-        cell: ({ row, getValue }) => (
-          <div 
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => handleRowClick(row.original.id)}
-          >
-            <div className={`p-1.5 sm:p-2 rounded-lg ${
-              getActivityColor(getValue()) === 'blue'
-                ? 'bg-blue-400/5'
-                : getActivityColor(getValue()) === 'orange'
-                  ? 'bg-orange-500/10'
-                  : `bg-${getActivityColor(getValue())}-500/10`
-            } border ${
-              getActivityColor(getValue()) === 'blue' 
-                ? 'border-blue-500/10'
-                : getActivityColor(getValue()) === 'orange'
-                  ? 'border-orange-500/20'
-                  : `border-${getActivityColor(getValue())}-500/20`
-            }`}>
-              {React.createElement(getActivityIcon(getValue()), {
-                className: `w-4 h-4 ${
-                  getActivityColor(getValue()) === 'blue'
-                    ? 'text-blue-400'
-                    : getActivityColor(getValue()) === 'orange'
-                      ? 'text-orange-500'
-                      : `text-${getActivityColor(getValue())}-500`
-                }`
-              })}
-            </div>
-            <div>
-              <div className="text-sm font-medium text-white capitalize">{getValue()}</div>
-              <div className="text-[10px] text-gray-400">{format(new Date(row.original.date), 'MMM d')}</div>
-            </div>
-            {row.original.amount && (
-              <div className="ml-auto text-sm font-medium text-emerald-500">
-                £{row.original.amount.toLocaleString()}
+        cell: ({ row, getValue }) => {
+          const quantity = row.original.quantity || 1;
+          return (
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => handleRowClick(row.original.id)}
+            >
+              <div className={`p-1.5 sm:p-2 rounded-lg ${
+                getActivityColor(getValue()) === 'blue'
+                  ? 'bg-blue-400/5'
+                  : getActivityColor(getValue()) === 'orange'
+                    ? 'bg-orange-500/10'
+                    : `bg-${getActivityColor(getValue())}-500/10`
+              } border ${
+                getActivityColor(getValue()) === 'blue' 
+                  ? 'border-blue-500/10'
+                  : getActivityColor(getValue()) === 'orange'
+                    ? 'border-orange-500/20'
+                    : `border-${getActivityColor(getValue())}-500/20`
+              }`}>
+                {React.createElement(getActivityIcon(getValue()), {
+                  className: `w-4 h-4 ${
+                    getActivityColor(getValue()) === 'blue'
+                      ? 'text-blue-400'
+                      : getActivityColor(getValue()) === 'orange'
+                        ? 'text-orange-500'
+                        : `text-${getActivityColor(getValue())}-500`
+                  }`
+                })}
               </div>
-            )}
-            {expandedRow === row.original.id && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="absolute left-0 right-0 top-full bg-gray-800/90 backdrop-blur-sm p-4 rounded-lg border border-gray-700/50 shadow-xl z-10 space-y-3"
-              >
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-400">Client</span>
-                  <span className="text-sm text-white">{row.original.client_name}</span>
+              <div>
+                <div className="text-sm font-medium text-white capitalize">
+                  {getValue()}
+                  {getValue() === 'outbound' && quantity > 1 && (
+                    <span className="ml-2 text-xs text-blue-400">×{quantity}</span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-400">Details</span>
-                  <span className="text-sm text-white">{row.original.details}</span>
+                <div className="text-[10px] text-gray-400">{format(new Date(row.original.date), 'MMM d')}</div>
+              </div>
+              {row.original.amount && (
+                <div className="ml-auto text-sm font-medium text-emerald-500">
+                  £{row.original.amount.toLocaleString()}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-400">Date</span>
-                  <span className="text-sm text-white">{format(new Date(row.original.date), 'MMM d, yyyy')}</span>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        ),
+              )}
+              {expandedRow === row.original.id && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="absolute left-0 right-0 top-full bg-gray-800/90 backdrop-blur-sm p-4 rounded-lg border border-gray-700/50 shadow-xl z-50 space-y-3"
+                >
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-400">Client</span>
+                    <span className="text-sm text-white">{row.original.clientName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-400">Sales Rep</span>
+                    <span className="text-sm text-white">{row.original.salesRep}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-400">Details</span>
+                    <span className="text-sm text-white">{row.original.details}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-400">Date</span>
+                    <span className="text-sm text-white">{format(new Date(row.original.date), 'MMM d, yyyy')}</span>
+                  </div>
+                  {row.original.quantity > 1 && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-400">Quantity</span>
+                      <span className="text-sm text-white">{row.original.quantity}</span>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'client_name',
@@ -375,7 +387,7 @@ export function SalesTable() {
                     <label className="text-sm font-medium text-gray-400">Client Name</label>
                     <input
                       type="text"
-                      defaultValue={info.row.original.client_name}
+                      defaultValue={info.row.original.clientName}
                       className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
                     />
                   </div>
@@ -592,7 +604,7 @@ export function SalesTable() {
                         onChange={(e) => setFilters({ salesRep: e.target.value === 'all' ? undefined : e.target.value })}
                       >
                         <option value="all">All Sales Reps</option>
-                        {Array.from(new Set(activities.map(a => a.sales_rep))).sort().map(rep => (
+                        {Array.from(new Set(activities.map(a => a.salesRep))).sort().map(rep => (
                           <option key={rep} value={rep}>{rep}</option>
                         ))}
                       </select>

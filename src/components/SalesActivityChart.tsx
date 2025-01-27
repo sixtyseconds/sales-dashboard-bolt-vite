@@ -37,10 +37,18 @@ const SalesActivityChart = () => {
         
         return {
           name: format(date, 'MMM d'),
-          Outbound: dayActivities.filter(a => a.type === 'outbound').length || 0.1,
-          Meetings: dayActivities.filter(a => a.type === 'meeting').length || 0.1,
-          Proposals: dayActivities.filter(a => a.type === 'proposal').length || 0.1,
-          Sales: dayActivities.filter(a => a.type === 'sale').length || 0.1,
+          Outbound: dayActivities
+            .filter(a => a.type === 'outbound')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Meetings: dayActivities
+            .filter(a => a.type === 'meeting')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Proposals: dayActivities
+            .filter(a => a.type === 'proposal')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Sales: dayActivities
+            .filter(a => a.type === 'sale')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
         };
       }).reverse();
       return data;
@@ -63,10 +71,18 @@ const SalesActivityChart = () => {
         
         return {
           name: `WC ${format(date, 'MMM d')}`,
-          Outbound: weekActivities.filter(a => a.type === 'outbound').length || 0.1,
-          Meetings: weekActivities.filter(a => a.type === 'meeting').length || 0.1,
-          Proposals: weekActivities.filter(a => a.type === 'proposal').length || 0.1,
-          Sales: weekActivities.filter(a => a.type === 'sale').length || 0.1,
+          Outbound: weekActivities
+            .filter(a => a.type === 'outbound')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Meetings: weekActivities
+            .filter(a => a.type === 'meeting')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Proposals: weekActivities
+            .filter(a => a.type === 'proposal')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+          Sales: weekActivities
+            .filter(a => a.type === 'sale')
+            .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
         };
       }).reverse();
       return data;
@@ -87,10 +103,18 @@ const SalesActivityChart = () => {
       
       data.push({
         name: format(date, 'MMM'),
-        Outbound: monthActivities.filter(a => a.type === 'outbound').length || 0.1,
-        Meetings: monthActivities.filter(a => a.type === 'meeting').length || 0.1,
-        Proposals: monthActivities.filter(a => a.type === 'proposal').length || 0.1,
-        Sales: monthActivities.filter(a => a.type === 'sale').length || 0.1,
+        Outbound: monthActivities
+          .filter(a => a.type === 'outbound')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+        Meetings: monthActivities
+          .filter(a => a.type === 'meeting')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+        Proposals: monthActivities
+          .filter(a => a.type === 'proposal')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
+        Sales: monthActivities
+          .filter(a => a.type === 'sale')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
       });
     }
     return data;

@@ -107,13 +107,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => toggleMobileMenu()}
             />
             <motion.div
-              initial={{ x: '-100%' }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="fixed top-0 left-0 bottom-0 w-[280px] bg-gray-900/95 backdrop-blur-xl border-r border-gray-800/50 z-50 lg:hidden"
+              className="fixed right-0 top-0 bottom-0 w-full max-w-[280px] bg-gray-900/50 backdrop-blur-xl border-l border-gray-800/50 p-6 z-50 lg:hidden"
             >
-              <div className="p-6">
+              <div className="relative h-full">
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg overflow-hidden">
@@ -233,7 +233,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <AnimatePresence>
                 <motion.div
                   initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
+                  animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}
                   className="overflow-hidden"
                 >

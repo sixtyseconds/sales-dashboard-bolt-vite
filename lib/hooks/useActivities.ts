@@ -29,7 +29,7 @@ const generateDummyData = async () => {
     activities.push({
       id: `dec-${i}-${Math.random()}`,
       type,
-      clientName: companies[Math.floor(Math.random() * companies.length)],
+      clientName: type === 'outbound' ? undefined : companies[Math.floor(Math.random() * companies.length)],
       date: format(date, 'yyyy-MM-dd'),
       salesRep,
       amount: type === 'sale' ? Math.floor(Math.random() * 50000) + 5000 : 
@@ -39,7 +39,8 @@ const generateDummyData = async () => {
                type === 'outbound' ? contactMethods[Math.floor(Math.random() * contactMethods.length)] :
                type === 'proposal' ? `Proposal Value: £${Math.floor(Math.random() * 75000) + 10000}` :
                'Closed Won',
-      priority: priorities[Math.floor(Math.random() * priorities.length)]
+      priority: priorities[Math.floor(Math.random() * priorities.length)],
+      quantity: type === 'outbound' ? Math.floor(Math.random() * 30) + 10 : 1  // 10-40 for outbound, 1 for others
     });
   }
 
@@ -51,7 +52,7 @@ const generateDummyData = async () => {
     activities.push({
       id: `jan-${i}-${Math.random()}`,
       type,
-      clientName: companies[Math.floor(Math.random() * companies.length)],
+      clientName: type === 'outbound' ? undefined : companies[Math.floor(Math.random() * companies.length)],
       date: format(date, 'yyyy-MM-dd'),
       salesRep,
       amount: type === 'sale' ? Math.floor(Math.random() * 50000) + 5000 : 
@@ -61,7 +62,8 @@ const generateDummyData = async () => {
                type === 'outbound' ? contactMethods[Math.floor(Math.random() * contactMethods.length)] :
                type === 'proposal' ? `Proposal Value: £${Math.floor(Math.random() * 75000) + 10000}` :
                'Closed Won',
-      priority: priorities[Math.floor(Math.random() * priorities.length)]
+      priority: priorities[Math.floor(Math.random() * priorities.length)],
+      quantity: type === 'outbound' ? Math.floor(Math.random() * 30) + 10 : 1  // 10-40 for outbound, 1 for others
     });
   }
 
@@ -71,9 +73,10 @@ const generateDummyData = async () => {
 export interface Activity {
   id: string;
   type: 'sale' | 'outbound' | 'meeting' | 'proposal';
-  clientName: string;
+  clientName?: string;
   date: string;
   amount?: number;
+  quantity: number;
   salesRep: string;
   status: 'completed' | 'pending' | 'cancelled';
   details: string;
@@ -82,7 +85,14 @@ export interface Activity {
 
 interface ActivitiesStore {
   activities: Activity[];
-  addActivity: (activity: Omit<Activity, 'id' | 'date' | 'status'>) => void;
+  addActivity: (activity: {
+    type: Activity['type'];
+    details: string;
+    priority: Activity['priority'];
+    amount?: number;
+    clientName?: string;
+    salesRep: string;
+  }) => void;
   removeActivity: (id: string) => void;
   updateActivity: (id: string, updates: Partial<Activity>) => void;
 }
@@ -96,7 +106,9 @@ export const useActivities = create<ActivitiesStore>((set) => ({
           ...activity,
           id: Math.random().toString(36).substr(2, 9),
           date: format(new Date(), 'yyyy-MM-dd'),
-          status: 'completed'
+          status: 'completed',
+          quantity: activity.type === 'outbound' ? 20 : 1,
+          clientName: activity.type === 'outbound' ? 'Outbound Activity' : activity.clientName || 'Unknown'
         },
         ...state.activities
       ]

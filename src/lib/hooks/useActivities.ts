@@ -16,6 +16,7 @@ export interface Activity {
   status: 'completed' | 'pending' | 'cancelled';
   details: string;
   priority: 'high' | 'medium' | 'low';
+  quantity?: number;
 }
 
 async function fetchActivities() {
@@ -28,22 +29,19 @@ async function fetchActivities() {
     .eq('user_id', user.id)
     .order('date', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching activities:', error);
-    throw error;
-  }
+  if (error) throw error;
 
-  // Ensure we only return activities that belong to the current user
   return data?.filter(activity => activity.user_id === user.id) || [];
 }
 
 async function createActivity(activity: { 
   type: Activity['type'];
-  clientName: string;
+  client_name: string;
   details?: string;
   amount?: number;
   priority?: Activity['priority'];
   date?: string;
+  quantity?: number;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -61,27 +59,96 @@ async function createActivity(activity: {
     .insert({
       user_id: user.id,
       type: activity.type,
-      client_name: activity.clientName,
+      client_name: activity.client_name,
       details: activity.details || '',
       amount: activity.amount,
       priority: activity.priority || 'medium',
       sales_rep: `${profile.first_name} ${profile.last_name}`,
       date: activity.date || new Date().toISOString(),
-      status: 'completed'
+      status: 'completed',
+      quantity: activity.quantity || 1
     })
     .select()
     .single();
 
-  if (error) {
-    console.error('Activity creation failed:', error);
-    throw error;
-  }
+  if (error) throw error;
 
   return data;
 }
 
+function fireConfetti() {
+  const count = 200;
+  const defaults = {
+    origin: { y: 0.7 },
+    spread: 90,
+    ticks: 400,
+    gravity: 1.2,
+    decay: 0.94,
+    startVelocity: 45,
+    colors: ['#37bd7e', '#34D399', '#6EE7B7', '#059669', '#047857']
+  };
+
+  function fire(particleRatio: number, opts: any) {
+    confetti({
+      ...defaults,
+      ...opts,
+      particleCount: Math.floor(count * particleRatio)
+    });
+  }
+
+  // Left side burst
+  fire(0.25, {
+    spread: 26,
+    startVelocity: 55,
+    origin: { x: 0.2, y: 0.9 }
+  });
+
+  // Right side burst
+  fire(0.25, {
+    spread: 26,
+    startVelocity: 55,
+    origin: { x: 0.8, y: 0.9 }
+  });
+
+  // Center burst
+  fire(0.35, {
+    spread: 100,
+    decay: 0.91,
+    origin: { x: 0.5, y: 0.8 }
+  });
+
+  // Delayed follow-up bursts
+  setTimeout(() => {
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 25,
+      decay: 0.92,
+      origin: { x: 0.3, y: 0.8 }
+    });
+  }, 200);
+
+  setTimeout(() => {
+    fire(0.1, {
+      spread: 120,
+      startVelocity: 25,
+      decay: 0.92,
+      origin: { x: 0.7, y: 0.8 }
+    });
+  }, 200);
+
+  // Final celebratory burst
+  setTimeout(() => {
+    fire(0.2, {
+      spread: 150,
+      startVelocity: 45,
+      decay: 0.91,
+      origin: { x: 0.5, y: 0.9 }
+    });
+  }, 400);
+}
+
 async function createSale(sale: { 
-  clientName: string;
+  client_name: string;
   amount: number;
   details?: string;
   saleType: 'one-off' | 'subscription' | 'lifetime';
@@ -98,26 +165,26 @@ async function createSale(sale: {
 
   if (!profile) throw new Error('User profile not found');
 
+  const activityData = {
+    user_id: user.id,
+    type: 'sale',
+    client_name: sale.client_name,
+    details: sale.details || `${sale.saleType} Sale`,
+    amount: sale.amount,
+    priority: 'high',
+    sales_rep: `${profile.first_name} ${profile.last_name}`,
+    date: sale.date || new Date().toISOString(),
+    status: 'completed'
+  };
+
   const { data, error } = await supabase
     .from('activities')
-    .insert({
-      user_id: user.id,
-      type: 'sale',
-      client_name: sale.clientName,
-      details: sale.details || `${sale.saleType} Sale`,
-      amount: sale.amount,
-      priority: 'high',
-      sales_rep: `${profile.first_name} ${profile.last_name}`,
-      date: sale.date || new Date().toISOString(),
-      status: 'completed'
-    })
+    .insert(activityData)
     .select()
     .single();
 
-  if (error) {
-    console.error('Sale creation failed:', error);
-    throw error;
-  }
+  if (error) throw error;
+  if (!data) throw new Error('Failed to create sale');
 
   return data;
 }
@@ -203,24 +270,15 @@ export function useActivities() {
   // Add sale mutation with error handling and confetti
   const addSaleMutation = useMutation({
     mutationFn: createSale,
-    onSuccess: () => {
-      // Invalidate all relevant queries
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['activities'] });
       queryClient.invalidateQueries({ queryKey: ['salesData'] });
       queryClient.invalidateQueries({ queryKey: ['targets'] });
       toast.success('Sale added successfully! 🎉');
-      
-      // Trigger confetti animation
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#10B981', '#34D399', '#6EE7B7']
-      });
+      fireConfetti();
     },
     onError: (error: Error) => {
-      toast.error(error.message);
-      console.error('Failed to add sale:', error);
+      toast.error(`Failed to add sale: ${error.message}`);
     },
   });
 
@@ -229,7 +287,6 @@ export function useActivities() {
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Activity> }) =>
       updateActivity(id, updates),
     onSuccess: () => {
-      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
       queryClient.invalidateQueries({ queryKey: ['salesData'] });
       queryClient.invalidateQueries({ queryKey: ['targets'] });
@@ -237,7 +294,6 @@ export function useActivities() {
     },
     onError: (error: Error) => {
       toast.error('Failed to update activity');
-      console.error('Failed to update activity:', error);
     },
   });
 
@@ -245,7 +301,6 @@ export function useActivities() {
   const removeActivityMutation = useMutation({
     mutationFn: deleteActivity,
     onSuccess: () => {
-      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ['activities'] });
       queryClient.invalidateQueries({ queryKey: ['salesData'] });
       queryClient.invalidateQueries({ queryKey: ['targets'] });
@@ -253,7 +308,6 @@ export function useActivities() {
     },
     onError: (error: Error) => {
       toast.error('Failed to delete activity');
-      console.error('Failed to delete activity:', error);
     },
   });
 

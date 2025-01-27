@@ -34,10 +34,18 @@ export default function Heatmap() {
       format(new Date(a.date), 'yyyy-MM-dd') === dateStr
     );
 
-    const outboundCalls = dayActivities.filter(a => a.type === 'outbound').length;
-    const meetings = dayActivities.filter(a => a.type === 'meeting').length;
-    const proposals = dayActivities.filter(a => a.type === 'proposal').length;
-    const deals = dayActivities.filter(a => a.type === 'sale').length;
+    const outboundCalls = dayActivities
+      .filter(a => a.type === 'outbound')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0);
+    const meetings = dayActivities
+      .filter(a => a.type === 'meeting')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0);
+    const proposals = dayActivities
+      .filter(a => a.type === 'proposal')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0);
+    const deals = dayActivities
+      .filter(a => a.type === 'sale')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0);
 
     return {
       points: outboundCalls * 1 + meetings * 5 + proposals * 10 + deals * 20,

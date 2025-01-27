@@ -16,10 +16,22 @@ import {
   UserPlus,
   Star,
   Target,
-  UserCheck
+  UserCheck,
+  Trash2
 } from 'lucide-react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
 
@@ -28,7 +40,7 @@ export default function Users() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStage, setSelectedStage] = useState('all');
   const [editingUser, setEditingUser] = useState(null);
-  const { users, updateUser, impersonateUser } = useUsers();
+  const { users, updateUser, impersonateUser, deleteUser } = useUsers();
   const navigate = useNavigate();
 
   const filteredUsers = useMemo(() => {
@@ -307,6 +319,33 @@ export default function Users() {
                         >
                           <Edit2 className="w-4 h-4 text-[#37bd7e]" />
                         </button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <button
+                              className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-gray-900/95 backdrop-blur-xl border border-gray-800/50">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete User</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {user.first_name} {user.last_name}? This action cannot be undone.
+                                All their activities and targets will also be deleted.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="bg-gray-800/50 text-gray-300 hover:bg-gray-800">Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteUser(user.id)}
+                                className="bg-red-500 hover:bg-red-600"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </td>
                   </tr>
