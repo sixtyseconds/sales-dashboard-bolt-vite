@@ -22,7 +22,10 @@ interface MetricCardProps {
   title: string;
   value: number;
   target: number;
-  trend: number;
+  trend: {
+    periodToDate: number;
+    fullMonth: number;
+  };
   icon: React.ElementType;
   type?: string;
   dateRange: {
@@ -73,9 +76,9 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={handleClick}
-      className="relative overflow-hidden bg-gradient-to-br from-gray-900/80 to-gray-900/40 backdrop-blur-xl rounded-3xl p-6 border border-gray-800/50"
+      className="relative overflow-visible bg-gradient-to-br from-gray-900/80 to-gray-900/40 backdrop-blur-xl rounded-3xl p-6 border border-gray-800/50"
     >
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 overflow-visible">
         <div className="flex items-center gap-3">
           <div className={`p-2.5 rounded-xl ${
             title === 'Outbound'
@@ -93,11 +96,84 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
             <span className="text-xs text-gray-500">This month</span>
           </div>
         </div>
-        <div className={`px-2.5 py-1 rounded-full text-xs font-medium 
-          ${trend >= 0 
-            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-            : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-          {trend >= 0 ? '+' : ''}{trend}%
+        <div className="flex items-center gap-3 overflow-visible">
+          <div className="flex items-center gap-1.5 overflow-visible">
+            {/* Period to Date Trend */}
+            <div className="group relative overflow-visible">
+              <div className={cn(
+                "h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200",
+                trend.periodToDate >= 0 
+                  ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" 
+                  : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+              )}>
+                <motion.svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  initial={{ rotate: trend.periodToDate >= 0 ? -45 : 135 }}
+                  animate={{ rotate: trend.periodToDate >= 0 ? 0 : 180 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </motion.svg>
+              </div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-[100] w-max">
+                <div className={cn(
+                  "opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:-translate-y-1",
+                  "bg-gray-900/95 backdrop-blur-xl border border-gray-800/50 rounded-lg px-3 py-2",
+                  "text-xs font-medium shadow-xl",
+                  "whitespace-nowrap"
+                )}>
+                  <div className="text-gray-400 mb-0.5">vs this time last month</div>
+                  <div className={cn(
+                    "font-bold",
+                    trend.periodToDate >= 0 ? "text-emerald-500" : "text-red-500"
+                  )}>
+                    {trend.periodToDate >= 0 ? '+' : ''}{trend.periodToDate}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Full Month Trend */}
+            <div className="group relative overflow-visible">
+              <div className={cn(
+                "h-8 w-8 rounded-lg flex items-center justify-center transition-all duration-200",
+                trend.fullMonth >= 0 
+                  ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20" 
+                  : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+              )}>
+                <motion.svg
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  initial={{ rotate: trend.fullMonth >= 0 ? -45 : 135 }}
+                  animate={{ rotate: trend.fullMonth >= 0 ? 0 : 180 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 10 }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                </motion.svg>
+              </div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none z-[100] w-max">
+                <div className={cn(
+                  "opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:-translate-y-1",
+                  "bg-gray-900/95 backdrop-blur-xl border border-gray-800/50 rounded-lg px-3 py-2",
+                  "text-xs font-medium shadow-xl",
+                  "whitespace-nowrap"
+                )}>
+                  <div className="text-gray-400 mb-0.5">vs last month's total</div>
+                  <div className={cn(
+                    "font-bold",
+                    trend.fullMonth >= 0 ? "text-emerald-500" : "text-red-500"
+                  )}>
+                    {trend.fullMonth >= 0 ? '+' : ''}{trend.fullMonth}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -221,18 +297,37 @@ export default function Dashboard() {
     end: endOfMonth(subMonths(selectedMonth, 1)),
   }), [selectedMonth]);
 
-  // Filter activities for selected month and calculate metrics
+  // Get current date to calculate progress up to this point
+  const currentDate = useMemo(() => new Date(), []);
+  
+  // Filter activities for selected month up to current date
   const selectedMonthActivities = useMemo(() => 
     activities?.filter(activity => {
       const activityDate = new Date(activity.date);
-      return activityDate >= selectedMonthRange.start && activityDate <= selectedMonthRange.end;
-    }) || [], [activities, selectedMonthRange]);
+      return activityDate >= selectedMonthRange.start && 
+             activityDate <= selectedMonthRange.end &&
+             activityDate <= currentDate;
+    }) || [], [activities, selectedMonthRange, currentDate]);
 
-  // Get previous month's activities for trend calculation
+  // Get previous month's activities up to the same day of month
   const previousMonthActivities = useMemo(() => 
     activities?.filter(activity => {
       const activityDate = new Date(activity.date);
-      return activityDate >= previousMonthRange.start && activityDate <= previousMonthRange.end;
+      const previousMonthSameDay = new Date(
+        previousMonthRange.start.getFullYear(),
+        previousMonthRange.start.getMonth(),
+        currentDate.getDate()
+      );
+      return activityDate >= previousMonthRange.start && 
+             activityDate <= previousMonthSameDay;
+    }) || [], [activities, previousMonthRange, currentDate]);
+
+  // Get all activities from previous month (for full month comparison)
+  const previousMonthFullActivities = useMemo(() => 
+    activities?.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return activityDate >= previousMonthRange.start && 
+             activityDate <= previousMonthRange.end;
     }) || [], [activities, previousMonthRange]);
 
   // Calculate metrics for selected month
@@ -267,18 +362,49 @@ export default function Dashboard() {
       .reduce((sum, a) => sum + (a.quantity || 1), 0)
   }), [previousMonthActivities]);
 
+  // Calculate full month metrics
+  const previousMonthFullMetrics = useMemo(() => ({
+    revenue: previousMonthFullActivities
+      .filter(a => a.type === 'sale')
+      .reduce((sum, a) => sum + (a.amount || 0), 0),
+    outbound: previousMonthFullActivities
+      .filter(a => a.type === 'outbound')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
+    meetings: previousMonthFullActivities
+      .filter(a => a.type === 'meeting')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0),
+    proposals: previousMonthFullActivities
+      .filter(a => a.type === 'proposal')
+      .reduce((sum, a) => sum + (a.quantity || 1), 0)
+  }), [previousMonthFullActivities]);
+
   // Calculate trends
   const calculateTrend = (current: number, previous: number) => {
-    if (previous === 0) return 0;
+    if (previous === 0 && current > 0) return 100;
+    if (current === 0 && previous > 0) return -100;
+    if (previous === 0 && current === 0) return 0;
     return Math.round(((current - previous) / previous) * 100);
   };
 
+  // Calculate both types of trends
   const trends = useMemo(() => ({
-    revenue: calculateTrend(metrics.revenue, previousMetrics.revenue),
-    outbound: calculateTrend(metrics.outbound, previousMetrics.outbound),
-    meetings: calculateTrend(metrics.meetings, previousMetrics.meetings),
-    proposals: calculateTrend(metrics.proposals, previousMetrics.proposals)
-  }), [metrics, previousMetrics]);
+    revenue: {
+      periodToDate: calculateTrend(metrics.revenue, previousMetrics.revenue),
+      fullMonth: calculateTrend(metrics.revenue, previousMonthFullMetrics.revenue)
+    },
+    outbound: {
+      periodToDate: calculateTrend(metrics.outbound, previousMetrics.outbound),
+      fullMonth: calculateTrend(metrics.outbound, previousMonthFullMetrics.outbound)
+    },
+    meetings: {
+      periodToDate: calculateTrend(metrics.meetings, previousMetrics.meetings),
+      fullMonth: calculateTrend(metrics.meetings, previousMonthFullMetrics.meetings)
+    },
+    proposals: {
+      periodToDate: calculateTrend(metrics.proposals, previousMetrics.proposals),
+      fullMonth: calculateTrend(metrics.proposals, previousMonthFullMetrics.proposals)
+    }
+  }), [metrics, previousMetrics, previousMonthFullMetrics]);
 
   // Filter deals based on search query
   const filteredDeals = useMemo(() => 
@@ -346,7 +472,7 @@ export default function Dashboard() {
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8 overflow-visible">
         <MetricCard
           title="Revenue"
           value={metrics.revenue}
