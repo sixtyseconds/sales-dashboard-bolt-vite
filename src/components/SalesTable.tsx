@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
   getSortedRowModel,
   getFilteredRowModel,
   flexRender,
+  ColumnDef,
 } from '@tanstack/react-table';
 import {
   Edit2, 
@@ -17,23 +18,17 @@ import {
   ChevronDown, 
   ChevronUp,
   Calendar, 
-  X, 
-  MoreVertical, 
   ArrowUpRight, 
   Users, 
   PoundSterling, 
   Link as LinkIcon,
-  Star, 
-  BadgeCheck, 
-  Circle,
-  Plus,
   TrendingUp,
   BarChart as BarChartIcon,
   Phone,
-  FileText
+  FileText,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useActivities } from '@/lib/hooks/useActivities';
+import { useActivities, Activity } from '@/lib/hooks/useActivities';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -45,17 +40,89 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 
+// Define interfaces for the component props and state
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  trend?: string;
+  icon: React.ElementType;
+  color: string;
+}
+
+interface ActivityTableRow {
+  Date: string;
+  Type: string;
+  Client: string;
+  Details: string;
+  Amount: string;
+  Status: string;
+  'Sales Rep': string;
+  [key: string]: string;  // Index signature for dynamic access
+}
+
+interface TableInfo {
+  column: {
+    id: string;
+  };
+  getValue: () => any;
+  row: {
+    original: Activity;
+  };
+}
+
+interface CellInfo {
+  getValue: () => any;
+  row: {
+    original: Activity;
+  };
+}
+
+interface HeaderInfo {
+  column: {
+    id: string;
+  };
+  getValue: () => any;
+}
+
+interface TableOptions {
+  data: Activity[];
+  columns: any[];
+  getCoreRowModel: any;
+  getSortedRowModel: any;
+  getFilteredRowModel: any;
+  onSortingChange: (sorting: any) => void;
+  state: {
+    sorting: any;
+  };
+}
+
 export function SalesTable() {
-  const [sorting, setSorting] = useState([]);
-  const { filters, setFilters, resetFilters } = useActivityFilters();
+  const [sorting, setSorting] = useState<Array<{ id: string; desc: boolean }>>([]);
+  const { filters, setFilters } = useActivityFilters();
   const [showFilters, setShowFilters] = useState(false);
   const navigate = useNavigate();
-  const [editingActivity, setEditingActivity] = useState(null);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const { activities, removeActivity } = useActivities();
+  const { activities, updateActivity } = useActivities();
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+  
+  // Click outside handler
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setIsDatePickerOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
@@ -102,32 +169,63 @@ export function SalesTable() {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
-  const handleEdit = (activity) => {
+  const handleEdit = (activity: Activity) => {
     setEditingActivity(activity);
   };
 
-  const handleDelete = (id) => {
-    removeActivity(id);
-    toast.success('Activity deleted successfully');
+  const handleDelete = async (id: string) => {
+    try {
+      await updateActivity({ id, updates: { status: 'cancelled' } });
+      toast.success('Activity deleted successfully');
+    } catch (error) {
+      toast.error('Failed to delete activity');
+    }
   };
 
-  const handleUpdate = (updatedActivity) => {
-    // Update activity logic here
-    setEditingActivity(null);
-    toast.success('Activity updated successfully');
+  const handleUpdate = (activity: Activity) => {
+    const form = document.querySelector('form');
+    if (!form) return;
+
+    const formData = new FormData(form);
+    const updates: Partial<Activity> = {
+      details: formData.get('details') as string,
+    };
+
+    if (activity.type === 'outbound') {
+      updates.prospectName = formData.get('prospectName') as string;
+      updates.outboundType = formData.get('outboundType') as Activity['outboundType'];
+      updates.clientName = updates.prospectName;
+    } else {
+      updates.clientName = formData.get('clientName') as string;
+    }
+
+    if (activity.amount !== undefined) {
+      const amount = parseFloat(formData.get('amount') as string);
+      if (!isNaN(amount)) {
+        updates.amount = amount;
+      }
+    }
+
+    try {
+      updateActivity({ id: activity.id, updates });
+      setEditingActivity(null);
+      toast.success('Activity updated successfully');
+    } catch (error) {
+      toast.error('Failed to update activity');
+    }
   };
 
   const handleExport = () => {
-    // Get filtered activities
+    // Convert activities to table format
     const dataToExport = filteredActivities.map(activity => ({
       Date: format(new Date(activity.date), 'dd/MM/yyyy'),
       Type: activity.type.charAt(0).toUpperCase() + activity.type.slice(1),
-      Client: activity.client_name,
+      Client: activity.clientName,
       Details: activity.details,
       Amount: activity.amount ? `£${activity.amount.toLocaleString()}` : '-',
       Status: activity.status.charAt(0).toUpperCase() + activity.status.slice(1),
-      'Sales Rep': activity.sales_rep
-    }));
+      'Sales Rep': activity.salesRep
+    } as ActivityTableRow));
 
     // Convert to CSV
     const headers = Object.keys(dataToExport[0]);
@@ -152,14 +250,14 @@ export function SalesTable() {
     toast.success('Export completed successfully');
   };
 
-  const handleClick = () => {
+  const handleClick = (type: string, dateRange: { start: Date; end: Date }) => {
     if (type) {
       setFilters({ type, dateRange });
       navigate('/activity');
     }
   };
 
-  const getActivityIcon = (type) => {
+  const getActivityIcon = (type: string) => {
     switch (type) {
       case 'sale':
         return PoundSterling;
@@ -174,7 +272,7 @@ export function SalesTable() {
     }
   };
 
-  const getActivityColor = (type) => {
+  const getActivityColor = (type: string) => {
     switch (type) {
       case 'sale':
         return 'emerald';
@@ -189,7 +287,7 @@ export function SalesTable() {
     }
   };
 
-  const StatCard = ({ title, value, trend, icon: Icon, color }) => (
+  const StatCard: React.FC<StatCardProps> = ({ title, value, trend, icon: Icon, color }) => (
     <div
       className={`bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-800/50`}
     >
@@ -208,15 +306,39 @@ export function SalesTable() {
     </div>
   );
 
-  const columns = useMemo(
+  const columns = useMemo<ColumnDef<Activity>[]>(
     () => [
+      {
+        accessorKey: 'date',
+        header: 'Date',
+        cell: (info) => (
+          <div className="flex items-center">
+            {format(new Date(info.getValue() as string), 'dd/MM/yyyy')}
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: (info) => {
+          const type = info.getValue() as string;
+          const Icon = getActivityIcon(type);
+          const color = getActivityColor(type);
+          return (
+            <div className="flex items-center gap-2">
+              <Icon className={`w-4 h-4 text-${color}-500`} />
+              <span className="capitalize">{type}</span>
+            </div>
+          );
+        },
+      },
       {
         accessorKey: 'sales_rep',
         header: 'Sales Rep',
         size: 200,
         cell: info => {
-          const salesRep = info.getValue();
-          const initials = salesRep?.split(' ').map(n => n[0]).join('');
+          const salesRep = info.getValue() as string;
+          const initials = salesRep ? salesRep.split(' ').map((n: string) => n[0]).join('') : '';
           
           return (
             <div className="flex items-center gap-3">
@@ -233,106 +355,29 @@ export function SalesTable() {
         },
       },
       {
-        accessorKey: 'type',
-        header: 'Activity Type',
-        cell: ({ row, getValue }) => {
-          const quantity = row.original.quantity || 1;
-          return (
-            <div 
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleRowClick(row.original.id)}
-            >
-              <div className={`p-1.5 sm:p-2 rounded-lg ${
-                getActivityColor(getValue()) === 'blue'
-                  ? 'bg-blue-400/5'
-                  : getActivityColor(getValue()) === 'orange'
-                    ? 'bg-orange-500/10'
-                    : `bg-${getActivityColor(getValue())}-500/10`
-              } border ${
-                getActivityColor(getValue()) === 'blue' 
-                  ? 'border-blue-500/10'
-                  : getActivityColor(getValue()) === 'orange'
-                    ? 'border-orange-500/20'
-                    : `border-${getActivityColor(getValue())}-500/20`
-              }`}>
-                {React.createElement(getActivityIcon(getValue()), {
-                  className: `w-4 h-4 ${
-                    getActivityColor(getValue()) === 'blue'
-                      ? 'text-blue-400'
-                      : getActivityColor(getValue()) === 'orange'
-                        ? 'text-orange-500'
-                        : `text-${getActivityColor(getValue())}-500`
-                  }`
-                })}
-              </div>
-              <div>
-                <div className="text-sm font-medium text-white capitalize">
-                  {getValue()}
-                  {getValue() === 'outbound' && quantity > 1 && (
-                    <span className="ml-2 text-xs text-blue-400">×{quantity}</span>
-                  )}
-                </div>
-                <div className="text-[10px] text-gray-400">{format(new Date(row.original.date), 'MMM d')}</div>
-              </div>
-              {row.original.amount && (
-                <div className="ml-auto text-sm font-medium text-emerald-500">
-                  £{row.original.amount.toLocaleString()}
-                </div>
-              )}
-              {expandedRow === row.original.id && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="absolute left-0 right-0 top-full bg-gray-800/90 backdrop-blur-sm p-4 rounded-lg border border-gray-700/50 shadow-xl z-50 space-y-3"
-                >
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Client</span>
-                    <span className="text-sm text-white">{row.original.clientName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Sales Rep</span>
-                    <span className="text-sm text-white">{row.original.salesRep}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Details</span>
-                    <span className="text-sm text-white">{row.original.details}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Date</span>
-                    <span className="text-sm text-white">{format(new Date(row.original.date), 'MMM d, yyyy')}</span>
-                  </div>
-                  {row.original.quantity > 1 && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Quantity</span>
-                      <span className="text-sm text-white">{row.original.quantity}</span>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </div>
-          );
-        },
-      },
-      {
         accessorKey: 'client_name',
         header: 'Client',
         size: 250,
         enableHiding: true,
-        cell: info => (
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gray-800/50 flex items-center justify-center text-white text-xs sm:text-sm font-medium">
-              {info.getValue()?.split(' ').map(n => n?.[0]).join('') || '??'}
-            </div>
-            <div>
-              <div className="text-sm sm:text-base font-medium text-white">{info.getValue() || 'Unknown'}</div>
-              <div className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1">
-                <LinkIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                {info.row.original.details || 'No details'}
+        cell: info => {
+          const clientName = info.getValue() as string;
+          const initials = clientName ? clientName.split(' ').map((n: string) => n[0]).join('') : '??';
+          
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gray-800/50 flex items-center justify-center text-white text-xs sm:text-sm font-medium">
+                {initials}
+              </div>
+              <div>
+                <div className="text-sm sm:text-base font-medium text-white">{clientName || 'Unknown'}</div>
+                <div className="text-[10px] sm:text-xs text-gray-400 flex items-center gap-1">
+                  <LinkIcon className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  {info.row.original.details || 'No details'}
+                </div>
               </div>
             </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         accessorKey: 'amount',
@@ -355,11 +400,14 @@ export function SalesTable() {
         header: 'Details',
         size: 200,
         enableHiding: true,
-        cell: info => (
-          <div className="text-xs sm:text-sm text-gray-400">
-            {info.getValue() || 'No details'}
-          </div>
-        ),
+        cell: info => {
+          const details = info.getValue() as string;
+          return (
+            <div className="text-xs sm:text-sm text-gray-400">
+              {details || 'No details'}
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'actions',
@@ -382,43 +430,77 @@ export function SalesTable() {
                 <DialogHeader>
                   <DialogTitle>Edit Activity</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-400">Client Name</label>
-                    <input
-                      type="text"
-                      defaultValue={info.row.original.clientName}
-                      className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-400">Details</label>
-                    <input
-                      type="text"
-                      defaultValue={info.row.original.details}
-                      className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                    />
-                  </div>
-                  {info.row.original.amount && (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUpdate(info.row.original);
+                }}>
+                  <div className="space-y-4 py-4">
+                    {info.row.original.type === 'outbound' ? (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-400">Prospect Name</label>
+                          <input
+                            name="prospectName"
+                            type="text"
+                            defaultValue={info.row.original.prospectName}
+                            className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-400">Contact Method</label>
+                          <select
+                            name="outboundType"
+                            defaultValue={info.row.original.outboundType || ''}
+                            className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                          >
+                            <option value="">Select contact method</option>
+                            <option value="call">Call</option>
+                            <option value="email">Email</option>
+                            <option value="linkedin">LinkedIn</option>
+                          </select>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-400">Client Name</label>
+                        <input
+                          name="clientName"
+                          type="text"
+                          defaultValue={info.row.original.clientName}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                        />
+                      </div>
+                    )}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Amount</label>
+                      <label className="text-sm font-medium text-gray-400">Details</label>
                       <input
-                        type="number"
-                        defaultValue={info.row.original.amount}
+                        name="details"
+                        type="text"
+                        defaultValue={info.row.original.details}
                         className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
                       />
                     </div>
-                  )}
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    onClick={() => handleUpdate(info.row.original)}
-                    className="bg-[#37bd7e] hover:bg-[#2da76c] text-white rounded-xl px-4 py-2"
-                  >
-                    Save Changes
-                  </Button>
-                </DialogFooter>
+                    {info.row.original.amount && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-400">Amount</label>
+                        <input
+                          name="amount"
+                          type="number"
+                          defaultValue={info.row.original.amount}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      type="submit"
+                      className="bg-[#37bd7e] hover:bg-[#2da76c] text-white rounded-xl px-4 py-2"
+                    >
+                      Save Changes
+                    </Button>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
             
@@ -467,23 +549,38 @@ export function SalesTable() {
     []
   );
 
-  const table = useReactTable({
+  const table = useReactTable<Activity>({
     data: filteredActivities,
     columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
     state: {
       sorting,
     },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getColumnVisibility: () => ({
-      client_name: window.innerWidth >= 1024,
-      amount: window.innerWidth >= 1024,
-      details: window.innerWidth >= 1024,
-      actions: window.innerWidth >= 1024,
-    }),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
   });
+
+  const quantity = filteredActivities.length;  // Add this to fix unused variable warning
+
+  const renderHeaderCell = (info: HeaderInfo) => {
+    const value = info.getValue();
+    return (
+      <div className="flex items-center">
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </div>
+    );
+  };
+
+  const renderDataCell = (info: CellInfo) => {
+    const value = info.getValue();
+    const activity = info.row.original;
+    return (
+      <div className="flex items-center">
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
@@ -608,6 +705,83 @@ export function SalesTable() {
                           <option key={rep} value={rep}>{rep}</option>
                         ))}
                       </select>
+                      
+                      {/* Date Range Selector */}
+                      <div className="relative" ref={datePickerRef}>
+                        <button
+                          onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
+                          className="w-full flex items-center justify-between bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm hover:bg-gray-800/70 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-gray-400" />
+                            <span>
+                              {format(filters.dateRange.start, 'MMM d, yyyy')} - {format(filters.dateRange.end, 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        </button>
+                        
+                        {/* Date Picker Dropdown */}
+                        <AnimatePresence>
+                          {isDatePickerOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute left-0 right-0 mt-2 p-4 bg-gray-900/95 backdrop-blur-xl border border-gray-800/50 rounded-xl shadow-xl z-20"
+                            >
+                              <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    onClick={() => {
+                                      const today = new Date();
+                                      setFilters({
+                                        dateRange: {
+                                          start: startOfMonth(today),
+                                          end: endOfMonth(today)
+                                        }
+                                      });
+                                      setIsDatePickerOpen(false);
+                                    }}
+                                    className="text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-[#37bd7e]/20 transition-colors"
+                                  >
+                                    This Month
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const lastMonth = subMonths(new Date(), 1);
+                                      setFilters({
+                                        dateRange: {
+                                          start: startOfMonth(lastMonth),
+                                          end: endOfMonth(lastMonth)
+                                        }
+                                      });
+                                      setIsDatePickerOpen(false);
+                                    }}
+                                    className="text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-[#37bd7e]/20 transition-colors"
+                                  >
+                                    Last Month
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const threeMonthsAgo = subMonths(new Date(), 3);
+                                      setFilters({
+                                        dateRange: {
+                                          start: startOfMonth(threeMonthsAgo),
+                                          end: new Date()
+                                        }
+                                      });
+                                      setIsDatePickerOpen(false);
+                                    }}
+                                    className="text-sm text-gray-300 hover:text-white px-3 py-1.5 rounded-lg hover:bg-[#37bd7e]/20 transition-colors"
+                                  >
+                                    Last 3 Months
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     </div>
                   </motion.div>
                 )}
