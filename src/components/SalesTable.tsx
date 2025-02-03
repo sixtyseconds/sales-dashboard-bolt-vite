@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -8,6 +8,7 @@ import {
   getFilteredRowModel,
   flexRender,
   ColumnDef,
+  Row,
 } from '@tanstack/react-table';
 import {
   Edit2, 
@@ -30,7 +31,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities, Activity } from '@/lib/hooks/useActivities';
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dialog';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 // Define interfaces for the component props and state
 interface StatCardProps {
@@ -63,52 +64,33 @@ interface ActivityTableRow {
   [key: string]: string;  // Index signature for dynamic access
 }
 
-interface TableInfo {
-  column: {
-    id: string;
-  };
-  getValue: () => any;
-  row: {
-    original: Activity;
-  };
+interface TableRowProps {
+  row: Row<Activity>;
 }
 
-interface CellInfo {
-  getValue: () => any;
-  row: {
-    original: Activity;
-  };
-}
+// Create a memoized row component
+const TableRow = memo(({ row }: TableRowProps) => {
+  return (
+    <tr className="border-b border-gray-800/50">
+      {row.getVisibleCells().map(cell => (
+        <td key={cell.id} className="p-2 sm:p-4">
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </td>
+      ))}
+    </tr>
+  );
+});
 
-interface HeaderInfo {
-  column: {
-    id: string;
-  };
-  getValue: () => any;
-}
-
-interface TableOptions {
-  data: Activity[];
-  columns: any[];
-  getCoreRowModel: any;
-  getSortedRowModel: any;
-  getFilteredRowModel: any;
-  onSortingChange: (sorting: any) => void;
-  state: {
-    sorting: any;
-  };
-}
+TableRow.displayName = 'TableRow';
 
 export function SalesTable() {
   const [sorting, setSorting] = useState<Array<{ id: string; desc: boolean }>>([]);
   const { filters, setFilters } = useActivityFilters();
   const [showFilters, setShowFilters] = useState(false);
-  const navigate = useNavigate();
-  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { activities, updateActivity } = useActivities();
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
+  const parentRef = useRef<HTMLDivElement>(null);
   
   // Click outside handler
   useEffect(() => {
@@ -124,38 +106,37 @@ export function SalesTable() {
     };
   }, []);
 
+  // Memoize the filter function itself
+  const filterActivity = useCallback((activity: Activity) => {
+    const matchesType = !filters.type || activity.type === filters.type;
+    const matchesSalesRep = !filters.salesRep || activity.salesRep === filters.salesRep;
+    const matchesSearch = !filters.searchQuery || 
+      activity.clientName?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+      activity.type.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+      activity.salesRep?.toLowerCase().includes(filters.searchQuery.toLowerCase());
+    const activityDate = new Date(activity.date);
+    const matchesDate = activityDate >= filters.dateRange.start && 
+                       activityDate <= filters.dateRange.end;
+    return matchesType && matchesSalesRep && matchesSearch && matchesDate;
+  }, [filters]);
+
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
-    return activities.filter(activity => {
-      const matchesType = !filters.type || activity.type === filters.type;
-      const matchesSalesRep = !filters.salesRep || activity.salesRep === filters.salesRep;
-      const matchesSearch = !filters.searchQuery || 
-        activity.clientName?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-        activity.type.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-        activity.salesRep?.toLowerCase().includes(filters.searchQuery.toLowerCase());
-      const activityDate = new Date(activity.date);
-      const matchesDate = activityDate >= filters.dateRange.start && 
-                         activityDate <= filters.dateRange.end;
-      return matchesType && matchesSalesRep && matchesSearch && matchesDate;
-    });
-  }, [activities, filters]);
+    return activities.filter(filterActivity);
+  }, [activities, filterActivity]);
 
-  // Calculate stats from filtered activities
+  // Memoize stats calculations
   const stats = useMemo(() => {
-    const totalRevenue = filteredActivities
-      .filter(a => a.type === 'sale')
-      .reduce((sum, a) => sum + (a.amount || 0), 0);
-
-    const activeDeals = filteredActivities
-      .filter(a => a.status === 'completed').length;
-
+    const salesActivities = filteredActivities.filter(a => a.type === 'sale');
+    const completedActivities = filteredActivities.filter(a => a.status === 'completed');
+    const proposalActivities = filteredActivities.filter(a => a.type === 'proposal');
+    
+    const totalRevenue = salesActivities.reduce((sum, a) => sum + (a.amount || 0), 0);
+    const activeDeals = completedActivities.length;
     const winRate = Math.round(
-      (filteredActivities.filter(a => a.type === 'sale').length /
-      Math.max(1, filteredActivities.filter(a => a.type === 'proposal').length)) * 100
+      (salesActivities.length / Math.max(1, proposalActivities.length)) * 100
     ) || 0;
-
-    const avgDeal = totalRevenue / 
-      filteredActivities.filter(a => a.type === 'sale').length || 0;
+    const avgDeal = salesActivities.length ? totalRevenue / salesActivities.length : 0;
 
     return {
       totalRevenue,
@@ -165,24 +146,17 @@ export function SalesTable() {
     };
   }, [filteredActivities]);
 
-  const handleRowClick = (id: string) => {
-    setExpandedRow(expandedRow === id ? null : id);
-  };
-
-  const handleEdit = (activity: Activity) => {
-    setEditingActivity(activity);
-  };
-
-  const handleDelete = async (id: string) => {
+  // Memoize handlers
+  const handleDelete = useCallback(async (id: string) => {
     try {
       await updateActivity({ id, updates: { status: 'cancelled' } });
       toast.success('Activity deleted successfully');
     } catch (error) {
       toast.error('Failed to delete activity');
     }
-  };
+  }, [updateActivity]);
 
-  const handleUpdate = (activity: Activity) => {
+  const handleUpdate = useCallback((activity: Activity) => {
     const form = document.querySelector('form');
     if (!form) return;
 
@@ -208,14 +182,13 @@ export function SalesTable() {
 
     try {
       updateActivity({ id: activity.id, updates });
-      setEditingActivity(null);
       toast.success('Activity updated successfully');
     } catch (error) {
       toast.error('Failed to update activity');
     }
-  };
+  }, [updateActivity]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     // Convert activities to table format
     const dataToExport = filteredActivities.map(activity => ({
       Date: format(new Date(activity.date), 'dd/MM/yyyy'),
@@ -248,14 +221,7 @@ export function SalesTable() {
     link.click();
     document.body.removeChild(link);
     toast.success('Export completed successfully');
-  };
-
-  const handleClick = (type: string, dateRange: { start: Date; end: Date }) => {
-    if (type) {
-      setFilters({ type, dateRange });
-      navigate('/activity');
-    }
-  };
+  }, [filteredActivities]);
 
   const getActivityIcon = (type: string) => {
     switch (type) {
@@ -546,41 +512,30 @@ export function SalesTable() {
         ),
       },
     ],
-    []
+    [handleDelete, handleUpdate]
   );
 
-  const table = useReactTable<Activity>({
-    data: filteredActivities,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    state: {
-      sorting,
-    },
+  const table = useMemo(
+    () => useReactTable<Activity>({
+      data: filteredActivities,
+      columns,
+      getCoreRowModel: getCoreRowModel(),
+      getSortedRowModel: getSortedRowModel(),
+      getFilteredRowModel: getFilteredRowModel(),
+      onSortingChange: setSorting,
+      state: {
+        sorting,
+      },
+    }),
+    [filteredActivities, columns, sorting]
+  );
+
+  const virtualizer = useVirtualizer({
+    count: table.getRowModel().rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // Approximate row height
+    overscan: 10,
   });
-
-  const quantity = filteredActivities.length;  // Add this to fix unused variable warning
-
-  const renderHeaderCell = (info: HeaderInfo) => {
-    const value = info.getValue();
-    return (
-      <div className="flex items-center">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </div>
-    );
-  };
-
-  const renderDataCell = (info: CellInfo) => {
-    const value = info.getValue();
-    const activity = info.row.original;
-    return (
-      <div className="flex items-center">
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
@@ -789,73 +744,38 @@ export function SalesTable() {
             </div>
 
             {/* Table */}
-            <div className="overflow-hidden">
+            <div ref={parentRef} className="overflow-auto" style={{ height: 'calc(100vh - 400px)' }}>
               <table className="w-full">
-                <thead>
+                <thead className="bg-gray-800/50">
                   {table.getHeaderGroups().map(headerGroup => (
-                    <tr key={headerGroup.id} className="border-b border-gray-800/50">
+                    <tr key={headerGroup.id}>
                       {headerGroup.headers.map(header => (
-                        header.column.getIsVisible() && (
-                          <th
-                            key={header.id}
-                            className="px-2 py-2 text-left text-xs font-medium text-gray-400 whitespace-nowrap"
-                          >
-                            {header.isPlaceholder ? null : (
-                              <div
-                                {...{
-                                  className: header.column.getCanSort()
-                                    ? 'cursor-pointer select-none flex items-center gap-2 group'
-                                    : '',
-                                  onClick: header.column.getToggleSortingHandler(),
-                                }}
-                              >
-                                {flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                  {{
-                                    asc: <ChevronUp className="w-4 h-4" />,
-                                    desc: <ChevronDown className="w-4 h-4" />,
-                                  }[header.column.getIsSorted()] ?? null}
-                                </div>
-                              </div>
-                            )}
-                          </th>
-                        )
+                        <th
+                          key={header.id}
+                          className="p-2 sm:p-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer select-none"
+                          onClick={header.column.getToggleSortingHandler()}
+                          style={{ width: header.getSize() }}
+                        >
+                          <div className="flex items-center gap-2">
+                            {flexRender(header.column.columnDef.header, header.getContext())}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              {header.column.getIsSorted() === 'asc' ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : header.column.getIsSorted() === 'desc' ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : null}
+                            </div>
+                          </div>
+                        </th>
                       ))}
                     </tr>
                   ))}
                 </thead>
                 <tbody>
-                  {table.getRowModel().rows.map(row => (
-                    <motion.tr 
-                      onClick={() => handleRowClick(row.original.id)}
-                      key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ 
-                        duration: 0.2,
-                        // Only animate on mount, not during filtering
-                        delay: filters.searchQuery ? 0 : row.index * 0.05
-                      }}
-                      className="relative border-b border-gray-800/50 hover:bg-gray-800/20 cursor-pointer"
-                    >
-                      {row.getVisibleCells().map(cell => (
-                        cell.column.getIsVisible() && (
-                          <td
-                            key={cell.id}
-                            className="px-2 py-2"
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext()
-                            )}
-                          </td>
-                        )
-                      ))}
-                    </motion.tr>
-                  ))}
+                  {virtualizer.getVirtualItems().map(virtualRow => {
+                    const row = table.getRowModel().rows[virtualRow.index];
+                    return <TableRow key={row.id} row={row} />;
+                  })}
                 </tbody>
               </table>
               {table.getRowModel().rows.length === 0 && (

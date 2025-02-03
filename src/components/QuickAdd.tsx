@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { Plus, X, Phone, FileText, Users, DollarSign } from 'lucide-react';
+import { X, Phone, FileText, Users, DollarSign } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities } from '@/lib/hooks/useActivities';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
-import { useUser } from '@/lib/hooks/useUser';
 import { toast } from 'sonner';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 interface QuickAddProps {
   isOpen: boolean;
@@ -23,31 +21,27 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
     details: '',
     amount: '',
     saleType: 'one-off',
-    outboundCount: '1'
+    outboundCount: '1',
+    outboundType: 'call'
   });
 
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  const reloadPage = () => {
-    navigate(location.pathname, { replace: true });
-  };
-
   const { addActivity, addSale } = useActivities();
-  const { userData } = useUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
       if (selectedAction === 'outbound') {
-        await addActivity({
-          type: 'outbound',
+        const outboundData = {
+          type: 'outbound' as const,
           client_name: formData.client_name || 'Unknown',
-          details: formData.details,
+          details: formData.outboundType,
           quantity: parseInt(formData.outboundCount) || 1,
-          date: selectedDate.toISOString()
-        });
+          date: selectedDate.toISOString(),
+          priority: 'medium' as const,
+          outboundType: formData.outboundType as 'call' | 'email' | 'linkedin'
+        };
+        await addActivity(outboundData);
       } else if (selectedAction === 'sale') {
         const saleData = {
           client_name: formData.client_name,
@@ -64,7 +58,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           client_name: formData.client_name,
           details: formData.details,
           amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
-          date: selectedDate.toISOString()
+          date: selectedDate.toISOString(),
+          priority: 'medium'
         });
       }
       
@@ -75,7 +70,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
         details: '',
         amount: '',
         saleType: 'one-off',
-        outboundCount: '1'
+        outboundCount: '1',
+        outboundType: 'call'
       });
       setSelectedAction(null);
       onClose();
@@ -324,6 +320,33 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                 )}
                 {selectedAction === 'outbound' && (
                   <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Prospect Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.client_name}
+                        onChange={(e) => setFormData({...formData, client_name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Contact Method
+                      </label>
+                      <select
+                        required
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.outboundType}
+                        onChange={(e) => setFormData({...formData, outboundType: e.target.value})}
+                      >
+                        <option value="call">Call</option>
+                        <option value="email">Email</option>
+                        <option value="linkedin">LinkedIn</option>
+                      </select>
+                    </div>
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-400/90">
                         Number of Activities
