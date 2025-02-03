@@ -5,13 +5,15 @@ import { useTargets } from '@/lib/hooks/useTargets';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { useNavigate } from 'react-router-dom';
 import { useActivities } from '@/lib/hooks/useActivities';
-import { format, startOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
 import {
   DollarSign,
   PoundSterling,
   Phone,
   Users,
   FileText,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SalesActivityChart from '@/components/SalesActivityChart';
@@ -203,50 +205,51 @@ export default function Dashboard() {
   // Move all hooks to the top
   const [searchQuery, setSearchQuery] = useState('');
   const [showContent, setShowContent] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const { userData } = useUser();
   const navigate = useNavigate();
   const { activities, isLoadingActivities } = useActivities();
   const { data: targets, isLoadingSales } = useTargets(userData?.id);
 
-  const currentMonth = useMemo(() => ({
-    start: startOfMonth(new Date()),
-    end: new Date(),
-  }), []);
+  const selectedMonthRange = useMemo(() => ({
+    start: startOfMonth(selectedMonth),
+    end: endOfMonth(selectedMonth),
+  }), [selectedMonth]);
 
-  const previousMonth = useMemo(() => ({
-    start: startOfMonth(subMonths(new Date(), 1)),
-    end: subMonths(new Date(), 1),
-  }), []);
+  const previousMonthRange = useMemo(() => ({
+    start: startOfMonth(subMonths(selectedMonth, 1)),
+    end: endOfMonth(subMonths(selectedMonth, 1)),
+  }), [selectedMonth]);
 
-  // Filter activities for current month and calculate metrics
-  const currentMonthActivities = useMemo(() => 
+  // Filter activities for selected month and calculate metrics
+  const selectedMonthActivities = useMemo(() => 
     activities?.filter(activity => {
       const activityDate = new Date(activity.date);
-      return activityDate >= currentMonth.start && activityDate <= currentMonth.end;
-    }) || [], [activities, currentMonth]);
+      return activityDate >= selectedMonthRange.start && activityDate <= selectedMonthRange.end;
+    }) || [], [activities, selectedMonthRange]);
 
   // Get previous month's activities for trend calculation
   const previousMonthActivities = useMemo(() => 
     activities?.filter(activity => {
       const activityDate = new Date(activity.date);
-      return activityDate >= previousMonth.start && activityDate <= previousMonth.end;
-    }) || [], [activities, previousMonth]);
+      return activityDate >= previousMonthRange.start && activityDate <= previousMonthRange.end;
+    }) || [], [activities, previousMonthRange]);
 
-  // Calculate metrics for current month
+  // Calculate metrics for selected month
   const metrics = useMemo(() => ({
-    revenue: currentMonthActivities
+    revenue: selectedMonthActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0),
-    outbound: currentMonthActivities
+    outbound: selectedMonthActivities
       .filter(a => a.type === 'outbound')
       .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    meetings: currentMonthActivities
+    meetings: selectedMonthActivities
       .filter(a => a.type === 'meeting')
       .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    proposals: currentMonthActivities
+    proposals: selectedMonthActivities
       .filter(a => a.type === 'proposal')
       .reduce((sum, a) => sum + (a.quantity || 1), 0)
-  }), [currentMonthActivities]);
+  }), [selectedMonthActivities]);
 
   // Calculate metrics for previous month
   const previousMetrics = useMemo(() => ({
@@ -279,12 +282,12 @@ export default function Dashboard() {
 
   // Filter deals based on search query
   const filteredDeals = useMemo(() => 
-    currentMonthActivities.filter(activity => 
+    selectedMonthActivities.filter(activity => 
       activity.type === 'sale' &&
       (activity.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
        activity.amount?.toString().includes(searchQuery) ||
        activity.details?.toLowerCase().includes(searchQuery.toLowerCase()))
-    ), [currentMonthActivities, searchQuery]);
+    ), [selectedMonthActivities, searchQuery]);
 
   // Check if any data is loading
   const isAnyLoading = isLoadingActivities || isLoadingSales || !userData;
@@ -316,10 +319,30 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-      {/* Header */}
+      {/* Header with Month Selection */}
       <div className="space-y-1 mt-12 lg:mt-0 mb-6 sm:mb-8">
         <h1 className="text-3xl font-bold">Welcome back, {userData?.first_name}</h1>
-        <p className="text-gray-400 mt-1">Here's how your sales performance is tracking this {format(currentMonth.start, 'MMMM')}</p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-gray-400">Here's how your sales performance is tracking</p>
+          <div className="flex items-center gap-3 bg-gray-900/50 backdrop-blur-xl rounded-xl p-2 border border-gray-800/50">
+            <button
+              onClick={() => setSelectedMonth(prev => subMonths(prev, 1))}
+              className="p-1.5 hover:bg-gray-800/50 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-400" />
+            </button>
+            <span className="text-sm font-medium text-white min-w-[100px] text-center">
+              {format(selectedMonth, 'MMMM yyyy')}
+            </span>
+            <button
+              onClick={() => setSelectedMonth(prev => addMonths(prev, 1))}
+              className="p-1.5 hover:bg-gray-800/50 rounded-lg transition-colors"
+              disabled={selectedMonth >= new Date()}
+            >
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Metrics Grid */}
@@ -331,7 +354,7 @@ export default function Dashboard() {
           trend={trends.revenue}
           icon={PoundSterling}
           type="sale"
-          dateRange={currentMonth}
+          dateRange={selectedMonthRange}
         />
         <MetricCard
           title="Outbound"
@@ -340,7 +363,7 @@ export default function Dashboard() {
           trend={trends.outbound}
           icon={Phone}
           type="outbound"
-          dateRange={currentMonth}
+          dateRange={selectedMonthRange}
         />
         <MetricCard
           title="Meetings"
@@ -349,7 +372,7 @@ export default function Dashboard() {
           trend={trends.meetings}
           icon={Users}
           type="meeting"
-          dateRange={currentMonth}
+          dateRange={selectedMonthRange}
         />
         <MetricCard
           title="Proposals"
@@ -358,13 +381,13 @@ export default function Dashboard() {
           trend={trends.proposals}
           icon={FileText}
           type="proposal"
-          dateRange={currentMonth}
+          dateRange={selectedMonthRange}
         />
       </div>
 
       {/* Sales Activity Chart */}
       <div className="mb-8">
-        <SalesActivityChart />
+        <SalesActivityChart selectedMonth={selectedMonth} />
       </div>
 
       {/* Recent Deals Section */}
