@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, subMonths } from 'date-fns';
 import {
   ComposedChart,
   Bar,
@@ -16,7 +16,11 @@ import { Calendar, ChevronDown } from 'lucide-react';
 import { useActivities } from '@/lib/hooks/useActivities';
 import { useUser } from '@/lib/hooks/useUser';
 
-const SalesActivityChart = () => {
+interface SalesActivityChartProps {
+  selectedMonth: Date;
+}
+
+const SalesActivityChart = ({ selectedMonth }: SalesActivityChartProps) => {
   const [timeframe, setTimeframe] = useState('daily');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { activities } = useActivities();
@@ -24,10 +28,12 @@ const SalesActivityChart = () => {
 
   const chartData = useMemo(() => {
     if (timeframe === 'daily') {
-      // Get last 14 days of data
-      const data = Array.from({ length: 14 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
+      // Get all days in the selected month
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+      const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      
+      return daysInMonth.map(date => {
         const dateStr = format(date, 'yyyy-MM-dd');
         
         // Filter activities for this date
@@ -50,18 +56,23 @@ const SalesActivityChart = () => {
             .filter(a => a.type === 'sale')
             .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
         };
-      }).reverse();
-      return data;
+      });
     }
     
     if (timeframe === 'weekly') {
-      // Get last 12 weeks of data
-      const data = Array.from({ length: 12 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (i * 7));
-        const weekStart = new Date(date);
-        const weekEnd = new Date(date);
-        weekEnd.setDate(weekEnd.getDate() + 6);
+      // Get weeks in the selected month
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+      const firstWeekStart = startOfWeek(monthStart);
+      const lastWeekEnd = endOfWeek(monthEnd);
+      
+      const weeks = eachWeekOfInterval({
+        start: firstWeekStart,
+        end: lastWeekEnd
+      });
+      
+      return weeks.map(weekStart => {
+        const weekEnd = endOfWeek(weekStart);
         
         // Filter activities for this week
         const weekActivities = activities.filter(a => {
@@ -70,7 +81,7 @@ const SalesActivityChart = () => {
         });
         
         return {
-          name: `WC ${format(date, 'MMM d')}`,
+          name: `WC ${format(weekStart, 'MMM d')}`,
           Outbound: weekActivities
             .filter(a => a.type === 'outbound')
             .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
@@ -84,25 +95,26 @@ const SalesActivityChart = () => {
             .filter(a => a.type === 'sale')
             .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
         };
-      }).reverse();
-      return data;
+      });
     }
 
-    // Monthly data
-    const data = [];
-    const now = new Date();
+    // Monthly view - show last 12 months up to selected month
+    const monthsData = [];
+    const endDate = endOfMonth(selectedMonth);
+    
     for (let i = 11; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      const date = subMonths(endDate, i);
+      const monthStart = startOfMonth(date);
+      const monthEnd = endOfMonth(date);
       
       // Filter activities for this month
       const monthActivities = activities.filter(a => {
         const activityDate = new Date(a.date);
-        return activityDate >= date && activityDate <= monthEnd;
+        return activityDate >= monthStart && activityDate <= monthEnd;
       });
       
-      data.push({
-        name: format(date, 'MMM'),
+      monthsData.push({
+        name: format(date, 'MMM yyyy'),
         Outbound: monthActivities
           .filter(a => a.type === 'outbound')
           .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
@@ -117,9 +129,9 @@ const SalesActivityChart = () => {
           .reduce((sum, a) => sum + (a.quantity || 1), 0) || 0.1,
       });
     }
-    return data;
-  }, [timeframe, activities]);
-
+    
+    return monthsData;
+  }, [activities, timeframe, selectedMonth]);
 
   const timeframeOptions = [
     { value: 'daily', label: 'Daily' },
