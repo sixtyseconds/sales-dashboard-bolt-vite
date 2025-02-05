@@ -34,13 +34,15 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
+import { useUser } from '@/lib/hooks/useUser';
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStage, setSelectedStage] = useState('all');
   const [editingUser, setEditingUser] = useState(null);
-  const { users, updateUser, impersonateUser, deleteUser } = useUsers();
+  const { users, updateUser, deleteUser } = useUsers();
+  const { user } = useUser();
   const navigate = useNavigate();
 
   const filteredUsers = useMemo(() => {
@@ -63,17 +65,6 @@ export default function Users() {
     } catch (error) {
       toast.error('Failed to update user');
       console.error('Update error:', error);
-    }
-  };
-
-  const handleImpersonate = async (userId: string) => {
-    try {
-      await impersonateUser(userId);
-      toast.success('Impersonation started');
-      navigate('/');
-    } catch (error) {
-      toast.error('Failed to impersonate user');
-      console.error('Impersonation error:', error);
     }
   };
 
@@ -307,12 +298,6 @@ export default function Users() {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleImpersonate(user.id)}
-                          className="p-2 hover:bg-violet-500/20 rounded-lg transition-colors"
-                        >
-                          <UserCheck className="w-4 h-4 text-violet-500" />
-                        </button>
                         <button
                           onClick={() => setEditingUser(user)}
                           className="p-2 hover:bg-[#37bd7e]/20 rounded-lg transition-colors"

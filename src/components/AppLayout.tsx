@@ -16,12 +16,13 @@ import {
   Plus,
   UserCog,
   UserX,
+  Lightbulb,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userData, isImpersonating, endImpersonating } = useUser();
+  const { userData } = useUser();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, toggleMobileMenu] = useCycle(false, true);
@@ -47,6 +48,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Activity, label: 'Heatmap', href: '/heatmap' },
     { icon: FileText, label: 'Activity Log', href: '/activity' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
+    { icon: Lightbulb, label: 'Feature Requests', href: '/features' },
     ...(userData?.is_admin ? [{ icon: UserCog, label: 'Admin', href: '/admin/users' }] : []),
   ];
 
@@ -80,8 +82,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           animate={isMobileMenuOpen ? { opacity: 0 } : { opacity: 1 }}
           onClick={() => toggleMobileMenu()}
           className="p-2 rounded-xl bg-gray-800/50 hover:bg-gray-800/70 transition-colors lg:hidden"
+          aria-label="Toggle mobile menu"
         >
-          <MenuIcon className="w-6 h-6 text-gray-400" />
+          <MenuIcon data-testid="menu-icon" className="w-6 h-6 text-gray-400" />
         </motion.button>
       </div>
       
@@ -112,6 +115,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               exit={{ x: '100%' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
               className="fixed right-0 top-0 bottom-0 w-full max-w-[280px] bg-gray-900/50 backdrop-blur-xl border-l border-gray-800/50 p-6 z-50 lg:hidden"
+              data-testid="mobile-menu-container"
             >
               <div className="relative h-full">
                 <div className="flex items-center justify-between mb-8">
@@ -146,7 +150,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   </button>
                 </div>
 
-                <nav className="space-y-2">
+                <nav className="space-y-2" role="navigation">
                   {menuItems.map((item) => (
                     <Link
                       to={item.href}
@@ -180,6 +184,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <button 
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                    data-testid="logout-button"
                   >
                     <LogOut className="w-5 h-5" />
                     Logout
@@ -317,29 +322,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               </AnimatePresence>
             </Link>
-            {isImpersonating && (
-              <button
-                onClick={endImpersonating}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors"
-              >
-                <UserX className="w-4 h-4" />
-                <AnimatePresence>
-                  {!isCollapsed && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="overflow-hidden whitespace-nowrap"
-                    >
-                      Stop Impersonating
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </button>
-            )}
             <button 
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              data-testid="logout-button"
             >
               <LogOut className="w-4 h-4" />
               <AnimatePresence>
