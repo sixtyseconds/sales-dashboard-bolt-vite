@@ -37,8 +37,29 @@ interface MetricCardProps {
   previousMonthTotal?: number;
 }
 
+interface TooltipProps {
+  show: boolean;
+  content: {
+    title: string;
+    message: string;
+    positive: boolean;
+  };
+  position: {
+    x: number;
+    y: number;
+  };
+}
+
+interface Deal {
+  id: string;
+  date: string;
+  client_name: string;
+  amount: number;
+  details: string;
+}
+
 // Tooltip component that uses Portal
-const Tooltip = ({ show, content, position }) => {
+const Tooltip = ({ show, content, position }: TooltipProps) => {
   if (!show) return null;
   
   return ReactDOM.createPortal(
@@ -71,8 +92,8 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
   const [showTotalTooltip, setShowTotalTooltip] = useState(false);
   const [trendPosition, setTrendPosition] = useState({ x: 0, y: 0 });
   const [totalPosition, setTotalPosition] = useState({ x: 0, y: 0 });
-  const trendRef = useRef(null);
-  const totalRef = useRef(null);
+  const trendRef = useRef<HTMLDivElement>(null);
+  const totalRef = useRef<HTMLDivElement>(null);
 
   const handleClick = () => {
     if (type) {
@@ -81,7 +102,7 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
     }
   };
 
-  const handleDealClick = (deal) => {
+  const handleDealClick = (deal: Deal) => {
     setFilters({ 
       type: 'sale',
       dateRange: {
@@ -92,7 +113,7 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
     navigate('/activity');
   };
 
-  const getIconColor = (title) => {
+  const getIconColor = (title: string) => {
     switch (title) {
       case 'Revenue':
         return 'emerald';
@@ -113,14 +134,14 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
     : 0;
 
   // Helper function for arrow styling
-  const getArrowClass = (trendValue) => {
+  const getArrowClass = (trendValue: number) => {
     return trendValue >= 0 
       ? 'text-emerald-500' 
       : 'text-red-500';
   };
 
   // Get background colors based on trend values
-  const getTrendBg = (trendValue) => {
+  const getTrendBg = (trendValue: number) => {
     return trendValue >= 0 
       ? 'bg-emerald-500/10 border-emerald-500/30' 
       : 'bg-red-500/10 border-red-500/30';
@@ -248,22 +269,23 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
         </div>
         
         <div className="space-y-1">
-          <div className="flex justify-between text-xs text-white">
+          <div className="h-2.5 bg-gray-900/80 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full ${
+                title === 'Revenue'
+                  ? 'bg-emerald-500/80'
+                  : title === 'Outbound'
+                  ? 'bg-blue-500/80'
+                  : title === 'Meetings'
+                  ? 'bg-violet-500/80'
+                  : 'bg-orange-500/80'
+              }`}
+              style={{ width: `${Math.min(100, (value / target) * 100)}%` }}
+            ></div>
+          </div>
+          <div className="text-xs text-gray-400 flex justify-between">
             <span>Progress</span>
             <span>{Math.round((value / target) * 100)}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-gray-800/50 overflow-hidden shadow-inner">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (value / target) * 100)}%` }}
-              transition={{ duration: 1, ease: "easeOut" }}
-              className={`h-full rounded-full ${
-                title === 'Revenue' ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
-                title === 'Outbound' ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
-                title === 'Meetings' ? 'bg-gradient-to-r from-violet-500 to-violet-400' :
-                'bg-gradient-to-r from-orange-500 to-orange-400'
-              } shadow-lg`}
-            />
           </div>
         </div>
       </div>
@@ -274,61 +296,71 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
 // Skeleton loader component for the dashboard
 function DashboardSkeleton() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-      {/* Header Skeleton */}
-      <div className="space-y-1 mt-12 lg:mt-0 mb-6 sm:mb-8">
-        <div className="h-9 w-64 bg-gray-800 rounded-lg" /> {/* Welcome back text */}
-        <div className="h-5 w-96 bg-gray-800 rounded-lg mt-2" /> {/* Month tracking text */}
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 mt-12 lg:mt-0 animate-pulse">
+      {/* Header skeleton */}
+      <div className="space-y-1 mb-6 sm:mb-8">
+        <div className="h-8 w-48 bg-gray-800 rounded-lg mb-2" />
+        <div className="h-4 w-64 bg-gray-800 rounded-lg" />
       </div>
 
-      {/* Metrics Grid - Matches the 2x2 layout */}
+      {/* Metrics grid skeleton */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-8">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50">
-            <div className="flex justify-between items-start mb-4">
-              <div className="h-6 w-32 bg-gray-800 rounded-lg" /> {/* Title */}
-              <div className="w-8 h-8 bg-gray-800 rounded-lg" /> {/* Icon */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gray-800 rounded-lg" />
+                <div>
+                  <div className="h-4 w-24 bg-gray-800 rounded-lg mb-1" />
+                  <div className="h-3 w-16 bg-gray-800 rounded-lg" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="w-16 h-8 bg-gray-800 rounded-lg" />
+              </div>
             </div>
             <div className="space-y-2">
-              <div className="flex items-baseline gap-2">
-                <div className="h-8 w-32 bg-gray-800 rounded-lg" /> {/* Value */}
-                <div className="h-5 w-24 bg-gray-800 rounded-lg" /> {/* Target */}
-              </div>
+              <div className="h-8 w-32 bg-gray-800 rounded-lg mb-2" />
               <div className="space-y-1">
+                <div className="h-2 bg-gray-800 rounded-full" />
                 <div className="flex justify-between">
-                  <div className="h-3 w-16 bg-gray-800 rounded-lg" /> {/* Progress text */}
-                  <div className="h-3 w-8 bg-gray-800 rounded-lg" /> {/* Percentage */}
+                  <div className="h-3 w-16 bg-gray-800 rounded-lg" />
+                  <div className="h-3 w-8 bg-gray-800 rounded-lg" />
                 </div>
-                <div className="h-2 w-full bg-gray-800/50 rounded-full" /> {/* Progress bar */}
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Sales Activity Chart Skeleton */}
-      <div className="mb-8">
-        <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50">
-          <div className="h-6 w-48 bg-gray-800 rounded-lg mb-4" /> {/* Chart title */}
-          <div className="h-[300px] bg-gray-800/50 rounded-lg" /> {/* Chart area */}
-        </div>
+      {/* Chart skeleton */}
+      <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 mb-8">
+        <div className="h-6 w-48 bg-gray-800 rounded-lg mb-8" />
+        <div className="h-64 w-full bg-gray-800 rounded-lg" />
       </div>
 
-      {/* Recent Deals Section Skeleton */}
-      <div className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-gray-800/50 mt-6 sm:mt-8">
+      {/* Recent deals skeleton */}
+      <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50">
         <div className="flex justify-between items-center mb-6">
-          <div className="h-6 w-32 bg-gray-800 rounded-lg" /> {/* Section title */}
-          <div className="h-9 w-64 bg-gray-800 rounded-lg" /> {/* Search input */}
+          <div className="h-6 w-36 bg-gray-800 rounded-lg" />
+          <div className="h-9 w-48 bg-gray-800 rounded-lg" />
         </div>
         <div className="space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex items-center gap-4 p-4 bg-gray-800/50 rounded-xl">
-              <div className="w-10 h-10 bg-gray-800 rounded-lg" /> {/* Deal icon */}
-              <div className="flex-1">
-                <div className="h-5 w-48 bg-gray-800 rounded-lg mb-1" /> {/* Deal title */}
-                <div className="h-4 w-32 bg-gray-800 rounded-lg" /> {/* Deal details */}
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-gray-800/50 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-gray-700 rounded-lg" />
+                  <div>
+                    <div className="h-5 w-32 bg-gray-700 rounded-lg mb-1" />
+                    <div className="h-4 w-48 bg-gray-700 rounded-lg" />
+                  </div>
+                </div>
+                <div>
+                  <div className="h-6 w-24 bg-gray-700 rounded-lg mb-1" />
+                  <div className="h-4 w-16 bg-gray-700 rounded-lg" />
+                </div>
               </div>
-              <div className="h-6 w-24 bg-gray-800 rounded-lg" /> {/* Deal amount */}
             </div>
           ))}
         </div>
@@ -344,8 +376,9 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const { userData } = useUser();
   const navigate = useNavigate();
-  const { activities, isLoadingActivities } = useActivities();
-  const { data: targets, isLoadingSales } = useTargets(userData?.id);
+  const { activities, isLoading: isLoadingActivities } = useActivities();
+  const { data: targets, isLoading: isLoadingSales } = useTargets(userData?.id);
+  const { setFilters } = useActivityFilters();
 
   const selectedMonthRange = useMemo(() => ({
     start: startOfMonth(selectedMonth),
@@ -467,6 +500,18 @@ export default function Dashboard() {
        activity.details?.toLowerCase().includes(searchQuery.toLowerCase()))
     ), [selectedMonthActivities, searchQuery]);
 
+  // For handling specific deal clicks
+  const handleDealClick = (deal: Deal) => {
+    setFilters({ 
+      type: 'sale',
+      dateRange: {
+        start: new Date(deal.date),
+        end: new Date(deal.date)
+      }
+    });
+    navigate('/activity');
+  };
+
   // Check if any data is loading
   const isAnyLoading = isLoadingActivities || isLoadingSales || !userData;
 
@@ -573,29 +618,20 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Deals Section */}
-      <div className="bg-gray-900/50 backdrop-blur-xl rounded-3xl p-4 sm:p-6 border border-gray-800/50 mt-6 sm:mt-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-xl font-bold">
-              {searchQuery ? 'Search Results' : 'Recent Deals'}
-            </h2>
-            <p className="text-sm text-gray-400">
-              {searchQuery 
-                ? `Found ${filteredDeals.length} matching deals`
-                : 'Track your latest sales activities'
-              }
-            </p>
+      <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+          <h2 className="text-xl font-semibold text-white">Recent Deals</h2>
+          <div className="relative w-full sm:w-64">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by client or amount..."
+              className="w-full py-2 px-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500"
+            />
           </div>
-          <button
-            className="hidden sm:block px-4 py-2 rounded-xl bg-violet-500/10 text-violet-500 border border-violet-500/20 hover:bg-violet-500/20 transition-colors"
-            onClick={() => navigate('/activity')}
-          >
-            View All
-          </button>
         </div>
-        
-        {/* Deals List */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredDeals.map((deal) => (
             <motion.div
               key={deal.id}
@@ -618,16 +654,6 @@ export default function Dashboard() {
                     transition={{ duration: 0.5 }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setFilters({ 
-                        type: 'sale',
-                        dateRange: {
-                          start: new Date(deal.date),
-                          end: new Date(deal.date)
-                        }
-                      });
-                      navigate('/activity');
-                    }}
-                    onClick={() => {
                       setFilters({ 
                         type: 'sale',
                         dateRange: {
