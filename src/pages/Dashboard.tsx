@@ -19,7 +19,6 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import SalesActivityChart from '@/components/SalesActivityChart';
 import ReactDOM from 'react-dom';
 
@@ -100,17 +99,6 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
       setFilters({ type, dateRange });
       navigate('/activity');
     }
-  };
-
-  const handleDealClick = (deal: Deal) => {
-    setFilters({ 
-      type: 'sale',
-      dateRange: {
-        start: new Date(deal.date),
-        end: new Date(deal.date)
-      }
-    });
-    navigate('/activity');
   };
 
   const getIconColor = (title: string) => {
@@ -385,11 +373,6 @@ export default function Dashboard() {
     end: endOfMonth(selectedMonth),
   }), [selectedMonth]);
 
-  const previousMonthRange = useMemo(() => ({
-    start: startOfMonth(subMonths(selectedMonth, 1)),
-    end: endOfMonth(subMonths(selectedMonth, 1)),
-  }), [selectedMonth]);
-
   // Get the current day of month for comparing with the same day in previous month
   const currentDayOfMonth = useMemo(() => getDate(new Date()), []);
 
@@ -406,7 +389,6 @@ export default function Dashboard() {
     const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
     
     // Calculate the cutoff date (same day of month as today, but in previous month)
-    const today = new Date();
     const dayOfMonth = Math.min(currentDayOfMonth, getDate(endOfMonth(prevMonthStart)));
     const prevMonthCutoff = new Date(prevMonthStart);
     prevMonthCutoff.setDate(dayOfMonth);
@@ -499,18 +481,6 @@ export default function Dashboard() {
        activity.amount?.toString().includes(searchQuery) ||
        activity.details?.toLowerCase().includes(searchQuery.toLowerCase()))
     ), [selectedMonthActivities, searchQuery]);
-
-  // For handling specific deal clicks
-  const handleDealClick = (deal: Deal) => {
-    setFilters({ 
-      type: 'sale',
-      dateRange: {
-        start: new Date(deal.date),
-        end: new Date(deal.date)
-      }
-    });
-    navigate('/activity');
-  };
 
   // Check if any data is loading
   const isAnyLoading = isLoadingActivities || isLoadingSales || !userData;
@@ -643,7 +613,16 @@ export default function Dashboard() {
               }}
               whileTap={{ scale: 0.98 }}
               className="bg-gray-800/50 rounded-xl p-3 sm:p-4 hover:bg-gray-800/70 transition-all duration-300 group hover:shadow-lg hover:shadow-emerald-500/10 border border-transparent hover:border-emerald-500/20 relative overflow-hidden cursor-pointer"
-              onClick={() => handleDealClick(deal)}
+              onClick={() => {
+                setFilters({ 
+                  type: 'sale',
+                  dateRange: {
+                    start: new Date(deal.date),
+                    end: new Date(deal.date)
+                  }
+                });
+                navigate('/activity');
+              }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
