@@ -67,28 +67,47 @@ async function impersonateUser(userId: string) {
   });
 
   if (signInError) throw signInError;
+
+  // Clear any cached queries to ensure fresh data load for impersonated user
+  if (window.queryClient) {
+    window.queryClient.invalidateQueries();
+  }
 }
 
 async function stopImpersonating() {
   const originalUserId = localStorage.getItem('originalUserId');
   if (!originalUserId) return;
 
-  // Get original user's login token
-  const { data: token, error: tokenError } = await supabase.functions.invoke('restore-user', {
-    body: { userId: originalUserId }
-  });
+  try {
+    // Get original user's login token
+    const { data: token, error: tokenError } = await supabase.functions.invoke('restore-user', {
+      body: { userId: originalUserId }
+    });
 
-  if (tokenError) throw tokenError;
+    if (tokenError) throw tokenError;
 
-  // Sign back in as original user
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: token.email,
-    password: token.password
-  });
+    // Remove the impersonation flag BEFORE signing back in
+    // This ensures the auth state change listener will detect the flag is already gone
+    localStorage.removeItem('originalUserId');
 
-  if (signInError) throw signInError;
+    // Sign back in as original user
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: token.email,
+      password: token.password
+    });
 
-  localStorage.removeItem('originalUserId');
+    if (signInError) throw signInError;
+
+    // Clear any cached queries to ensure fresh data load for original user
+    if (window.queryClient) {
+      window.queryClient.invalidateQueries();
+    }
+  } catch (error) {
+    console.error('Error stopping impersonation:', error);
+    // If there's an error, still try to clear the localStorage to avoid being stuck
+    localStorage.removeItem('originalUserId');
+    throw error;
+  }
 }
 
 export function useUser() {
@@ -100,10 +119,17 @@ export function useUser() {
 
   useEffect(() => {
     console.log('Setting up auth listener...');
+    
+    // Check for impersonation state immediately
+    const isCurrentlyImpersonating = !!localStorage.getItem('originalUserId');
+    setIsImpersonating(isCurrentlyImpersonating);
+    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
+      
+      // Check again in case it changed
       setIsImpersonating(!!localStorage.getItem('originalUserId'));
     });
 
@@ -111,7 +137,11 @@ export function useUser() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', { event, userId: session?.user?.id });
       setUser(session?.user ?? null);
-      setIsImpersonating(!!localStorage.getItem('originalUserId'));
+      
+      // Force re-check impersonation status on each auth state change
+      const impersonating = !!localStorage.getItem('originalUserId');
+      console.log('Impersonation status on auth change:', impersonating);
+      setIsImpersonating(impersonating);
     });
 
     return () => {
@@ -156,6 +186,10 @@ export function useUser() {
   const endImpersonating = async () => {
     try {
       await stopImpersonating();
+      
+      // Force UI update immediately
+      setIsImpersonating(false);
+      
       toast.success('Returned to original user');
     } catch (error) {
       toast.error('Failed to stop impersonating');

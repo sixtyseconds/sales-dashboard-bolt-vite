@@ -21,6 +21,14 @@ const queryClient = new QueryClient({
   },
 });
 
+// Make queryClient globally available
+declare global {
+  interface Window {
+    queryClient: QueryClient;
+  }
+}
+window.queryClient = queryClient;
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>

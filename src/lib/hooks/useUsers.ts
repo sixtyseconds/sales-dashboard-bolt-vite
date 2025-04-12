@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, supabaseAdmin } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 export interface User {
   id: string;
@@ -66,9 +67,42 @@ async function updateUser(userId: string, updates: any) {
 }
 
 async function impersonateUser(userId: string) {
-  // This would typically involve creating a temporary token or session
-  // For now, we'll just simulate it
-  toast.success('Impersonation not implemented in demo');
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  // Check if current user is admin
+  const { data: currentUser } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', session.user.id)
+    .single();
+
+  if (!currentUser?.is_admin) {
+    throw new Error('Unauthorized');
+  }
+
+  // Get impersonation token
+  const { data: token, error: tokenError } = await supabase.functions.invoke('impersonate-user', {
+    body: { userId }
+  });
+
+  if (tokenError) throw tokenError;
+
+  // Store original user ID for restoring later
+  localStorage.setItem('originalUserId', session.user.id);
+
+  // Sign in as impersonated user
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: token.email,
+    password: token.password
+  });
+
+  if (signInError) throw signInError;
+
+  // Clear any cached queries to ensure fresh data load for impersonated user
+  if (window.queryClient) {
+    window.queryClient.invalidateQueries();
+  }
 }
 
 async function deleteUser(userId: string) {
