@@ -262,8 +262,8 @@ export function useActivities() {
       toast.success('Activity added successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message);
-      console.error('Failed to add activity:', error);
+      toast.error('Failed to add activity');
+      console.error('[Activities]', error);
     },
   });
 

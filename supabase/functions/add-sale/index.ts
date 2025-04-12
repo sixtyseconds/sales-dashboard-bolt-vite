@@ -84,6 +84,25 @@ serve(async (req) => {
       throw new Error('Failed to create sale')
     }
 
+    // Add sale to database
+    const { error: insertError } = await supabaseAdmin
+      .from('sales')
+      .insert([{
+        user_id: user.id,
+        type: saleType,
+        client_name: clientName,
+        details: details || `${saleType} Sale`,
+        amount,
+        sales_rep: salesRep,
+        date: new Date().toISOString()
+      }])
+      .single()
+
+    if (insertError) {
+      console.error('[Database]', insertError)
+      throw insertError
+    }
+
     return new Response(
       JSON.stringify(data),
       {

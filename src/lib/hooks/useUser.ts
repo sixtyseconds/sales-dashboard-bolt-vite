@@ -103,7 +103,7 @@ async function stopImpersonating() {
       window.queryClient.invalidateQueries();
     }
   } catch (error) {
-    console.error('Error stopping impersonation:', error);
+    console.error('[Auth]', error);
     // If there's an error, still try to clear the localStorage to avoid being stuck
     localStorage.removeItem('originalUserId');
     throw error;
@@ -118,15 +118,8 @@ export function useUser() {
   const [isImpersonating, setIsImpersonating] = useState(false);
 
   useEffect(() => {
-    console.log('Setting up auth listener...');
-    
-    // Check for impersonation state immediately
-    const isCurrentlyImpersonating = !!localStorage.getItem('originalUserId');
-    setIsImpersonating(isCurrentlyImpersonating);
-    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
       
       // Check again in case it changed
@@ -135,39 +128,32 @@ export function useUser() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', { event, userId: session?.user?.id });
       setUser(session?.user ?? null);
       
       // Force re-check impersonation status on each auth state change
       const impersonating = !!localStorage.getItem('originalUserId');
-      console.log('Impersonation status on auth change:', impersonating);
       setIsImpersonating(impersonating);
     });
 
     return () => {
-      console.log('Cleaning up auth listener');
       subscription.unsubscribe();
     };
   }, []);
 
   useEffect(() => {
     if (user) {
-      console.log('Fetching user profile for:', user.id);
       fetchUserProfile(user)
         .then(data => {
-          console.log('User profile loaded:', data?.id);
           setUserData(data);
         })
         .catch(error => {
-          console.error('Error loading user profile:', error);
+          console.error('[Profile]', error);
           setError(error);
         })
         .finally(() => {
-          console.log('Finished loading user profile');
           setLoading(false);
         });
     } else {
-      console.log('No user, clearing user data');
       setUserData(null);
       setLoading(false);
     }
@@ -179,7 +165,7 @@ export function useUser() {
       toast.success('Successfully impersonating user');
     } catch (error) {
       toast.error('Failed to impersonate user');
-      console.error('Impersonation error:', error);
+      console.error('[Impersonation]', error);
     }
   };
 
@@ -193,7 +179,7 @@ export function useUser() {
       toast.success('Returned to original user');
     } catch (error) {
       toast.error('Failed to stop impersonating');
-      console.error('Stop impersonation error:', error);
+      console.error('[Impersonation]', error);
     }
   };
 

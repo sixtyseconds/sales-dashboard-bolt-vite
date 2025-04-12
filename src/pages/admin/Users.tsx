@@ -73,7 +73,7 @@ export default function Users() {
       navigate('/');
     } catch (error) {
       toast.error('Failed to impersonate user');
-      console.error('Impersonation error:', error);
+      console.error('[Impersonation]', error);
     }
   };
 

@@ -65,28 +65,30 @@ serve(async (req) => {
     }
 
     // Create activity
-    const { data, error } = await supabaseAdmin
+    const activityData = {
+      user_id: user.id,
+      type,
+      client_name: clientName,
+      details,
+      amount: type === 'sale' ? amount : null,
+      priority,
+      sales_rep: salesRep,
+      date: new Date().toISOString()
+    }
+
+    // Add activity to database
+    const { error } = await supabaseAdmin
       .from('activities')
-      .insert({
-        user_id: user.id,
-        type,
-        client_name: clientName,
-        details,
-        amount: type === 'sale' ? amount : null,
-        priority,
-        sales_rep: salesRep,
-        date: new Date().toISOString()
-      })
-      .select()
+      .insert([activityData])
       .single()
 
     if (error) {
-      console.error('Database error:', error)
-      throw new Error('Failed to create activity')
+      console.error('[Database]', error)
+      throw error
     }
 
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(activityData),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

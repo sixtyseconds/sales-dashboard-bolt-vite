@@ -114,7 +114,7 @@ async function deleteUser(userId: string) {
       .eq('user_id', userId);
     
     if (activitiesError) {
-      console.error('Error deleting activities:', activitiesError);
+      console.error('[Users] Delete activities:', activitiesError);
       throw activitiesError;
     }
 
@@ -125,7 +125,7 @@ async function deleteUser(userId: string) {
       .eq('user_id', userId);
     
     if (targetsError) {
-      console.error('Error deleting targets:', targetsError);
+      console.error('[Users] Delete targets:', targetsError);
       throw targetsError;
     }
 
@@ -136,7 +136,7 @@ async function deleteUser(userId: string) {
       .eq('id', userId);
     
     if (profileError) {
-      console.error('Error deleting profile:', profileError);
+      console.error('[Users] Delete profile:', profileError);
       throw profileError;
     }
 
@@ -144,13 +144,13 @@ async function deleteUser(userId: string) {
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     
     if (authError) {
-      console.error('Error deleting auth user:', authError);
+      console.error('[Users] Delete auth user:', authError);
       throw authError;
     }
     
     toast.success('User deleted successfully');
   } catch (error) {
-    console.error('Error deleting user:', error);
+    console.error('[Users] Delete operation failed:', error);
     toast.error('Failed to delete user');
     throw error;
   }
@@ -173,7 +173,7 @@ export function useUsers() {
     },
     onError: (error: Error) => {
       toast.error('Failed to update user');
-      console.error('Update error:', error);
+      console.error('[Users]', error);
     },
   });
 
@@ -184,7 +184,7 @@ export function useUsers() {
     },
     onError: (error: Error) => {
       toast.error('Failed to delete user');
-      console.error('Delete error:', error);
+      console.error('[Users]', error);
     },
   });
 
@@ -195,7 +195,7 @@ export function useUsers() {
     },
     onError: (error: Error) => {
       toast.error('Failed to impersonate user');
-      console.error('Impersonation error:', error);
+      console.error('[Users]', error);
     },
   });
 

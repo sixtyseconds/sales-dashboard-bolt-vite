@@ -50,7 +50,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       toast.success('Logged out successfully');
     } catch (error: any) {
       toast.error('Error logging out');
-      console.error('Logout error:', error);
+      console.error('[Auth]', error);
     }
   };
 

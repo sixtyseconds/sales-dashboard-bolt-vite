@@ -119,9 +119,8 @@ export default function Profile() {
       const publicUrl = await uploadProfileImage(file);
       toast.success('Profile picture updated successfully');
     } catch (error) {
-      toast.error('Failed to upload profile picture');
-      console.error('Upload error:', error);
-    } finally {
+      toast.error('Upload failed');
+      console.error('[Profile]', error);
       setUploading(false);
     }
   };
