@@ -5,9 +5,8 @@ import { useTargets } from '@/lib/hooks/useTargets';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { useNavigate } from 'react-router-dom';
 import { useActivities } from '@/lib/hooks/useActivities';
-import { format, startOfMonth, endOfMonth, subMonths, addMonths, isAfter, isBefore, isSameDay, getDate } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths, isAfter, isBefore, getDate } from 'date-fns';
 import {
-  DollarSign,
   PoundSterling,
   Phone,
   Users,
@@ -49,7 +48,7 @@ interface TooltipProps {
   };
 }
 
-interface Deal {
+export interface Deal {
   id: string;
   date: string;
   client_name: string;
