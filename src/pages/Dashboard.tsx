@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/lib/hooks/useUser';
 import { useTargets } from '@/lib/hooks/useTargets';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { useNavigate } from 'react-router-dom';
 import { useActivities } from '@/lib/hooks/useActivities';
-import { format, startOfMonth, endOfMonth, subMonths, addMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, addMonths, isAfter, isBefore, isSameDay, getDate } from 'date-fns';
 import {
   DollarSign,
   PoundSterling,
@@ -14,9 +14,14 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import SalesActivityChart from '@/components/SalesActivityChart';
+import ReactDOM from 'react-dom';
 
 interface MetricCardProps {
   title: string;
@@ -29,11 +34,45 @@ interface MetricCardProps {
     start: Date;
     end: Date;
   };
+  previousMonthTotal?: number;
 }
 
-const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }: MetricCardProps) => {
+// Tooltip component that uses Portal
+const Tooltip = ({ show, content, position }) => {
+  if (!show) return null;
+  
+  return ReactDOM.createPortal(
+    <div 
+      style={{
+        position: 'fixed',
+        top: position.y - 10,
+        left: position.x,
+        transform: 'translate(-50%, -100%)',
+        zIndex: 9999,
+      }}
+      className="bg-gray-900/95 text-white text-xs rounded-lg p-2.5 w-48 shadow-xl border border-gray-700"
+    >
+      <div className="text-center font-medium mb-2">{content.title}</div>
+      <div className="flex justify-center items-center gap-1">
+        <span className={content.positive ? "text-emerald-400" : "text-red-400"}>
+          {content.message}
+        </span>
+      </div>
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900 border-r border-b border-gray-700"></div>
+    </div>,
+    document.body
+  );
+};
+
+const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, previousMonthTotal }: MetricCardProps) => {
   const navigate = useNavigate();
   const { setFilters } = useActivityFilters();
+  const [showTrendTooltip, setShowTrendTooltip] = useState(false);
+  const [showTotalTooltip, setShowTotalTooltip] = useState(false);
+  const [trendPosition, setTrendPosition] = useState({ x: 0, y: 0 });
+  const [totalPosition, setTotalPosition] = useState({ x: 0, y: 0 });
+  const trendRef = useRef(null);
+  const totalRef = useRef(null);
 
   const handleClick = () => {
     if (type) {
@@ -68,12 +107,55 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
     }
   };
 
+  // Calculate trend against previous month's total
+  const totalTrend = previousMonthTotal 
+    ? Math.round(((value - previousMonthTotal) / previousMonthTotal) * 100) 
+    : 0;
+
+  // Helper function for arrow styling
+  const getArrowClass = (trendValue) => {
+    return trendValue >= 0 
+      ? 'text-emerald-500' 
+      : 'text-red-500';
+  };
+
+  // Get background colors based on trend values
+  const getTrendBg = (trendValue) => {
+    return trendValue >= 0 
+      ? 'bg-emerald-500/10 border-emerald-500/30' 
+      : 'bg-red-500/10 border-red-500/30';
+  };
+
+  // Handle mouse enter for trend tooltip
+  const handleTrendMouseEnter = () => {
+    if (trendRef.current) {
+      const rect = trendRef.current.getBoundingClientRect();
+      setTrendPosition({ 
+        x: rect.left + rect.width / 2, 
+        y: rect.top 
+      });
+      setShowTrendTooltip(true);
+    }
+  };
+
+  // Handle mouse enter for total tooltip
+  const handleTotalMouseEnter = () => {
+    if (totalRef.current) {
+      const rect = totalRef.current.getBoundingClientRect();
+      setTotalPosition({ 
+        x: rect.left + rect.width / 2, 
+        y: rect.top 
+      });
+      setShowTotalTooltip(true);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       onClick={handleClick}
-      className="relative overflow-hidden bg-gradient-to-br from-gray-900/80 to-gray-900/40 backdrop-blur-xl rounded-3xl p-6 border border-gray-800/50"
+      className="relative overflow-visible bg-gradient-to-br from-gray-900/80 to-gray-900/40 backdrop-blur-xl rounded-3xl p-6 border border-gray-800/50"
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -93,11 +175,65 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
             <span className="text-xs text-gray-500">This month</span>
           </div>
         </div>
-        <div className={`px-2.5 py-1 rounded-full text-xs font-medium 
-          ${trend >= 0 
-            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
-            : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-          {trend >= 0 ? '+' : ''}{trend}%
+        <div className="flex items-center gap-2">
+          {/* Arrow for same time in previous month comparison */}
+          <div 
+            ref={trendRef}
+            className={`p-2 rounded-lg ${getTrendBg(trend)} backdrop-blur-sm relative transition-all duration-300 hover:scale-105 shadow-lg`}
+            onMouseEnter={handleTrendMouseEnter}
+            onMouseLeave={() => setShowTrendTooltip(false)}
+          >
+            <div className="flex items-center gap-1.5">
+              {trend >= 0 ? (
+                <TrendingUp className={`w-4 h-4 ${getArrowClass(trend)}`} />
+              ) : (
+                <TrendingDown className={`w-4 h-4 ${getArrowClass(trend)}`} />
+              )}
+              <span className={`text-xs font-semibold ${getArrowClass(trend)}`}>
+                {trend >= 0 ? '+' : ''}{trend}%
+              </span>
+            </div>
+          </div>
+          
+          {/* Arrow for total previous month comparison */}
+          <div 
+            ref={totalRef}
+            className={`p-2 rounded-lg ${getTrendBg(totalTrend)} backdrop-blur-sm relative transition-all duration-300 hover:scale-105 shadow-lg`}
+            onMouseEnter={handleTotalMouseEnter}
+            onMouseLeave={() => setShowTotalTooltip(false)}
+          >
+            <div className="flex items-center gap-1.5">
+              {totalTrend >= 0 ? (
+                <ArrowUp className={`w-4 h-4 ${getArrowClass(totalTrend)}`} />
+              ) : (
+                <ArrowDown className={`w-4 h-4 ${getArrowClass(totalTrend)}`} />
+              )}
+              <span className={`text-xs font-semibold ${getArrowClass(totalTrend)}`}>
+                {totalTrend >= 0 ? '+' : ''}{totalTrend}%
+              </span>
+            </div>
+          </div>
+          
+          {/* Tooltips using Portal */}
+          <Tooltip 
+            show={showTrendTooltip}
+            position={trendPosition}
+            content={{
+              title: "Vs. same point last month",
+              message: trend >= 0 ? "Growing faster" : "Growing slower",
+              positive: trend >= 0
+            }}
+          />
+          
+          <Tooltip 
+            show={showTotalTooltip}
+            position={totalPosition}
+            content={{
+              title: "Vs. previous month's total",
+              message: totalTrend >= 0 ? "Already ahead of last month" : "Behind last month's performance",
+              positive: totalTrend >= 0
+            }}
+          />
         </div>
       </div>
       
@@ -116,7 +252,7 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
             <span>Progress</span>
             <span>{Math.round((value / target) * 100)}%</span>
           </div>
-          <div className="h-2 rounded-full bg-gray-800/50 overflow-hidden">
+          <div className="h-2 rounded-full bg-gray-800/50 overflow-hidden shadow-inner">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${Math.min(100, (value / target) * 100)}%` }}
@@ -126,7 +262,7 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange }
                 title === 'Outbound' ? 'bg-gradient-to-r from-blue-500 to-blue-400' :
                 title === 'Meetings' ? 'bg-gradient-to-r from-violet-500 to-violet-400' :
                 'bg-gradient-to-r from-orange-500 to-orange-400'
-              }`}
+              } shadow-lg`}
             />
           </div>
         </div>
@@ -221,6 +357,9 @@ export default function Dashboard() {
     end: endOfMonth(subMonths(selectedMonth, 1)),
   }), [selectedMonth]);
 
+  // Get the current day of month for comparing with the same day in previous month
+  const currentDayOfMonth = useMemo(() => getDate(new Date()), []);
+
   // Filter activities for selected month and calculate metrics
   const selectedMonthActivities = useMemo(() => 
     activities?.filter(activity => {
@@ -228,12 +367,22 @@ export default function Dashboard() {
       return activityDate >= selectedMonthRange.start && activityDate <= selectedMonthRange.end;
     }) || [], [activities, selectedMonthRange]);
 
-  // Get previous month's activities for trend calculation
-  const previousMonthActivities = useMemo(() => 
-    activities?.filter(activity => {
+  // Get previous month's activities up to the SAME DAY for proper trend calculation
+  const previousMonthToDateActivities = useMemo(() => {
+    // Get the previous month's range
+    const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+    
+    // Calculate the cutoff date (same day of month as today, but in previous month)
+    const today = new Date();
+    const dayOfMonth = Math.min(currentDayOfMonth, getDate(endOfMonth(prevMonthStart)));
+    const prevMonthCutoff = new Date(prevMonthStart);
+    prevMonthCutoff.setDate(dayOfMonth);
+    
+    return activities?.filter(activity => {
       const activityDate = new Date(activity.date);
-      return activityDate >= previousMonthRange.start && activityDate <= previousMonthRange.end;
-    }) || [], [activities, previousMonthRange]);
+      return activityDate >= prevMonthStart && activityDate <= prevMonthCutoff;
+    }) || [];
+  }, [activities, selectedMonth, currentDayOfMonth]);
 
   // Calculate metrics for selected month
   const metrics = useMemo(() => ({
@@ -251,34 +400,63 @@ export default function Dashboard() {
       .reduce((sum, a) => sum + (a.quantity || 1), 0)
   }), [selectedMonthActivities]);
 
-  // Calculate metrics for previous month
-  const previousMetrics = useMemo(() => ({
-    revenue: previousMonthActivities
+  // Calculate metrics for previous month TO SAME DATE (for fair comparison)
+  const previousMetricsToDate = useMemo(() => ({
+    revenue: previousMonthToDateActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0),
-    outbound: previousMonthActivities
+    outbound: previousMonthToDateActivities
       .filter(a => a.type === 'outbound')
       .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    meetings: previousMonthActivities
+    meetings: previousMonthToDateActivities
       .filter(a => a.type === 'meeting')
       .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    proposals: previousMonthActivities
+    proposals: previousMonthToDateActivities
       .filter(a => a.type === 'proposal')
       .reduce((sum, a) => sum + (a.quantity || 1), 0)
-  }), [previousMonthActivities]);
+  }), [previousMonthToDateActivities]);
 
-  // Calculate trends
+  // Calculate previous month's complete total metrics (for the entire previous month)
+  const previousMonthTotals = useMemo(() => {
+    // First, get the full previous month date range
+    const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+    const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
+    
+    // Get all activities from the previous month (entire month)
+    const fullPreviousMonthActivities = activities?.filter(activity => {
+      const activityDate = new Date(activity.date);
+      return !isBefore(activityDate, prevMonthStart) && !isAfter(activityDate, prevMonthEnd);
+    }) || [];
+    
+    // Calculate the full month totals
+    return {
+      revenue: fullPreviousMonthActivities
+        .filter(a => a.type === 'sale')
+        .reduce((sum, a) => sum + (a.amount || 0), 0),
+      outbound: fullPreviousMonthActivities
+        .filter(a => a.type === 'outbound')
+        .reduce((sum, a) => sum + (a.quantity || 1), 0),
+      meetings: fullPreviousMonthActivities
+        .filter(a => a.type === 'meeting')
+        .reduce((sum, a) => sum + (a.quantity || 1), 0),
+      proposals: fullPreviousMonthActivities
+        .filter(a => a.type === 'proposal')
+        .reduce((sum, a) => sum + (a.quantity || 1), 0)
+    };
+  }, [activities, selectedMonth]);
+
+  // Calculate trends (comparing current month-to-date with previous month SAME DATE)
   const calculateTrend = (current: number, previous: number) => {
     if (previous === 0) return 0;
     return Math.round(((current - previous) / previous) * 100);
   };
 
   const trends = useMemo(() => ({
-    revenue: calculateTrend(metrics.revenue, previousMetrics.revenue),
-    outbound: calculateTrend(metrics.outbound, previousMetrics.outbound),
-    meetings: calculateTrend(metrics.meetings, previousMetrics.meetings),
-    proposals: calculateTrend(metrics.proposals, previousMetrics.proposals)
-  }), [metrics, previousMetrics]);
+    revenue: calculateTrend(metrics.revenue, previousMetricsToDate.revenue),
+    outbound: calculateTrend(metrics.outbound, previousMetricsToDate.outbound),
+    meetings: calculateTrend(metrics.meetings, previousMetricsToDate.meetings),
+    proposals: calculateTrend(metrics.proposals, previousMetricsToDate.proposals)
+  }), [metrics, previousMetricsToDate]);
 
   // Filter deals based on search query
   const filteredDeals = useMemo(() => 
@@ -355,6 +533,7 @@ export default function Dashboard() {
           icon={PoundSterling}
           type="sale"
           dateRange={selectedMonthRange}
+          previousMonthTotal={previousMonthTotals.revenue}
         />
         <MetricCard
           title="Outbound"
@@ -364,6 +543,7 @@ export default function Dashboard() {
           icon={Phone}
           type="outbound"
           dateRange={selectedMonthRange}
+          previousMonthTotal={previousMonthTotals.outbound}
         />
         <MetricCard
           title="Meetings"
@@ -373,6 +553,7 @@ export default function Dashboard() {
           icon={Users}
           type="meeting"
           dateRange={selectedMonthRange}
+          previousMonthTotal={previousMonthTotals.meetings}
         />
         <MetricCard
           title="Proposals"
@@ -382,6 +563,7 @@ export default function Dashboard() {
           icon={FileText}
           type="proposal"
           dateRange={selectedMonthRange}
+          previousMonthTotal={previousMonthTotals.proposals}
         />
       </div>
 
