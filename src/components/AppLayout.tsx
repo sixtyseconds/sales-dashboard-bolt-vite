@@ -63,10 +63,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
+    { icon: Kanban, label: 'Pipeline', href: '/pipeline' },
     { icon: Activity, label: 'Heatmap', href: '/heatmap' },
     { icon: FileText, label: 'Activity Log', href: '/activity' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
-    { icon: Kanban, label: 'Pipeline', href: '/pipeline' },
     ...(userData?.is_admin ? [
       { 
         icon: UserCog, 
