@@ -56,6 +56,8 @@ export function SalesTable() {
   const [editingActivity, setEditingActivity] = useState(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { activities, removeActivity } = useActivities();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
@@ -107,8 +109,20 @@ export function SalesTable() {
   };
 
   const handleDelete = (id) => {
+    console.log('Attempting to delete activity with id:', id);
+    if (!id) {
+      console.error('No activity ID provided for deletion');
+      return;
+    }
     removeActivity(id);
-    toast.success('Activity deleted successfully');
+    setDeleteDialogOpen(false);
+    setActivityToDelete(null);
+  };
+
+  const handleDeleteClick = (id: string) => {
+    console.log('Setting activity to delete:', id);
+    setActivityToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
   const handleUpdate = (updatedActivity) => {
@@ -422,44 +436,17 @@ export function SalesTable() {
               </DialogContent>
             </Dialog>
             
-            <Dialog>
-              <DialogTrigger asChild>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
-                </motion.button>
-              </DialogTrigger>
-              <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-gray-800/50 text-white p-6 rounded-xl">
-                <DialogHeader>
-                  <DialogTitle>Delete Activity</DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                  <p className="text-gray-400">
-                    Are you sure you want to delete this activity? This action cannot be undone.
-                  </p>
-                </div>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {}}
-                    className="bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => handleDelete(info.row.original.id)}
-                    className="bg-red-500 hover:bg-red-600 text-white"
-                  >
-                    Delete
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(info.row.original.id);
+              }}
+            >
+              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
+            </motion.button>
           </div>
         ),
       },
@@ -484,6 +471,42 @@ export function SalesTable() {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+
+  // Delete confirmation dialog - placed outside of the table rendering
+  const DeleteConfirmationDialog = () => (
+    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-gray-800/50 text-white p-6 rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Delete Activity</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-gray-400">
+            Are you sure you want to delete this activity? This action cannot be undone.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setDeleteDialogOpen(false)}
+            className="bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              console.log('Delete button clicked, id:', activityToDelete);
+              handleDelete(activityToDelete);
+            }}
+            className="bg-red-500 hover:bg-red-600 text-white"
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
@@ -701,6 +724,8 @@ export function SalesTable() {
           </div>
         </div>
       </div>
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmationDialog />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { format, subDays } from 'date-fns';
 import { supabase } from '../lib/supabase';
+import { IdentifierType } from '../../components/IdentifierField';
 
 const generateDummyData = async () => {
   const activities = [];
@@ -81,6 +82,8 @@ export interface Activity {
   status: 'completed' | 'pending' | 'cancelled';
   details: string;
   priority: 'high' | 'medium' | 'low';
+  contactIdentifier?: string;
+  contactIdentifierType?: IdentifierType;
 }
 
 interface ActivitiesStore {

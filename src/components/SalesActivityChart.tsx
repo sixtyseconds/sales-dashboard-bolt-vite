@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, subMonths, eachWeekOfInterval } from 'date-fns';
 import {
   ComposedChart,
   Bar,

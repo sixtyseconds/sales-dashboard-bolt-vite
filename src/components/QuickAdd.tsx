@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { useUser } from '@/lib/hooks/useUser';
 import { toast } from 'sonner';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { IdentifierField, IdentifierType } from './IdentifierField';
 
 interface QuickAddProps {
   isOpen: boolean;
@@ -23,7 +24,10 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
     details: '',
     amount: '',
     saleType: 'one-off',
-    outboundCount: '1'
+    outboundCount: '1',
+    outboundType: 'Call',
+    contactIdentifier: '',
+    contactIdentifierType: 'unknown' as IdentifierType
   });
 
   const location = useLocation();
@@ -39,14 +43,27 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate if contact identifier is provided and valid
+    if (!formData.contactIdentifier) {
+      toast.error('Please provide a contact identifier (email, phone number, or LinkedIn URL)');
+      return;
+    }
+    
+    if (formData.contactIdentifierType === 'unknown') {
+      toast.error('Please enter a valid email, phone number, or LinkedIn URL');
+      return;
+    }
+    
     try {
       if (selectedAction === 'outbound') {
         await addActivity({
           type: 'outbound',
           client_name: formData.client_name || 'Unknown',
-          details: formData.details,
+          details: formData.outboundType,
           quantity: parseInt(formData.outboundCount) || 1,
-          date: selectedDate.toISOString()
+          date: selectedDate.toISOString(),
+          contactIdentifier: formData.contactIdentifier,
+          contactIdentifierType: formData.contactIdentifierType
         });
       } else if (selectedAction === 'sale') {
         const saleData = {
@@ -54,7 +71,9 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           amount: parseFloat(formData.amount),
           details: formData.details || `${formData.saleType} Sale`,
           saleType: formData.saleType as 'one-off' | 'subscription' | 'lifetime',
-          date: selectedDate.toISOString()
+          date: selectedDate.toISOString(),
+          contactIdentifier: formData.contactIdentifier,
+          contactIdentifierType: formData.contactIdentifierType
         };
         
         await addSale(saleData);
@@ -64,7 +83,9 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           client_name: formData.client_name,
           details: formData.details,
           amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
-          date: selectedDate.toISOString()
+          date: selectedDate.toISOString(),
+          contactIdentifier: formData.contactIdentifier,
+          contactIdentifierType: formData.contactIdentifierType
         });
       }
       
@@ -75,7 +96,10 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
         details: '',
         amount: '',
         saleType: 'one-off',
-        outboundCount: '1'
+        outboundCount: '1',
+        outboundType: 'Call',
+        contactIdentifier: '',
+        contactIdentifierType: 'unknown'
       });
       setSelectedAction(null);
       onClose();
@@ -258,6 +282,29 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                     />
                   </div>
                 )}
+
+                {/* Contact Identifier Field - added to all activity types */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-400/90 flex items-center">
+                    Contact Identifier
+                    <span className="text-red-500 ml-1">*</span>
+                    <span className="text-xs text-gray-500 ml-2">(Email, Phone, or LinkedIn URL)</span>
+                  </label>
+                  <IdentifierField
+                    value={formData.contactIdentifier}
+                    onChange={(value, type) => 
+                      setFormData({
+                        ...formData, 
+                        contactIdentifier: value, 
+                        contactIdentifierType: type
+                      })
+                    }
+                    required={true}
+                    placeholder="Required: Enter email, phone, or LinkedIn URL"
+                    label={null}
+                  />
+                </div>
+                
                 {selectedAction === 'sale' && <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-400/90">
                     Sale Type
@@ -323,21 +370,47 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                   </div>
                 )}
                 {selectedAction === 'outbound' && (
-                  <div className="space-y-4">
+                  <>
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-400/90">
-                        Number of Activities
+                        Prospect Name
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2.5 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.client_name}
+                        onChange={(e) => setFormData({...formData, client_name: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Outbound Type
+                      </label>
+                      <select
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2.5 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.outboundType}
+                        onChange={(e) => setFormData({...formData, outboundType: e.target.value})}
+                      >
+                        <option value="Call">Call</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                        <option value="Email">Email</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Number of Contacts
                       </label>
                       <input
                         type="number"
-                        required
                         min="1"
-                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2.5 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                         value={formData.outboundCount}
                         onChange={(e) => setFormData({...formData, outboundCount: e.target.value})}
                       />
                     </div>
-                  </div>
+                  </>
                 )}
 
                 <div className="flex justify-end gap-3 mt-6">

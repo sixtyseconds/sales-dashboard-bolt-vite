@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, DollarSign, Users, Building, FileText } from 'lucide-react';
 import { useDealStages } from '@/lib/hooks/useDealStages';
+import { IdentifierField, IdentifierType } from '../../../components/IdentifierField';
+import { toast } from 'sonner';
 
 interface DealFormProps {
   deal?: any;
@@ -20,6 +22,8 @@ interface FormData {
   expected_close_date: string;
   description: string;
   probability: string | number;
+  contactIdentifier: string;
+  contactIdentifierType: IdentifierType;
 }
 
 export function DealForm({ 
@@ -39,7 +43,9 @@ export function DealForm({
     stage_id: '',
     expected_close_date: '',
     description: '',
-    probability: ''
+    probability: '',
+    contactIdentifier: '',
+    contactIdentifierType: 'unknown'
   });
   
   // Initialize form with deal data if editing
@@ -55,7 +61,9 @@ export function DealForm({
         stage_id: deal.stage_id || '',
         expected_close_date: deal.expected_close_date || '',
         description: deal.description || '',
-        probability: deal.probability || ''
+        probability: deal.probability || '',
+        contactIdentifier: deal.contactIdentifier || '',
+        contactIdentifierType: deal.contactIdentifierType || 'unknown'
       });
     } else if (initialStageId) {
       setFormData(prev => ({
@@ -88,6 +96,19 @@ export function DealForm({
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if contact identifier is provided
+    if (!formData.contactIdentifier) {
+      toast.error('Please provide a contact identifier (email, phone number, or LinkedIn URL)');
+      return;
+    }
+    
+    // Validate the contact identifier if it's provided
+    if (formData.contactIdentifierType === 'unknown') {
+      toast.error('Please enter a valid email, phone number, or LinkedIn URL');
+      return;
+    }
+    
     onSave(formData);
   };
   
@@ -176,6 +197,27 @@ export function DealForm({
                 outline-none text-white"
             />
           </div>
+        </div>
+        
+        {/* Contact Identifier Field with improved styling */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center">
+            Contact Identifier
+            <span className="text-red-500 ml-1">*</span>
+            <span className="text-xs text-gray-500 ml-2">(Email, Phone, or LinkedIn URL)</span>
+          </label>
+          <IdentifierField
+            value={formData.contactIdentifier}
+            onChange={(value, type) => 
+              setFormData({
+                ...formData, 
+                contactIdentifier: value, 
+                contactIdentifierType: type
+              })
+            }
+            required={true}
+            placeholder="Required: Enter email, phone or LinkedIn URL"
+          />
         </div>
         
         {/* Deal Value and Stage side by side */}

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
+import { IdentifierType } from '@/components/IdentifierField';
 
 export interface Activity {
   id: string;
@@ -17,6 +18,8 @@ export interface Activity {
   details: string;
   priority: 'high' | 'medium' | 'low';
   quantity?: number;
+  contactIdentifier?: string;
+  contactIdentifierType?: IdentifierType;
 }
 
 async function fetchActivities() {
@@ -42,6 +45,8 @@ async function createActivity(activity: {
   priority?: Activity['priority'];
   date?: string;
   quantity?: number;
+  contactIdentifier?: string;
+  contactIdentifierType?: IdentifierType;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -66,7 +71,9 @@ async function createActivity(activity: {
       sales_rep: `${profile.first_name} ${profile.last_name}`,
       date: activity.date || new Date().toISOString(),
       status: 'completed',
-      quantity: activity.quantity || 1
+      quantity: activity.quantity || 1,
+      contact_identifier: activity.contactIdentifier,
+      contact_identifier_type: activity.contactIdentifierType
     })
     .select()
     .single();
@@ -153,6 +160,8 @@ async function createSale(sale: {
   details?: string;
   saleType: 'one-off' | 'subscription' | 'lifetime';
   date?: string;
+  contactIdentifier?: string;
+  contactIdentifierType?: IdentifierType;
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -174,7 +183,9 @@ async function createSale(sale: {
     priority: 'high',
     sales_rep: `${profile.first_name} ${profile.last_name}`,
     date: sale.date || new Date().toISOString(),
-    status: 'completed'
+    status: 'completed',
+    contact_identifier: sale.contactIdentifier,
+    contact_identifier_type: sale.contactIdentifierType
   };
 
   const { data, error } = await supabase
