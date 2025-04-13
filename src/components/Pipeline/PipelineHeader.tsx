@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Search, Filter, PlusCircle } from 'lucide-react';
+import { Search, Filter, PlusCircle, LayoutGrid, Table, X, DollarSign, Percent } from 'lucide-react';
 import { usePipeline } from '@/lib/contexts/PipelineContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface PipelineHeaderProps {
   onAddDealClick: () => void;
+  view: 'kanban' | 'table';
+  onViewChange: (view: 'kanban' | 'table') => void;
 }
 
-export function PipelineHeader({ onAddDealClick }: PipelineHeaderProps) {
+export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineHeaderProps) {
   const { 
     searchTerm, 
     setSearchTerm, 
@@ -29,6 +32,8 @@ export function PipelineHeader({ onAddDealClick }: PipelineHeaderProps) {
     currency: 'GBP',
     maximumFractionDigits: 0
   }).format(weightedPipelineValue);
+
+  const hasActiveFilters = filterOptions.minValue || filterOptions.maxValue || filterOptions.probability || filterOptions.tags.length;
   
   return (
     <div className="mb-6 space-y-4">
@@ -70,14 +75,33 @@ export function PipelineHeader({ onAddDealClick }: PipelineHeaderProps) {
             className={`
               flex items-center gap-2 px-4 py-2.5 rounded-xl
               border transition-colors
-              ${filterOptions.minValue || filterOptions.maxValue || filterOptions.probability || filterOptions.tags.length
-                ? 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-                : 'bg-gray-800/50 text-gray-400 border-gray-700'}
+              ${hasActiveFilters
+                ? 'bg-violet-500/20 text-violet-400 border-violet-500/30 hover:bg-violet-500/30'
+                : 'bg-gray-800/50 text-gray-400 border-gray-700 hover:bg-gray-700/50'}
             `}
           >
-            <Filter className="w-5 h-5" />
-            <span>Filter</span>
+            <Filter className={`w-5 h-5 ${showFilters ? 'text-violet-400' : ''}`} />
+            <span>
+              {hasActiveFilters ? `Filters (${Object.values(filterOptions).filter(val => val !== null && val !== undefined && val.length !== 0).length})` : 'Filter'}
+            </span>
           </button>
+          
+          <div className="border border-gray-700 rounded-xl overflow-hidden flex">
+            <button 
+              onClick={() => onViewChange('kanban')}
+              className={`flex items-center gap-2 px-3 py-2.5 transition-colors ${view === 'kanban' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+            >
+              <LayoutGrid className="w-5 h-5 mr-2" />
+              <span className="hidden sm:inline">Kanban</span>
+            </button>
+            <button 
+              onClick={() => onViewChange('table')}
+              className={`flex items-center gap-2 px-3 py-2.5 transition-colors ${view === 'table' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+            >
+              <Table className="w-5 h-5 mr-2" />
+              <span className="hidden sm:inline">Table</span>
+            </button>
+          </div>
         </div>
         
         <div className="flex items-center px-3 py-2 rounded-xl border border-gray-700
@@ -95,81 +119,118 @@ export function PipelineHeader({ onAddDealClick }: PipelineHeaderProps) {
         </div>
       </div>
       
-      {/* Filter Panel */}
-      {showFilters && (
-        <div
-          className="p-4 rounded-xl border border-gray-700 bg-gray-800/50"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
-                Deal Value
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  placeholder="Min"
-                  value={filterOptions.minValue || ''}
-                  onChange={(e) => setFilterOptions({
-                    ...filterOptions,
-                    minValue: e.target.value ? Number(e.target.value) : null
+      {/* Filter Panel with Animation */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="p-6 rounded-xl border border-gray-700 bg-gray-800/70 backdrop-blur-sm shadow-lg">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-white">Filter Deals</h3>
+                <button 
+                  onClick={() => setShowFilters(false)}
+                  className="p-1 rounded-full hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <DollarSign className="w-4 h-4 mr-2 text-gray-400" />
+                      Deal Value Range
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          placeholder="Min"
+                          value={filterOptions.minValue || ''}
+                          onChange={(e) => setFilterOptions({
+                            ...filterOptions,
+                            minValue: e.target.value ? Number(e.target.value) : null
+                          })}
+                          className="w-full p-3 pl-4 rounded-lg border border-gray-700 bg-gray-900/80 text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
+                        />
+                      </div>
+                      <span className="text-gray-500">to</span>
+                      <div className="relative flex-1">
+                        <input
+                          type="number"
+                          placeholder="Max"
+                          value={filterOptions.maxValue || ''}
+                          onChange={(e) => setFilterOptions({
+                            ...filterOptions,
+                            maxValue: e.target.value ? Number(e.target.value) : null
+                          })}
+                          className="w-full p-3 pl-4 rounded-lg border border-gray-700 bg-gray-900/80 text-white focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-all"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
+                      <Percent className="w-4 h-4 mr-2 text-gray-400" />
+                      Minimum Probability
+                    </label>
+                    <div className="px-1">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={filterOptions.probability || 0}
+                        onChange={(e) => setFilterOptions({
+                          ...filterOptions,
+                          probability: Number(e.target.value) || null
+                        })}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                      />
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-xs text-gray-500">0%</span>
+                        <span className="text-sm font-medium text-violet-400">
+                          {filterOptions.probability || 0}%
+                        </span>
+                        <span className="text-xs text-gray-500">100%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-end mt-6 gap-3">
+                <button
+                  onClick={() => setFilterOptions({
+                    minValue: null,
+                    maxValue: null,
+                    probability: null,
+                    tags: []
                   })}
-                  className="w-full p-2 rounded-lg border border-gray-700 bg-gray-900/80 text-white"
-                />
-                <span className="text-gray-500">to</span>
-                <input
-                  type="number"
-                  placeholder="Max"
-                  value={filterOptions.maxValue || ''}
-                  onChange={(e) => setFilterOptions({
-                    ...filterOptions,
-                    maxValue: e.target.value ? Number(e.target.value) : null
-                  })}
-                  className="w-full p-2 rounded-lg border border-gray-700 bg-gray-900/80 text-white"
-                />
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-gray-700/70 transition-colors"
+                >
+                  Reset Filters
+                </button>
+                <button
+                  onClick={() => setShowFilters(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30 hover:bg-violet-500/30 transition-colors"
+                >
+                  Apply Filters
+                </button>
               </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
-                Min Probability (%)
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={filterOptions.probability || 0}
-                onChange={(e) => setFilterOptions({
-                  ...filterOptions,
-                  probability: Number(e.target.value) || null
-                })}
-                className="w-full bg-gray-700 rounded-lg appearance-none h-2 outline-none"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0%</span>
-                <span>{filterOptions.probability || 0}%</span>
-                <span>100%</span>
-              </div>
-            </div>
-            
-            <div className="flex items-end">
-              <button
-                onClick={() => setFilterOptions({
-                  minValue: null,
-                  maxValue: null,
-                  probability: null,
-                  tags: []
-                })}
-                className="w-full p-2 rounded-lg border border-gray-700 
-                  bg-gray-900/80 text-gray-400 hover:bg-gray-800 transition-colors"
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 

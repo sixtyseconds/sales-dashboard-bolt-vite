@@ -6,6 +6,7 @@ import { PipelineHeader } from './PipelineHeader';
 import { PipelineColumn } from './PipelineColumn';
 import { DealCard } from './DealCard';
 import { DealForm } from './DealForm';
+import { PipelineTable } from './PipelineTable';
 import { Loader2, ArrowDownUp } from 'lucide-react';
 
 interface ModalProps {
@@ -88,9 +89,11 @@ function PipelineContent() {
     error, 
     moveDealToStage,
     createDeal,
-    updateDeal 
+    updateDeal,
+    deleteDeal
   } = usePipeline();
   
+  const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [dealsByStage, setDealsByStage] = useState<Record<string, any[]>>({});
   const [activeContainer, setActiveContainer] = useState<string | null>(null);
   const [showDealForm, setShowDealForm] = useState(false);
@@ -257,26 +260,9 @@ function PipelineContent() {
               ]
             };
           }
+          
+          return prev;
         }
-        
-        return prev;
-      });
-    }
-    // If we're in the same container but hovering over a different item
-    else if (id !== overId) {
-      setDealsByStage(prev => {
-        const items = [...prev[activeContainer]];
-        const activeIndex = items.findIndex(item => item.id === id);
-        const overIndex = items.findIndex(item => item.id === overId);
-        
-        if (activeIndex !== -1 && overIndex !== -1) {
-          return {
-            ...prev,
-            [activeContainer]: arrayMove(items, activeIndex, overIndex)
-          };
-        }
-        
-        return prev;
       });
     }
   };
@@ -284,28 +270,48 @@ function PipelineContent() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     
-    // Reset the active states
-    setActiveDeal(null);
+    // Reset active states
     setActiveContainer(null);
+    setActiveDeal(null);
     
+    // Exit if we're not over anything
     if (!over) return;
     
-    const dealId = active.id as string;
-    const overContainer = over.id as string;
-    const sourceContainer = findContainer(dealId);
+    const { id } = active;
+    const { id: overId } = over;
     
-    // If dropped in a container directly
-    if (sourceContainer && sourceContainer !== overContainer && overContainer in dealsByStage) {
-      // Move to new stage in the backend
-      await moveDealToStage(dealId, overContainer);
+    // Find the containers
+    const activeContainer = findContainer(id);
+    const overContainer = findContainer(overId);
+    
+    if (!activeContainer || !overContainer) {
+      return;
     }
-    // If dropped on another deal
-    else if (sourceContainer && over.id !== overContainer) {
-      const overItemContainer = findContainer(over.id as string);
-      if (overItemContainer && sourceContainer !== overItemContainer) {
-        // Move to new stage in the backend
-        await moveDealToStage(dealId, overItemContainer);
-      }
+    
+    // If the item was dropped in a different container or position has changed
+    if (activeContainer !== overContainer) {
+      setDealsByStage(prev => {
+        const activeItems = [...prev[activeContainer]];
+        const overItems = [...prev[overContainer]];
+        
+        // Find the indexes
+        const activeIndex = activeItems.findIndex(item => item.id === id);
+        
+        if (activeIndex === -1) {
+          return prev;
+        }
+        
+        // Save the active item
+        const activeItem = activeItems[activeIndex];
+        
+        // Update the deal's stage in the backend
+        const updatedDeal = { ...activeItem, stage_id: overContainer };
+        
+        // Attempt to move the deal
+        moveDealToStage(id, overContainer);
+        
+        return prev;
+      });
     }
   };
   
@@ -322,88 +328,66 @@ function PipelineContent() {
     );
   }
   
-  // Get all possible deal IDs for the sortable context
-  const allDealIds = Object.values(dealsByStage)
-    .flat()
-    .map(deal => deal.id);
-  
   return (
     <>
-      <PipelineHeader onAddDealClick={() => handleAddDealClick()} />
+      <PipelineHeader 
+        onAddDealClick={() => handleAddDealClick()} 
+        view={view}
+        onViewChange={setView}
+      />
       
-      <div className="flex justify-end mb-4">
-        <button 
-          onClick={toggleSorting}
-          className={`
-            flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-            ${sortBy !== 'none' ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30' : 'bg-gray-800/70 text-gray-400 hover:bg-gray-800 hover:text-gray-300'}
-            transition-colors
-          `}
-        >
-          <ArrowDownUp className="w-3.5 h-3.5" />
-          {getSortLabel()}
-        </button>
-      </div>
-      
-      <DndContext 
-        sensors={sensors}
-        collisionDetection={(args) => {
-          // First try pointer intersection for more accurate drops
-          const pointerCollisions = pointerWithin(args);
-          if (pointerCollisions.length > 0) {
-            return pointerCollisions;
-          }
-          
-          // Fallback to rectangle intersection
-          return rectIntersection(args);
-        }}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={allDealIds} strategy={horizontalListSortingStrategy}>
-          <div className="flex space-x-4 pb-6 overflow-x-auto min-h-[600px] w-full scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ overflowY: 'visible' }}>
-            {stages?.map(stage => (
-              <PipelineColumn
-                key={stage.id}
-                stage={stage}
-                deals={dealsByStage[stage.id] || []}
-                onDealClick={handleDealClick}
-                onAddDealClick={handleAddDealClick}
-              />
-            ))}
-            {stages?.length === 0 && (
-              <div className="flex flex-col items-center justify-center w-full p-8">
-                <div className="text-gray-400 mb-4">No pipeline stages found</div>
-                <div className="text-sm text-gray-500">
-                  Create stages in the pipeline settings
-                </div>
-              </div>
-            )}
-            {/* Add spacer at the end to prevent overlap with menu */}
-            <div className="min-w-[120px] flex-shrink-0 h-1"></div>
-          </div>
-        </SortableContext>
-        
-        {/* Drag overlay - what shows when dragging */}
-        <DragOverlay>
-          {activeDeal ? (
-            <div className="w-[320px] opacity-90 scale-105 pointer-events-none">
-              <DealCard
-                deal={activeDeal}
-                onClick={() => {}}
-                isDragOverlay
-              />
+      {view === 'kanban' ? (
+        <>
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2 md:gap-4">
+              <button
+                onClick={toggleSorting}
+                className="flex items-center gap-1.5 text-sm text-gray-400
+                  px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-800/50
+                  hover:bg-gray-800 transition-colors"
+              >
+                <ArrowDownUp className="w-4 h-4" />
+                <span>{getSortLabel()}</span>
+              </button>
             </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-      
+          </div>
+          
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="flex gap-4 overflow-x-auto pb-6">
+              {stages.map(stage => (
+                <PipelineColumn
+                  key={stage.id}
+                  stage={stage}
+                  deals={dealsByStage[stage.id] || []}
+                  onAddDealClick={() => handleAddDealClick(stage.id)}
+                  onDealClick={handleDealClick}
+                />
+              ))}
+            </div>
+            
+            <DragOverlay>
+              {activeDeal && <DealCard deal={activeDeal} index={0} />}
+            </DragOverlay>
+          </DndContext>
+        </>
+      ) : (
+        <PipelineTable 
+          onDealClick={handleDealClick} 
+          onDeleteDeal={(id) => deleteDeal(id)} 
+        />
+      )}
+
       <Modal
         isOpen={showDealForm}
         onClose={() => setShowDealForm(false)}
       >
-        <DealForm 
+        <DealForm
           deal={selectedDeal}
           initialStageId={initialStageId}
           onSave={handleSaveDeal}
