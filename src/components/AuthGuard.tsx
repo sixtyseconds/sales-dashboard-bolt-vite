@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 
-const publicRoutes = ['/auth/login', '/auth/signup'];
+const publicRoutes = ['/auth/login', '/auth/signup', '/auth/forgot-password', '/auth/reset-password'];
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -19,7 +19,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         if (!session && !isPublicRoute) {
           navigate('/auth/login');
         } else if (session && isPublicRoute) {
-          navigate('/');
+          if (location.pathname !== '/auth/reset-password') {
+            navigate('/');
+          }
         }
       } finally {
         setIsLoading(false);
@@ -34,7 +36,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!session && !isPublicRoute) {
         navigate('/auth/login');
       } else if (session && isPublicRoute) {
-        navigate('/');
+        if (location.pathname !== '/auth/reset-password') {
+          navigate('/');
+        }
       }
     });
 

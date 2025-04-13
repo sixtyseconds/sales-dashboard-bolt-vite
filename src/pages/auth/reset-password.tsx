@@ -1,34 +1,60 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
-export default function Login() {
+export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
     password: '',
+    confirmPassword: '',
   });
   const navigate = useNavigate();
 
+  // Check if user is authenticated through the reset link
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      
+      // If no session exists or we don't have the recovery flow in URL params
+      // this likely means the user navigated here directly without a valid reset link
+      if (!data.session && !window.location.hash.includes('type=recovery')) {
+        toast.error('Invalid or expired password reset link');
+        navigate('/auth/login');
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+      const { error } = await supabase.auth.updateUser({
         password: formData.password,
       });
 
       if (error) throw error;
 
-      toast.success('Welcome back!');
-      navigate('/');
+      toast.success('Password updated successfully');
+      navigate('/auth/login');
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || 'Failed to update password');
     } finally {
       setIsLoading(false);
     }
@@ -49,40 +75,15 @@ export default function Login() {
           <div className="absolute -right-20 -top-20 w-40 h-40 bg-[#37bd7e]/10 blur-3xl rounded-full" />
 
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2 text-white">Welcome back</h1>
-            <p className="text-gray-400">Sign in to your account to continue</p>
+            <h1 className="text-3xl font-bold mb-2 text-white">Set New Password</h1>
+            <p className="text-gray-400">Create a new password for your account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-400">
-                Email Address
+                New Password
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
-                  placeholder="sarah@example.com"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-sm font-medium text-gray-400">
-                  Password
-                </label>
-                <Link 
-                  to="/auth/forgot-password" 
-                  className="text-xs text-[#37bd7e] hover:text-[#2da76c] font-medium transition-colors"
-                >
-                  Forgot Password?
-                </Link>
-              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -92,6 +93,25 @@ export default function Login() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
+                  minLength={6}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                  className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                  placeholder="••••••••"
+                  minLength={6}
                 />
               </div>
             </div>
@@ -101,21 +121,11 @@ export default function Login() {
               disabled={isLoading}
               className="w-full bg-[#37bd7e] text-white py-2.5 rounded-xl font-medium hover:bg-[#2da76c] focus:outline-none focus:ring-2 focus:ring-[#37bd7e] focus:ring-offset-2 focus:ring-offset-gray-900 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#37bd7e]/20"
             >
-              {isLoading ? 'Signing in...' : 'Sign in'}
+              {isLoading ? 'Updating Password...' : 'Update Password'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <Link
-              to="/auth/signup"
-              className="text-[#37bd7e] hover:text-[#2da76c] text-sm font-medium inline-flex items-center gap-1 transition-all duration-300 hover:gap-2"
-            >
-              Create an account
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
         </div>
       </motion.div>
     </div>
   );
-}
+} 

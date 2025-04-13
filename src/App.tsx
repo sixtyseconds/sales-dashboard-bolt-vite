@@ -11,6 +11,8 @@ import Profile from '@/pages/Profile';
 import Users from '@/pages/admin/Users';
 import Login from '@/pages/auth/login';
 import Signup from '@/pages/auth/signup';
+import ForgotPassword from '@/pages/auth/forgot-password';
+import ResetPassword from '@/pages/auth/reset-password';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +38,8 @@ function App() {
         <Routes>
           <Route path="/auth/login" element={<Login />} />
           <Route path="/auth/signup" element={<Signup />} />
+          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
           <Route path="/activity" element={<AppLayout><ActivityLog /></AppLayout>} />
           <Route path="/heatmap" element={<AppLayout><Heatmap /></AppLayout>} />
