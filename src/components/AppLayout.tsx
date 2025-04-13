@@ -16,6 +16,9 @@ import {
   Plus,
   UserCog,
   UserX,
+  Kanban,
+  PanelLeft,
+  Users as UsersIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
@@ -63,7 +66,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Activity, label: 'Heatmap', href: '/heatmap' },
     { icon: FileText, label: 'Activity Log', href: '/activity' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
-    ...(userData?.is_admin ? [{ icon: UserCog, label: 'Admin', href: '/admin/users' }] : []),
+    { icon: Kanban, label: 'Pipeline', href: '/pipeline' },
+    ...(userData?.is_admin ? [
+      { 
+        icon: UserCog, 
+        label: 'Admin', 
+        href: '/admin/users',
+        subItems: [
+          { icon: UsersIcon, label: 'Users', href: '/admin/users' },
+          { icon: PanelLeft, label: 'Pipeline Settings', href: '/admin/pipeline-settings' }
+        ]
+      }
+    ] : []),
   ];
 
   return (
@@ -173,23 +187,46 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
                 <nav className="space-y-2">
                   {menuItems.map((item) => (
-                    <Link
-                      to={item.href}
-                      key={item.href}
-                      onClick={() => toggleMobileMenu()}
-                      className={cn(
-                        'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
-                        location.pathname === item.href
-                          ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
-                          : 'text-gray-400/80 hover:bg-gray-800/20'
+                    <div key={item.href + item.label}>
+                      <Link
+                        to={item.href}
+                        onClick={() => toggleMobileMenu()}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                          location.pathname === item.href || (item.subItems && item.subItems.some(sub => location.pathname === sub.href))
+                            ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
+                            : 'text-gray-400/80 hover:bg-gray-800/20'
+                        )}
+                      >
+                        <item.icon className={cn(
+                          'w-5 h-5',
+                          location.pathname === item.href || (item.subItems && item.subItems.some(sub => location.pathname === sub.href))
+                            ? 'text-white' : 'text-gray-400/80'
+                        )} />
+                        <span>{item.label}</span>
+                      </Link>
+                      
+                      {item.subItems && (
+                        <div className="ml-8 mt-1 space-y-1">
+                          {item.subItems.map((subItem) => (
+                            <Link
+                              key={subItem.href + subItem.label}
+                              to={subItem.href}
+                              onClick={() => toggleMobileMenu()}
+                              className={cn(
+                                'w-full flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-medium transition-colors',
+                                location.pathname === subItem.href
+                                  ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
+                                  : 'text-gray-400/80 hover:bg-gray-800/20'
+                              )}
+                            >
+                              <subItem.icon className="w-4 h-4" />
+                              <span>{subItem.label}</span>
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                    >
-                      <item.icon className={cn(
-                        'w-5 h-5',
-                        location.pathname === item.href ? 'text-white' : 'text-gray-400/80'
-                      )} />
-                      <span>{item.label}</span>
-                    </Link>
+                    </div>
                   ))}
                 </nav>
 
@@ -238,7 +275,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           'fixed top-0 left-0 h-screen bg-gray-900/50 backdrop-blur-xl border-r border-gray-800/50 p-6',
           'transition-[width] duration-300 ease-in-out flex-shrink-0',
           isCollapsed ? 'w-[80px]' : 'w-[256px]',
-          'hidden lg:block'
+          'hidden lg:block z-[100]'
         )}
       >
         <div className={cn(
@@ -296,41 +333,63 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         
         <nav className="space-y-2">
           {menuItems.map((item) => (
-            <Link
-              to={item.href}
-              key={item.label}
-              className={cn(
-                'w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                location.pathname === item.href
-                  ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
-                  : 'text-gray-400/80 hover:bg-gray-800/20'
-              )}
-            >
-              <motion.div
-                animate={{
-                  x: isCollapsed ? 0 : 0,
-                  scale: isCollapsed ? 1.1 : 1
-                }}
+            <div key={item.href + item.label}>
+              <Link
+                to={item.href}
                 className={cn(
-                  'relative z-10 min-w-[20px] flex items-center justify-center',
-                  location.pathname === item.href ? 'text-white' : 'text-gray-400/80'
+                  'w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                  location.pathname === item.href || (item.subItems && item.subItems.some(sub => location.pathname === sub.href))
+                    ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
+                    : 'text-gray-400/80 hover:bg-gray-800/20'
                 )}
               >
-                <item.icon className="w-4 h-4" />
-              </motion.div>
-              <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    className="overflow-hidden whitespace-nowrap"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
+                <motion.div
+                  animate={{
+                    x: isCollapsed ? 0 : 0,
+                    scale: isCollapsed ? 1.1 : 1
+                  }}
+                  className={cn(
+                    'relative z-10 min-w-[20px] flex items-center justify-center',
+                    location.pathname === item.href || (item.subItems && item.subItems.some(sub => location.pathname === sub.href))
+                      ? 'text-white' : 'text-gray-400/80'
+                  )}
+                >
+                  <item.icon className="w-4 h-4" />
+                </motion.div>
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden whitespace-nowrap"
+                    >
+                      {item.label}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </Link>
+              
+              {item.subItems && !isCollapsed && (
+                <div className="ml-8 mt-1 space-y-1">
+                  {item.subItems.map((subItem) => (
+                    <Link
+                      key={subItem.href + subItem.label}
+                      to={subItem.href}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-2 py-2 rounded-xl text-xs font-medium transition-colors',
+                        location.pathname === subItem.href
+                          ? 'bg-[#37bd7e]/10 text-white border border-[#37bd7e]/20'
+                          : 'text-gray-400/80 hover:bg-gray-800/20'
+                      )}
+                    >
+                      <subItem.icon className="w-3.5 h-3.5" />
+                      <span>{subItem.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
         
