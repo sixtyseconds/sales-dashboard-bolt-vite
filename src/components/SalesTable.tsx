@@ -47,6 +47,7 @@ import {
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
+import { IdentifierField } from '../components/IdentifierField';
 
 export function SalesTable() {
   const [sorting, setSorting] = useState([]);
@@ -55,7 +56,7 @@ export function SalesTable() {
   const navigate = useNavigate();
   const [editingActivity, setEditingActivity] = useState(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const { activities, removeActivity } = useActivities();
+  const { activities, removeActivity, updateActivity } = useActivities();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
 
@@ -126,7 +127,40 @@ export function SalesTable() {
   };
 
   const handleUpdate = (updatedActivity) => {
-    // Update activity logic here
+    // Get form values
+    const clientName = document.querySelector('input[defaultValue="' + updatedActivity.clientName + '"]').value;
+    const details = document.querySelector('input[defaultValue="' + updatedActivity.details + '"]').value;
+    
+    // Create update object
+    const updates = {
+      client_name: clientName,
+      details: details
+    };
+    
+    // Add amount if it exists
+    if (updatedActivity.amount) {
+      const amountInput = document.querySelector('input[defaultValue="' + updatedActivity.amount + '"]');
+      if (amountInput) {
+        updates.amount = parseFloat(amountInput.value);
+      }
+    }
+    
+    // Add status field for all activities
+    const statusSelect = document.querySelector('select[defaultValue="' + updatedActivity.status + '"]');
+    if (statusSelect) {
+      updates.status = statusSelect.value;
+    }
+    
+    // Add contact identifier fields
+    if (updatedActivity.contact_identifier !== undefined) {
+      updates.contact_identifier = updatedActivity.contact_identifier;
+      updates.contact_identifier_type = updatedActivity.contact_identifier_type;
+    }
+    
+    // Call updateActivity from useActivities
+    updateActivity(updatedActivity.id, updates);
+    
+    // Close modal
     setEditingActivity(null);
     toast.success('Activity updated successfully');
   };
@@ -358,8 +392,16 @@ export function SalesTable() {
             <div className="text-sm sm:text-base text-white">
               {info.getValue() ? `£${Number(info.getValue()).toLocaleString()}` : '-'}
             </div>
-            <div className="text-[10px] sm:text-xs text-gray-400 capitalize">
-              {info.row.original.status || 'Unknown'}
+            <div className={`text-[10px] sm:text-xs capitalize ${
+              info.row.original.status === 'no_show' 
+                ? 'text-red-400' 
+                : info.row.original.status === 'completed'
+                  ? 'text-green-400'
+                  : info.row.original.status === 'cancelled'
+                    ? 'text-yellow-400'
+                    : 'text-gray-400'
+            }`}>
+              {info.row.original.status === 'no_show' ? 'No Show' : info.row.original.status || 'Unknown'}
             </div>
           </div>
         ),
@@ -412,6 +454,32 @@ export function SalesTable() {
                       defaultValue={info.row.original.details}
                       className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Email Address</label>
+                    <IdentifierField
+                      value={info.row.original.contact_identifier || ''}
+                      onChange={(value, type) => {
+                        // This will be handled in the final save
+                        info.row.original.contact_identifier = value;
+                        info.row.original.contact_identifier_type = type;
+                      }}
+                      required={false}
+                      placeholder="Enter email address"
+                      label={null}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Status</label>
+                    <select
+                      defaultValue={info.row.original.status}
+                      className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                    >
+                      <option value="completed">Completed</option>
+                      <option value="no_show">No Show</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="pending">Pending</option>
+                    </select>
                   </div>
                   {info.row.original.amount && (
                     <div className="space-y-2">

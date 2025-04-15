@@ -11,5 +11,10 @@ if (!supabaseServiceKey) throw new Error('Missing env.VITE_SUPABASE_SERVICE_ROLE
 // Regular client for normal operations
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Admin client with service role for admin operations
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Admin client with service role for admin operations, configured to avoid auth conflicts
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    persistSession: false, // Don't persist admin sessions
+    autoRefreshToken: false // Disable auto refresh for admin client
+  }
+});

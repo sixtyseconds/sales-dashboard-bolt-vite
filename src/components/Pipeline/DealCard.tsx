@@ -80,6 +80,55 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
   // Determine stage color for indicators
   const stageColor = deal.deal_stages?.color || '#3b82f6';
 
+  // Get stage name from the deal data
+  const stageName = useMemo(() => {
+    console.log('Deal stages in DealCard:', deal.id, deal.company, deal.deal_stages, 'Stage ID:', deal.stage_id);
+    
+    // Primary: Get stage name from deal_stages object if available
+    if (deal.deal_stages?.name) {
+      return deal.deal_stages.name;
+    }
+    
+    // Secondary: If deal_stages is missing but we have a stage_id that doesn't match deal_stages.id,
+    // we should try to find the stage info from the pipeline context
+    if (deal.stage_id && (!deal.deal_stages || deal.stage_id !== deal.deal_stages.id)) {
+      // This would require access to the stages from the pipeline context
+      // For now we'll fall back to known stages
+      console.log("Stage ID mismatch or missing deal_stages:", deal.stage_id);
+    }
+    
+    // Tertiary: Check if stage_id matches a known stage name
+    const knownStages: Record<string, string> = {
+      'lead': 'Lead',
+      'mql': 'MQL',
+      'sql': 'SQL',
+      'discovery': 'Discovery',
+      'proposal': 'Proposal',
+      'negotiation': 'Negotiation',
+      'closed': 'Closed/Won'
+    };
+    
+    if (deal.stage_id && knownStages[deal.stage_id.toLowerCase()]) {
+      return knownStages[deal.stage_id.toLowerCase()];
+    }
+    
+    // Fallback to showing the stage_id if nothing else is available
+    return deal.stage_id || 'Unknown Stage';
+  }, [deal.deal_stages, deal.id, deal.company, deal.stage_id]);
+
+  // Custom badge styles based on stage color
+  const stageBadgeStyle = useMemo(() => {
+    if (deal.deal_stages?.color) {
+      return {
+        backgroundColor: `${deal.deal_stages.color}20`,
+        color: deal.deal_stages.color,
+        borderColor: `${deal.deal_stages.color}40`,
+        border: '1px solid'
+      };
+    }
+    return {};
+  }, [deal.deal_stages?.color]);
+
   return (
     <div
       ref={setNodeRef}
@@ -123,11 +172,20 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       
       <div className="relative z-[2] flex flex-wrap gap-1.5 mt-3">
         {/* Stage badge */}
-        <Badge 
-          color={getColorFromHex(deal.deal_stages?.color)}
-        >
-          {deal.deal_stages?.name || 'Unknown Stage'}
-        </Badge>
+        {deal.deal_stages?.color ? (
+          <span
+            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
+            style={stageBadgeStyle}
+          >
+            {stageName}
+          </span>
+        ) : (
+          <Badge 
+            color={getColorFromHex(deal.deal_stages?.color)}
+          >
+            {stageName}
+          </Badge>
+        )}
         
         {/* Due date badge if exists */}
         {deal.expected_close_date && (

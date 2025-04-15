@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
 import { useDeals } from '@/lib/hooks/useDeals';
 import { useDealStages } from '@/lib/hooks/useDealStages';
 
@@ -25,6 +25,8 @@ interface PipelineContextType {
   updateDeal: (id: string, updates: any) => Promise<boolean>;
   deleteDeal: (id: string) => Promise<boolean>;
   moveDealToStage: (dealId: string, newStageId: string) => Promise<boolean>;
+  forceUpdateDealStage: (dealId: string, stageId: string) => Promise<boolean>;
+  refreshDeals: () => Promise<void>;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   filterOptions: FilterOptions;
@@ -42,6 +44,14 @@ interface PipelineProviderProps {
 }
 
 export function PipelineProvider({ children }: PipelineProviderProps) {
+  // First get the stages
+  const {
+    stages,
+    isLoading: isLoadingStages,
+    error: stagesError
+  } = useDealStages();
+  
+  // Then pass stages to useDeals
   const { 
     deals, 
     isLoading: isLoadingDeals, 
@@ -49,14 +59,10 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     createDeal,
     updateDeal,
     deleteDeal,
-    moveDealToStage 
-  } = useDeals();
-  
-  const {
-    stages,
-    isLoading: isLoadingStages,
-    error: stagesError
-  } = useDealStages();
+    moveDealToStage,
+    forceUpdateDealStage,
+    refreshDeals
+  } = useDeals(stages);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -67,7 +73,8 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
   });
   
   // Group deals by stage
-  const dealsByStage = useCallback(() => {
+  const dealsByStage = useMemo(() => {
+    console.log("Computing dealsByStage");
     const groupedDeals: Record<string, any[]> = {};
     
     // Initialize with empty arrays for all stages
@@ -120,13 +127,13 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
   };
   
   // Calculate pipeline value (total of all deals)
-  const calculatePipelineValue = useCallback(() => {
+  const pipelineValue = useMemo(() => {
     if (!deals) return 0;
     return deals.reduce((sum, deal) => sum + parseFloat(deal.value), 0);
   }, [deals]);
   
   // Calculate weighted pipeline value (based on probability)
-  const calculateWeightedPipelineValue = useCallback(() => {
+  const weightedPipelineValue = useMemo(() => {
     if (!deals) return 0;
     return deals.reduce((sum, deal) => {
       const probability = deal.probability || deal.deal_stages?.default_probability || 0;
@@ -135,7 +142,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
   }, [deals]);
   
   // Calculate total count and value by stage
-  const calculateStageMetrics = useCallback(() => {
+  const stageMetrics = useMemo(() => {
     if (!deals || !stages) return [];
     
     const metrics = stages.map(stage => {
@@ -154,7 +161,8 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     return metrics;
   }, [deals, stages]);
   
-  const value = {
+  // Memoize the context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     deals,
     stages,
     isLoading: isLoadingDeals || isLoadingStages,
@@ -163,15 +171,36 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     updateDeal,
     deleteDeal,
     moveDealToStage,
+    forceUpdateDealStage,
+    refreshDeals,
     searchTerm,
     setSearchTerm,
     filterOptions,
     setFilterOptions,
-    dealsByStage: dealsByStage(),
-    pipelineValue: calculatePipelineValue(),
-    weightedPipelineValue: calculateWeightedPipelineValue(),
-    stageMetrics: calculateStageMetrics()
-  };
+    dealsByStage,
+    pipelineValue,
+    weightedPipelineValue,
+    stageMetrics
+  }), [
+    deals, 
+    stages, 
+    isLoadingDeals, 
+    isLoadingStages, 
+    dealsError, 
+    stagesError, 
+    createDeal, 
+    updateDeal, 
+    deleteDeal, 
+    moveDealToStage, 
+    forceUpdateDealStage,
+    refreshDeals, 
+    searchTerm, 
+    filterOptions, 
+    dealsByStage, 
+    pipelineValue, 
+    weightedPipelineValue, 
+    stageMetrics
+  ]);
   
   return (
     <PipelineContext.Provider value={value}>

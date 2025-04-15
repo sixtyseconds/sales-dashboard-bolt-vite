@@ -15,8 +15,8 @@ export function IdentifierField({
   value,
   onChange,
   required = false,
-  placeholder = "Enter email, phone, or LinkedIn URL",
-  label = "Contact Identifier"
+  placeholder = "Enter email address",
+  label = "Email Address"
 }: IdentifierFieldProps) {
   const [identifierType, setIdentifierType] = useState<IdentifierType>('unknown');
   const [isTouched, setIsTouched] = useState(false);
@@ -28,8 +28,9 @@ export function IdentifierField({
       return;
     }
     
-    // Check if it's an email
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    // Improved email validation with regex to check for domain pattern
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(value)) {
       setIdentifierType('email');
       return;
     }
@@ -48,6 +49,13 @@ export function IdentifierField({
     
     setIdentifierType('unknown');
   }, [value]);
+  
+  // Update parent component when identifier type changes
+  useEffect(() => {
+    if (value) {
+      onChange(value, identifierType);
+    }
+  }, [identifierType, value, onChange]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;

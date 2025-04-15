@@ -79,7 +79,7 @@ export interface Activity {
   amount?: number;
   quantity: number;
   salesRep: string;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'completed' | 'pending' | 'cancelled' | 'no_show';
   details: string;
   priority: 'high' | 'medium' | 'low';
   contactIdentifier?: string;

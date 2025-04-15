@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, DollarSign, Users, Building, FileText } from 'lucide-react';
 import { useDealStages } from '@/lib/hooks/useDealStages';
-import { IdentifierField, IdentifierType } from '../../../components/IdentifierField';
+import { IdentifierField, IdentifierType } from '@/components/IdentifierField';
 import { toast } from 'sonner';
 
 interface DealFormProps {
@@ -202,9 +202,8 @@ export function DealForm({
         {/* Contact Identifier Field with improved styling */}
         <div className="space-y-2">
           <label className="block text-sm font-medium text-gray-400 mb-1 flex items-center">
-            Contact Identifier
+            Email Address
             <span className="text-red-500 ml-1">*</span>
-            <span className="text-xs text-gray-500 ml-2">(Email, Phone, or LinkedIn URL)</span>
           </label>
           <IdentifierField
             value={formData.contactIdentifier}
@@ -216,7 +215,7 @@ export function DealForm({
               })
             }
             required={true}
-            placeholder="Required: Enter email, phone or LinkedIn URL"
+            placeholder="Required: Enter email address"
           />
         </div>
         

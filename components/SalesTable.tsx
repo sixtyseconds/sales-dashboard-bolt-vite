@@ -59,6 +59,7 @@ import { DateRangePicker } from './DateRangePicker';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
+import { IdentifierField } from './IdentifierField';
 
 export default function SalesTable() {
   const [isPortrait, setIsPortrait] = useState(false);
@@ -67,7 +68,7 @@ export default function SalesTable() {
   const [showFilters, setShowFilters] = useState(false);
   const [editingActivity, setEditingActivity] = useState(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const { activities, removeActivity } = useActivities();
+  const { activities, removeActivity, updateActivity } = useActivities();
 
   // Filter activities based on current filters
   const filteredActivities = useMemo(() => {
@@ -135,7 +136,40 @@ export default function SalesTable() {
   };
 
   const handleUpdate = (updatedActivity) => {
-    // Update activity logic here
+    // Get form values
+    const clientName = document.querySelector('input[defaultValue="' + updatedActivity.clientName + '"]').value;
+    const details = document.querySelector('input[defaultValue="' + updatedActivity.details + '"]').value;
+    
+    // Create update object
+    const updates = {
+      client_name: clientName,
+      details: details
+    };
+    
+    // Add amount if it exists
+    if (updatedActivity.amount) {
+      const amountInput = document.querySelector('input[defaultValue="' + updatedActivity.amount + '"]');
+      if (amountInput) {
+        updates.amount = parseFloat(amountInput.value);
+      }
+    }
+    
+    // Add status field for all activities
+    const statusSelect = document.querySelector('select[defaultValue="' + updatedActivity.status + '"]');
+    if (statusSelect) {
+      updates.status = statusSelect.value;
+    }
+    
+    // Add contact identifier fields
+    if (updatedActivity.contact_identifier !== undefined) {
+      updates.contact_identifier = updatedActivity.contact_identifier;
+      updates.contact_identifier_type = updatedActivity.contact_identifier_type;
+    }
+    
+    // Call updateActivity from useActivities
+    updateActivity(updatedActivity.id, updates);
+    
+    // Close modal
     setEditingActivity(null);
     toast.success('Activity updated successfully');
   };
@@ -412,6 +446,32 @@ export default function SalesTable() {
                       defaultValue={info.row.original.details}
                       className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Email Address</label>
+                    <IdentifierField
+                      value={info.row.original.contact_identifier || ''}
+                      onChange={(value, type) => {
+                        // This will be handled in the final save
+                        info.row.original.contact_identifier = value;
+                        info.row.original.contact_identifier_type = type;
+                      }}
+                      required={false}
+                      placeholder="Enter email address"
+                      label={null}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-400">Status</label>
+                    <select
+                      defaultValue={info.row.original.status}
+                      className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
+                    >
+                      <option value="completed">Completed</option>
+                      <option value="no_show">No Show</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="pending">Pending</option>
+                    </select>
                   </div>
                   {info.row.original.amount && (
                     <div className="space-y-2">

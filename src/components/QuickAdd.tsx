@@ -27,8 +27,15 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
     outboundCount: '1',
     outboundType: 'Call',
     contactIdentifier: '',
-    contactIdentifierType: 'unknown' as IdentifierType
+    contactIdentifierType: 'unknown' as IdentifierType,
+    status: 'completed'
   });
+
+  // Reset selectedAction when modal is closed
+  const handleClose = () => {
+    setSelectedAction(null);
+    onClose();
+  };
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,7 +92,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
           date: selectedDate.toISOString(),
           contactIdentifier: formData.contactIdentifier,
-          contactIdentifierType: formData.contactIdentifierType
+          contactIdentifierType: formData.contactIdentifierType,
+          status: selectedAction === 'meeting' ? formData.status : 'completed'
         });
       }
       
@@ -99,10 +107,10 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
         outboundCount: '1',
         outboundType: 'Call',
         contactIdentifier: '',
-        contactIdentifierType: 'unknown'
+        contactIdentifierType: 'unknown',
+        status: 'completed'
       });
-      setSelectedAction(null);
-      onClose();
+      handleClose();
     } catch (error) {
       toast.error('Failed to add activity');
     }
@@ -124,7 +132,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-          onClick={onClose}
+          onClick={handleClose}
         >
           <motion.div
             initial={{ y: '100%', opacity: 0 }}
@@ -159,7 +167,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
               <div className="w-12 h-1 rounded-full bg-gray-800 absolute -top-8 left-1/2 -translate-x-1/2 sm:hidden" />
               <h2 className="text-xl font-semibold text-white/90 tracking-wide">Quick Add</h2>
               <button
-                onClick={onClose}
+                onClick={handleClose}
                 className="p-2 hover:bg-gray-800/50 rounded-xl transition-colors"
               >
                 <X className="w-5 h-5 text-gray-400" />
@@ -286,9 +294,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                 {/* Contact Identifier Field - added to all activity types */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-400/90 flex items-center">
-                    Contact Identifier
+                    Email Address
                     <span className="text-red-500 ml-1">*</span>
-                    <span className="text-xs text-gray-500 ml-2">(Email, Phone, or LinkedIn URL)</span>
                   </label>
                   <IdentifierField
                     value={formData.contactIdentifier}
@@ -300,7 +307,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                       })
                     }
                     required={true}
-                    placeholder="Required: Enter email, phone, or LinkedIn URL"
+                    placeholder="Required: Enter email address"
                     label={null}
                   />
                 </div>
@@ -351,6 +358,23 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                       <option value="demo">Demo</option>
                       <option value="follow-up">Follow-up</option>
                     </select>
+                    
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Meeting Status
+                      </label>
+                      <select
+                        required
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-colors hover:bg-gray-800/50 mt-2"
+                        value={formData.status || 'completed'}
+                        onChange={(e) => setFormData({...formData, status: e.target.value})}
+                      >
+                        <option value="completed">Completed</option>
+                        <option value="no_show">No Show</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    </div>
                   </div>
                 )}
                 {selectedAction === 'proposal' && (

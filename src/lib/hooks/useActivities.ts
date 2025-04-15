@@ -14,7 +14,7 @@ export interface Activity {
   user_id: string;
   sales_rep: string;
   avatar_url?: string | null;
-  status: 'completed' | 'pending' | 'cancelled';
+  status: 'completed' | 'pending' | 'cancelled' | 'no_show';
   details: string;
   priority: 'high' | 'medium' | 'low';
   quantity?: number;
@@ -47,6 +47,7 @@ async function createActivity(activity: {
   quantity?: number;
   contactIdentifier?: string;
   contactIdentifierType?: IdentifierType;
+  status?: Activity['status'];
 }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
@@ -70,7 +71,7 @@ async function createActivity(activity: {
       priority: activity.priority || 'medium',
       sales_rep: `${profile.first_name} ${profile.last_name}`,
       date: activity.date || new Date().toISOString(),
-      status: 'completed',
+      status: activity.status || 'completed',
       quantity: activity.quantity || 1,
       contact_identifier: activity.contactIdentifier,
       contact_identifier_type: activity.contactIdentifierType

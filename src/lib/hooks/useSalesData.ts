@@ -8,7 +8,7 @@ export interface SalesActivity {
   user_id: string;
   team_id: string | null;
   type: 'outbound' | 'meeting' | 'proposal' | 'sale';
-  status: 'pending' | 'completed' | 'cancelled';
+  status: 'pending' | 'completed' | 'cancelled' | 'no_show';
   priority: 'low' | 'medium' | 'high';
   client_name: string;
   details: string;
