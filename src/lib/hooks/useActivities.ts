@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase/client';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
-import confetti from 'canvas-confetti';
+import { ConfettiService } from '@/lib/services/confettiService';
 import { IdentifierType } from '@/components/IdentifierField';
 
 export interface Activity {
@@ -37,7 +37,7 @@ async function fetchActivities() {
   return data?.filter(activity => activity.user_id === user.id) || [];
 }
 
-async function createActivity(activity: { 
+async function createActivity(activity: {
   type: Activity['type'];
   client_name: string;
   details?: string;
@@ -84,78 +84,7 @@ async function createActivity(activity: {
   return data;
 }
 
-function fireConfetti() {
-  const count = 200;
-  const defaults = {
-    origin: { y: 0.7 },
-    spread: 90,
-    ticks: 400,
-    gravity: 1.2,
-    decay: 0.94,
-    startVelocity: 45,
-    colors: ['#37bd7e', '#34D399', '#6EE7B7', '#059669', '#047857']
-  };
-
-  function fire(particleRatio: number, opts: any) {
-    confetti({
-      ...defaults,
-      ...opts,
-      particleCount: Math.floor(count * particleRatio)
-    });
-  }
-
-  // Left side burst
-  fire(0.25, {
-    spread: 26,
-    startVelocity: 55,
-    origin: { x: 0.2, y: 0.9 }
-  });
-
-  // Right side burst
-  fire(0.25, {
-    spread: 26,
-    startVelocity: 55,
-    origin: { x: 0.8, y: 0.9 }
-  });
-
-  // Center burst
-  fire(0.35, {
-    spread: 100,
-    decay: 0.91,
-    origin: { x: 0.5, y: 0.8 }
-  });
-
-  // Delayed follow-up bursts
-  setTimeout(() => {
-    fire(0.1, {
-      spread: 120,
-      startVelocity: 25,
-      decay: 0.92,
-      origin: { x: 0.3, y: 0.8 }
-    });
-  }, 200);
-
-  setTimeout(() => {
-    fire(0.1, {
-      spread: 120,
-      startVelocity: 25,
-      decay: 0.92,
-      origin: { x: 0.7, y: 0.8 }
-    });
-  }, 200);
-
-  // Final celebratory burst
-  setTimeout(() => {
-    fire(0.2, {
-      spread: 150,
-      startVelocity: 45,
-      decay: 0.91,
-      origin: { x: 0.5, y: 0.9 }
-    });
-  }, 400);
-}
-
-async function createSale(sale: { 
+async function createSale(sale: {
   client_name: string;
   amount: number;
   details?: string;
@@ -287,7 +216,7 @@ export function useActivities() {
       queryClient.invalidateQueries({ queryKey: ['salesData'] });
       queryClient.invalidateQueries({ queryKey: ['targets'] });
       toast.success('Sale added successfully! 🎉');
-      fireConfetti();
+      ConfettiService.celebrate();
     },
     onError: (error: Error) => {
       toast.error(`Failed to add sale: ${error.message}`);
