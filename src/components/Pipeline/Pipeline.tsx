@@ -357,10 +357,10 @@ function PipelineContent() {
         return;
     }
 
-    if (activeContainer === targetContainer) {
-        console.log("Same container, ignoring");
-        return;
-    }
+    // if (activeContainer === targetContainer) {
+    //     console.log("Same container, ignoring");
+    //     return;
+    // }
 
     // Find the deal being moved
     let dealBeingMoved: any = null;
@@ -438,142 +438,144 @@ function PipelineContent() {
       return newState;
     });
 
+    refreshDeals();
+
     // Attempt to update the backend
-    try {
-      console.log("Updating deal stage in database", {
-        dealId: id,
-        newStageId: targetContainer
-      });
+    // try {
+    //   console.log("Updating deal stage in database", {
+    //     dealId: id,
+    //     newStageId: targetContainer
+    //   });
 
-      // Create the update payload with stage change data
-      const updatePayload = {
-        stage_id: targetContainer,
-        stage_changed_at: new Date().toISOString()
-      };
+    //   // Create the update payload with stage change data
+    //   const updatePayload = {
+    //     stage_id: targetContainer,
+    //     stage_changed_at: new Date().toISOString()
+    //   };
 
-      // First use the direct force update function to ensure the change persists
-      let updateSuccess = await forceUpdateDealStage(id, targetContainer);
+    //   // First use the direct force update function to ensure the change persists
+    //   let updateSuccess = await forceUpdateDealStage(id, targetContainer);
 
-      if (updateSuccess) {
-        console.log("Successfully force updated deal stage");
-        toast.success("Deal moved successfully");
-      } else {
-        // If direct force update fails, try the moveDealToStage function
-        console.log("Force update failed, trying moveDealToStage");
-        const moveResult = await moveDealToStage(id, targetContainer);
+    //   if (updateSuccess) {
+    //     console.log("Successfully force updated deal stage");
+    //     toast.success("Deal moved successfully");
+    //   } else {
+    //     // If direct force update fails, try the moveDealToStage function
+    //     console.log("Force update failed, trying moveDealToStage");
+    //     const moveResult = await moveDealToStage(id, targetContainer);
 
-        if (moveResult) {
-          console.log("Successfully moved deal with moveDealToStage");
-          toast.success("Deal moved successfully");
-          updateSuccess = true;
-        } else {
-          console.log("moveDealToStage failed, trying direct update");
+    //     if (moveResult) {
+    //       console.log("Successfully moved deal with moveDealToStage");
+    //       toast.success("Deal moved successfully");
+    //       updateSuccess = true;
+    //     } else {
+    //       console.log("moveDealToStage failed, trying direct update");
 
-          // Last resort: direct Supabase update with retries
-          let retryCount = 0;
+    //       // Last resort: direct Supabase update with retries
+    //       let retryCount = 0;
 
-          while (!updateSuccess && retryCount < 3) {
-            try {
-              const { data, error } = await supabase
-                .from('deals')
-                .update(updatePayload)
-                .eq('id', id)
-                .select();
+    //       while (!updateSuccess && retryCount < 3) {
+    //         try {
+    //           const { data, error } = await supabase
+    //             .from('deals')
+    //             .update(updatePayload)
+    //             .eq('id', id)
+    //             .select();
 
-              if (error) {
-                console.error(`Database update error (attempt ${retryCount + 1}):`, error);
-                retryCount++;
+    //           if (error) {
+    //             console.error(`Database update error (attempt ${retryCount + 1}):`, error);
+    //             retryCount++;
 
-                if (retryCount >= 3) {
-                  // Final retry failed
-                  setLocalDealsByStage(previousLocalDealsByStage);
-                  toast.error("Failed to move the deal", {
-                    description: "Database error: " + error.message
-                  });
-                  return;
-                }
+    //             if (retryCount >= 3) {
+    //               // Final retry failed
+    //               setLocalDealsByStage(previousLocalDealsByStage);
+    //               toast.error("Failed to move the deal", {
+    //                 description: "Database error: " + error.message
+    //               });
+    //               return;
+    //             }
 
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, 500));
-              } else {
-                console.log("Database update successful:", data);
-                updateSuccess = true;
+    //             // Wait before retrying
+    //             await new Promise(resolve => setTimeout(resolve, 500));
+    //           } else {
+    //             console.log("Database update successful:", data);
+    //             updateSuccess = true;
 
-                // Verify the returned data has the correct stage_id
-                const updatedDeal = Array.isArray(data) ? data[0] : data;
-                if (updatedDeal && updatedDeal.stage_id !== targetContainer) {
-                  console.warn(`Stage ID mismatch after update - expected ${targetContainer}, got ${updatedDeal.stage_id}`);
+    //             // Verify the returned data has the correct stage_id
+    //             const updatedDeal = Array.isArray(data) ? data[0] : data;
+    //             if (updatedDeal && updatedDeal.stage_id !== targetContainer) {
+    //               console.warn(`Stage ID mismatch after update - expected ${targetContainer}, got ${updatedDeal.stage_id}`);
 
-                  // Try one more focused update
-                  console.log("Attempting focused stage_id update");
-                  await supabase
-                    .from('deals')
-                    .update({ stage_id: targetContainer })
-                    .eq('id', id);
-                }
+    //               // Try one more focused update
+    //               console.log("Attempting focused stage_id update");
+    //               await supabase
+    //                 .from('deals')
+    //                 .update({ stage_id: targetContainer })
+    //                 .eq('id', id);
+    //             }
 
-                toast.success("Deal moved successfully", {
-                  description: "Deal stage updated."
-                });
-              }
-            } catch (err) {
-              console.error(`Attempt ${retryCount + 1} error:`, err);
-              retryCount++;
+    //             toast.success("Deal moved successfully", {
+    //               description: "Deal stage updated."
+    //             });
+    //           }
+    //         } catch (err) {
+    //           console.error(`Attempt ${retryCount + 1} error:`, err);
+    //           retryCount++;
 
-              if (retryCount >= 3) {
-                setLocalDealsByStage(previousLocalDealsByStage);
-                toast.error("Failed to move the deal", {
-                  description: "Unexpected error occurred."
-                });
-                return;
-              }
-            }
-          }
-        }
-      }
+    //           if (retryCount >= 3) {
+    //             setLocalDealsByStage(previousLocalDealsByStage);
+    //             toast.error("Failed to move the deal", {
+    //               description: "Unexpected error occurred."
+    //             });
+    //             return;
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
 
-      // Force a refresh to ensure UI reflects database state
-      await refreshDeals();
+    //   // Force a refresh to ensure UI reflects database state
+    //   await refreshDeals();
 
-      // One final check after refreshing to verify stage was updated
-      setTimeout(async () => {
-        try {
-          const { data } = await supabase
-            .from('deals')
-            .select('id, stage_id')
-            .eq('id', id)
-            .single();
+    //   // One final check after refreshing to verify stage was updated
+    //   setTimeout(async () => {
+    //     try {
+    //       const { data } = await supabase
+    //         .from('deals')
+    //         .select('id, stage_id')
+    //         .eq('id', id)
+    //         .single();
 
-          if (data && data.stage_id !== targetContainer) {
-            console.error(`Final verification failed - expected ${targetContainer}, got ${data.stage_id}`);
+    //       if (data && data.stage_id !== targetContainer) {
+    //         console.error(`Final verification failed - expected ${targetContainer}, got ${data.stage_id}`);
 
-            // Make one last attempt to fix the issue
-            console.log("Making final correction attempt");
-            const finalFix = await forceUpdateDealStage(id, targetContainer);
-            if (finalFix) {
-              console.log("Final correction successful");
-              refreshDeals();
-            } else {
-              toast.error("Changes may not have saved properly", {
-                description: "Please check and try again."
-              });
-            }
-          } else {
-            console.log("Final verification passed");
-          }
-        } catch (err) {
-          console.error("Error in final verification:", err);
-        }
-      }, 1000);
-    } catch (err) {
-      console.error("Error during drag and drop backend update:", err);
-      setLocalDealsByStage(previousLocalDealsByStage); // Revert optimistic update on error
-      toast.error("Error moving deal", {
-        description: "An unexpected error occurred. Please try again."
-      });
-      // Force a refresh from the database
-      refreshDeals();
-    }
+    //         // Make one last attempt to fix the issue
+    //         console.log("Making final correction attempt");
+    //         const finalFix = await forceUpdateDealStage(id, targetContainer);
+    //         if (finalFix) {
+    //           console.log("Final correction successful");
+    //           refreshDeals();
+    //         } else {
+    //           toast.error("Changes may not have saved properly", {
+    //             description: "Please check and try again."
+    //           });
+    //         }
+    //       } else {
+    //         console.log("Final verification passed");
+    //       }
+    //     } catch (err) {
+    //       console.error("Error in final verification:", err);
+    //     }
+    //   }, 1000);
+    // } catch (err) {
+    //   console.error("Error during drag and drop backend update:", err);
+    //   setLocalDealsByStage(previousLocalDealsByStage); // Revert optimistic update on error
+    //   toast.error("Error moving deal", {
+    //     description: "An unexpected error occurred. Please try again."
+    //   });
+    //   // Force a refresh from the database
+    //   refreshDeals();
+    // }
   };
 
   if (isLoading) {
@@ -626,6 +628,7 @@ function PipelineContent() {
                   key={stage.id}
                   stage={stage}
                   deals={localDealsByStage[stage.id] || []}
+                  // deals={deals?.filter(deal => deal.stage_id === stage.id) || []}
                   onAddDealClick={() => handleAddDealClick(stage.id)}
                   onDealClick={handleDealClick}
                 />

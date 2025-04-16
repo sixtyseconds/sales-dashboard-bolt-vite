@@ -2,10 +2,10 @@ import React, { useMemo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Badge } from './Badge';
-import { 
-  Clock, 
-  AlertCircle, 
-  User, 
+import {
+  Clock,
+  AlertCircle,
+  User,
   Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -31,7 +31,7 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
     data: deal,
     disabled: isDragOverlay
   });
-  
+
   // Apply transform styles for dragging with animations
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -39,32 +39,32 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
     opacity: isDragging ? '0.3' : '1',
     ...(isDragOverlay ? { zIndex: 9999 } : {}),
   };
-  
+
   // Determine time indicator status
   const timeIndicator = useMemo(() => {
     if (!deal.daysInStage) return { status: 'normal', text: 'New deal' };
-    
+
     if (deal.daysInStage > 14) {
-      return { 
-        status: 'danger', 
-        text: `${deal.daysInStage} days in stage`, 
-        icon: AlertCircle 
+      return {
+        status: 'danger',
+        text: `${deal.daysInStage} days in stage`,
+        icon: AlertCircle
       };
     } else if (deal.daysInStage > 7) {
-      return { 
-        status: 'warning', 
-        text: `${deal.daysInStage} days in stage`, 
-        icon: Clock 
+      return {
+        status: 'warning',
+        text: `${deal.daysInStage} days in stage`,
+        icon: Clock
       };
     } else {
-      return { 
-        status: 'normal', 
-        text: `${deal.daysInStage} days in stage`, 
-        icon: Clock 
+      return {
+        status: 'normal',
+        text: `${deal.daysInStage} days in stage`,
+        icon: Clock
       };
     }
   }, [deal.daysInStage]);
-  
+
   // Format deal value
   const formattedValue = useMemo(() => {
     return new Intl.NumberFormat('en-GB', {
@@ -73,22 +73,22 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       maximumFractionDigits: 0
     }).format(deal.value);
   }, [deal.value]);
-  
+
   // Calculate probability
   const probability = deal.probability || deal.deal_stages?.default_probability || 0;
-  
+
   // Determine stage color for indicators
   const stageColor = deal.deal_stages?.color || '#3b82f6';
 
   // Get stage name from the deal data
   const stageName = useMemo(() => {
     console.log('Deal stages in DealCard:', deal.id, deal.company, deal.deal_stages, 'Stage ID:', deal.stage_id);
-    
+
     // Primary: Get stage name from deal_stages object if available
     if (deal.deal_stages?.name) {
       return deal.deal_stages.name;
     }
-    
+
     // Secondary: If deal_stages is missing but we have a stage_id that doesn't match deal_stages.id,
     // we should try to find the stage info from the pipeline context
     if (deal.stage_id && (!deal.deal_stages || deal.stage_id !== deal.deal_stages.id)) {
@@ -96,7 +96,7 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       // For now we'll fall back to known stages
       console.log("Stage ID mismatch or missing deal_stages:", deal.stage_id);
     }
-    
+
     // Tertiary: Check if stage_id matches a known stage name
     const knownStages: Record<string, string> = {
       'lead': 'Lead',
@@ -107,11 +107,11 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       'negotiation': 'Negotiation',
       'closed': 'Closed/Won'
     };
-    
+
     if (deal.stage_id && knownStages[deal.stage_id.toLowerCase()]) {
       return knownStages[deal.stage_id.toLowerCase()];
     }
-    
+
     // Fallback to showing the stage_id if nothing else is available
     return deal.stage_id || 'Unknown Stage';
   }, [deal.deal_stages, deal.id, deal.company, deal.stage_id]);
@@ -122,8 +122,11 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       return {
         backgroundColor: `${deal.deal_stages.color}20`,
         color: deal.deal_stages.color,
-        borderColor: `${deal.deal_stages.color}40`,
-        border: '1px solid'
+        // Remplacer les propriétés en conflit
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: `${deal.deal_stages.color}40`
+        // Supprimer la ligne border: '1px solid' qui créait le conflit
       };
     }
     return {};
@@ -136,7 +139,7 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       {...listeners}
       onClick={() => isDragging ? null : onClick(deal)}
       className={`
-        bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800/70 
+        bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800/70
         transition-all border border-gray-800/80
         hover:border-gray-700 shadow-md hover:shadow-lg group
         ${isDragging || isDragOverlay ? 'shadow-xl cursor-grabbing z-[9999]' : 'cursor-grab'}
@@ -146,16 +149,16 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
     >
       {/* Only show shine effect when not dragging */}
       {!isDragging && !isDragOverlay && (
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent 
-          via-white/[0.03] to-transparent translate-x-[-200%] 
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent
+          via-white/[0.03] to-transparent translate-x-[-200%]
           group-hover:translate-x-[200%] transition-transform duration-1000 pointer-events-none
           z-[1]"
         />
       )}
-      
+
       <div className="relative z-[2] flex justify-between items-start">
         <div>
-          <h3 className="font-medium text-white group-hover:text-blue-400 
+          <h3 className="font-medium text-white group-hover:text-blue-400
             transition-colors duration-300 text-lg"
           >
             {deal.company}
@@ -169,7 +172,7 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
           {formattedValue}
         </div>
       </div>
-      
+
       <div className="relative z-[2] flex flex-wrap gap-1.5 mt-3">
         {/* Stage badge */}
         {deal.deal_stages?.color ? (
@@ -180,45 +183,45 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
             {stageName}
           </span>
         ) : (
-          <Badge 
+          <Badge
             color={getColorFromHex(deal.deal_stages?.color)}
           >
             {stageName}
           </Badge>
         )}
-        
+
         {/* Due date badge if exists */}
         {deal.expected_close_date && (
-          <Badge 
+          <Badge
             color={isPastDue(deal.expected_close_date) ? 'red' : 'blue'}
           >
             <Calendar className="w-3 h-3 mr-1" />
             {format(new Date(deal.expected_close_date), 'MMM d')}
           </Badge>
         )}
-        
+
         {/* Additional badges could be added here */}
       </div>
-      
+
       <div className="relative z-[2] flex items-center justify-between mt-4">
         {/* Time in stage indicator */}
         <div className={`
           flex items-center gap-1.5 text-xs
-          ${timeIndicator.status === 'danger' ? 'text-red-400' : 
+          ${timeIndicator.status === 'danger' ? 'text-red-400' :
             timeIndicator.status === 'warning' ? 'text-yellow-400' : 'text-gray-400'}
         `}>
           {timeIndicator.icon && <timeIndicator.icon className="w-3.5 h-3.5" />}
           <span>{timeIndicator.text}</span>
         </div>
-        
+
         {/* Probability indicator */}
         <div className="flex items-center gap-2">
           <div className="w-12 h-1 bg-gray-700 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full rounded-full"
-              style={{ 
+              style={{
                 width: `${probability}%`,
-                backgroundColor: stageColor 
+                backgroundColor: stageColor
               }}
             />
           </div>
@@ -234,8 +237,8 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
 // Helper functions
 function getColorFromHex(hex: string | undefined): "blue" | "emerald" | "violet" | "orange" | "yellow" | "red" | "gray" {
   if (!hex) return 'gray';
-  
-  // This is a simple mapping - you'd want to extend this 
+
+  // This is a simple mapping - you'd want to extend this
   // based on your color scheme
   if (hex.includes('#10b981') || hex.includes('emerald')) return 'emerald';
   if (hex.includes('#3b82f6') || hex.includes('blue')) return 'blue';
@@ -243,11 +246,11 @@ function getColorFromHex(hex: string | undefined): "blue" | "emerald" | "violet"
   if (hex.includes('#f97316') || hex.includes('orange')) return 'orange';
   if (hex.includes('#eab308') || hex.includes('yellow')) return 'yellow';
   if (hex.includes('#ef4444') || hex.includes('red')) return 'red';
-  
+
   return 'gray';
 }
 
 function isPastDue(dateString: string): boolean {
   const date = new Date(dateString);
   return date < new Date();
-} 
+}
