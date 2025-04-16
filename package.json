@@ -50,7 +50,7 @@
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
-    "happy-dom": "^12.10.3",
+    "happy-dom": "^17.4.4",
     "jsdom": "^23.2.0",
     "postcss": "^8.4.33",
     "tailwind-scrollbar": "^3.0.5",
