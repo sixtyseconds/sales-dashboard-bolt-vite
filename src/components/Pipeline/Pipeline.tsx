@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/client';
 
 // Add a debug log to confirm Supabase is imported correctly
-console.log("Pipeline component loaded with Supabase client:", 
+console.log("Pipeline component loaded with Supabase client:",
   supabase ? "Supabase client loaded successfully" : "Supabase client loading failed");
 
 interface ModalProps {
@@ -25,7 +25,7 @@ interface ModalProps {
 // Modal component for deal form
 function Modal({ isOpen, onClose, children }: ModalProps) {
   if (!isOpen) return null;
-  
+
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50
@@ -51,7 +51,7 @@ function PipelineSkeleton() {
       <div className="mb-6 space-y-4">
         <div className="h-8 bg-gray-800 rounded-lg w-48" />
         <div className="h-4 bg-gray-800 rounded-lg w-80" />
-        
+
         <div className="flex justify-between mt-4">
           <div className="flex gap-2">
             <div className="h-10 bg-gray-800 rounded-lg w-32" />
@@ -60,7 +60,7 @@ function PipelineSkeleton() {
           <div className="h-10 bg-gray-800 rounded-lg w-64" />
         </div>
       </div>
-      
+
       {/* Pipeline columns skeleton */}
       <div className="flex gap-4 overflow-x-auto pb-6">
         {[1, 2, 3, 4, 5].map(i => (
@@ -74,7 +74,7 @@ function PipelineSkeleton() {
               </div>
               <div className="bg-gray-800/50 rounded-full w-8 h-5" />
             </div>
-            
+
             <div className="p-4 space-y-3 flex-1">
               {[1, 2, 3].map(j => (
                 <div key={j} className="bg-gray-800/50 rounded-xl p-4 h-32" />
@@ -89,9 +89,9 @@ function PipelineSkeleton() {
 
 // Pipeline content component - uses the context
 function PipelineContent() {
-  const { 
-    deals, 
-    stages, 
+  const {
+    deals,
+    stages,
     isLoading,
     error,
     dealsByStage: contextDealsByStage,
@@ -102,7 +102,7 @@ function PipelineContent() {
     forceUpdateDealStage,
     refreshDeals
   } = usePipeline();
-  
+
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
   const [localDealsByStage, setLocalDealsByStage] = useState<Record<string, any[]>>({});
   const [activeContainer, setActiveContainer] = useState<string | null>(null);
@@ -112,23 +112,23 @@ function PipelineContent() {
   const [activeDeal, setActiveDeal] = useState<any>(null);
   const [sortBy, setSortBy] = useState<'value' | 'date' | 'alpha' | 'none'>('none');
   const lastValidOverContainerIdRef = React.useRef<string | null>(null); // Use ref instead of state
-  
+
   // Update local state when the context data changes
   React.useEffect(() => {
-    console.log("Context dealsByStage changed:", 
+    console.log("Context dealsByStage changed:",
       Object.keys(contextDealsByStage).map(stageId => ({
         stageId,
         dealCount: contextDealsByStage[stageId].length,
         deals: contextDealsByStage[stageId].map(d => ({ id: d.id, stage_id: d.stage_id }))
       }))
     );
-    
+
     // Always update from context to ensure database changes are reflected in UI
     console.log("Updating localDealsByStage from context");
     setLocalDealsByStage(structuredClone(contextDealsByStage));
-    
+
   }, [contextDealsByStage]);
-  
+
   // Apply sorting to the local state
   React.useEffect(() => {
     if (sortBy === 'none') {
@@ -136,9 +136,9 @@ function PipelineContent() {
       setLocalDealsByStage(contextDealsByStage);
       return;
     }
-    
+
     const sortedDeals = {...localDealsByStage};
-    
+
     Object.keys(sortedDeals).forEach(stageId => {
       sortedDeals[stageId] = [...sortedDeals[stageId]].sort((a, b) => {
         switch (sortBy) {
@@ -153,10 +153,10 @@ function PipelineContent() {
         }
       });
     });
-    
+
     setLocalDealsByStage(sortedDeals);
   }, [sortBy, contextDealsByStage]);
-  
+
   // Configure sensors for drag operations
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -165,19 +165,19 @@ function PipelineContent() {
       },
     })
   );
-  
+
   const handleAddDealClick = (stageId: string | null = null) => {
     setSelectedDeal(null);
     setInitialStageId(stageId);
     setShowDealForm(true);
   };
-  
+
   const handleDealClick = (deal: any) => {
     setSelectedDeal(deal);
     setInitialStageId(null);
     setShowDealForm(true);
   };
-  
+
   const handleSaveDeal = async (formData: any) => {
     if (selectedDeal) {
       await updateDeal(selectedDeal.id, formData);
@@ -186,14 +186,14 @@ function PipelineContent() {
     }
     setShowDealForm(false);
   };
-  
+
   const toggleSorting = () => {
     const sortOptions: Array<'value' | 'date' | 'alpha' | 'none'> = ['none', 'value', 'date', 'alpha'];
     const currentIndex = sortOptions.indexOf(sortBy);
     const nextIndex = (currentIndex + 1) % sortOptions.length;
     setSortBy(sortOptions[nextIndex]);
   };
-  
+
   const getSortLabel = () => {
     switch (sortBy) {
       case 'value': return 'Sort: Value ↓';
@@ -202,28 +202,28 @@ function PipelineContent() {
       default: return 'Sort: Manual';
     }
   };
-  
+
   const findContainer = (id: string) => {
     if (id in localDealsByStage) {
       return id;
     }
-    
-    return Object.keys(localDealsByStage).find(key => 
+
+    return Object.keys(localDealsByStage).find(key =>
       localDealsByStage[key].some(item => item.id === id)
     );
   };
-  
+
   const handleDragStart = (event: any) => {
     const { active } = event;
     const { id } = active;
-    
+
     console.log("Drag start with ID:", id);
-    
+
     const activeContainer = findContainer(id);
     if (!activeContainer) return;
-    
+
     setActiveContainer(activeContainer);
-    
+
     // Find the deal across all stages in the local state
     for (const stageId in localDealsByStage) {
       const deal = localDealsByStage[stageId].find(d => d.id === id);
@@ -233,23 +233,23 @@ function PipelineContent() {
         break;
       }
     }
-    
+
     // When dragging starts, disable any automatic sorting
     if (sortBy !== 'none') {
       setSortBy('none');
     }
   };
-  
+
   const handleDragOver = (event: any) => {
     const { active, over } = event;
     const { id } = active;
-    
+
     if (!over) return;
-    
+
     const { id: overId } = over;
-    
+
     console.log("Dragging over:", overId);
-    
+
     const activeContainer = findContainer(id);
     let overContainer = findContainer(overId);
 
@@ -258,35 +258,35 @@ function PipelineContent() {
     if (!overContainer && stages.find(s => s.id === overId)) {
         overContainer = overId;
     }
-    
+
     if (!activeContainer || !overContainer || activeContainer === overContainer) {
-      // If dragging over the original container or an invalid target, 
+      // If dragging over the original container or an invalid target,
       // clear the ref *only if* the current overId is the active one.
       // This prevents clearing the target ID if the last event before drop is invalid.
-      if (overId === id || overId === activeContainer) { 
-        lastValidOverContainerIdRef.current = null; 
+      if (overId === id || overId === activeContainer) {
+        lastValidOverContainerIdRef.current = null;
         console.log("Resetting ref due to dragging over self/original container");
       }
       return;
     }
-    
+
     // Valid drop target detected, store its ID in the ref
     console.log(`Setting lastValidOverContainerIdRef to: ${overContainer}`);
     lastValidOverContainerIdRef.current = overContainer;
-    
+
     // Optimistic UI update during drag is handled here
     setLocalDealsByStage(prev => {
       const activeItems = prev[activeContainer] ? [...prev[activeContainer]] : [];
       const overItems = prev[overContainer] ? [...prev[overContainer]] : [];
-      
+
       const activeIndex = activeItems.findIndex(item => item.id === id);
       if (activeIndex === -1) return prev; // Item not found
 
       const [movedItem] = activeItems.splice(activeIndex, 1);
-      
+
       // Update the stage_id property of the moved item to match its new container
       movedItem.stage_id = overContainer;
-      
+
       let overIndex = overItems.findIndex(item => item.id === overId);
 
       // If dropping onto the column (container) itself
@@ -309,34 +309,38 @@ function PipelineContent() {
       };
     });
   };
-  
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event; // Destructure active and over first
     const storedOverId = lastValidOverContainerIdRef.current; // Get value from ref
 
     // Add requested diagnostic logs
-    console.log("Dragged card ID:", active.id); 
+    console.log("Dragged card ID:", active.id);
     console.log("Dropped on column ID (from event):", over?.id);
     console.log("Dropped on column ID (from ref):", storedOverId);
 
     console.log("Drag end event:", event); // Existing log
-    
+
+    if (active.id && event?.active?.data.current?.stage_id) {
+      await updateDeal(String(active.id), { stage_id: event?.active?.data.current?.stage_id });
+    }
+
     setActiveContainer(null);
     setActiveDeal(null);
-    
+
     // Prioritize the ID stored in the ref
     const finalOverId = storedOverId || over?.id;
 
-    if (!finalOverId) { 
+    if (!finalOverId) {
       console.log("No valid over target found from ref or event");
       lastValidOverContainerIdRef.current = null; // Reset ref just in case
       return;
     }
-    
+
     const { id } = active;
     const eventOverId = over?.id; // Keep for logging comparison if needed
     console.log("Drag ID:", id, "Final Over ID (used for logic):", finalOverId, "Event Over ID:", eventOverId);
-     
+
     const activeContainer = findContainer(id);
 
     // Determine the target container using the finalOverId
@@ -344,7 +348,7 @@ function PipelineContent() {
     if (!targetContainer && stages.find(s => s.id === finalOverId)) {
         targetContainer = finalOverId;
     }
-     
+
     // Reset the ref immediately after reading it for this drag operation
     lastValidOverContainerIdRef.current = null;
 
@@ -352,12 +356,12 @@ function PipelineContent() {
         console.log("Missing container - active:", activeContainer, "target:", targetContainer);
         return;
     }
-    
+
     if (activeContainer === targetContainer) {
         console.log("Same container, ignoring");
         return;
     }
-    
+
     // Find the deal being moved
     let dealBeingMoved: any = null;
     for (const stageId in localDealsByStage) {
@@ -367,28 +371,28 @@ function PipelineContent() {
         break;
       }
     }
-    
+
     if (!dealBeingMoved) {
       console.error("Could not find deal to move");
       return;
     }
-    
+
     // Check if the deal's stage_id has already been updated in the local state during drag
     if (dealBeingMoved.stage_id !== targetContainer) {
       console.log("Updating dealBeingMoved.stage_id from", dealBeingMoved.stage_id, "to", targetContainer);
       dealBeingMoved.stage_id = targetContainer;
     }
-    
+
     console.log("Deal being moved:", {
       id: dealBeingMoved.id,
       company: dealBeingMoved.company,
       oldStageId: activeContainer,
       newStageId: targetContainer // Use targetContainer here
     });
-    
+
     // Keep a snapshot of the state before the optimistic update for potential rollback
     const previousLocalDealsByStage = structuredClone(localDealsByStage);
-    
+
     console.log("Moving deal from", activeContainer, "to", targetContainer);
 
     // Optimistically update local UI state immediately
@@ -396,26 +400,26 @@ function PipelineContent() {
       const activeItems = prev[activeContainer] ? [...prev[activeContainer]] : [];
       const overItems = prev[targetContainer] ? [...prev[targetContainer]] : [];
       const activeIndex = activeItems.findIndex(item => item.id === id);
-      
+
       if (activeIndex === -1) return prev;
-      
+
       const [movedItem] = activeItems.splice(activeIndex, 1);
-      
+
       // Important: Update the stage_id property of the moved item
       movedItem.stage_id = targetContainer;
       console.log("Updated stage_id on moved item:", movedItem.stage_id);
-      
+
       let overIndex = overItems.findIndex(item => item.id === finalOverId); // Check against finalOverId for positioning
       if (finalOverId === targetContainer) { // If dropped directly on container
           overIndex = overItems.length;
-      } 
+      }
 
       if (overIndex !== -1) {
          overItems.splice(overIndex, 0, movedItem);
       } else {
          overItems.push(movedItem);
       }
-      
+
       console.log("Updated local state - moved item:", movedItem);
 
       const newState = {
@@ -423,14 +427,14 @@ function PipelineContent() {
           [activeContainer]: activeItems,
           [targetContainer]: overItems
       };
-      
-      console.log("New localDealsByStage state:", 
+
+      console.log("New localDealsByStage state:",
         Object.keys(newState).map(stageId => ({
           stageId,
           deals: newState[stageId].map(d => ({ id: d.id, stage_id: d.stage_id }))
         }))
       );
-      
+
       return newState;
     });
 
@@ -440,16 +444,16 @@ function PipelineContent() {
         dealId: id,
         newStageId: targetContainer
       });
-      
+
       // Create the update payload with stage change data
       const updatePayload = {
         stage_id: targetContainer,
         stage_changed_at: new Date().toISOString()
       };
-      
+
       // First use the direct force update function to ensure the change persists
       let updateSuccess = await forceUpdateDealStage(id, targetContainer);
-      
+
       if (updateSuccess) {
         console.log("Successfully force updated deal stage");
         toast.success("Deal moved successfully");
@@ -457,17 +461,17 @@ function PipelineContent() {
         // If direct force update fails, try the moveDealToStage function
         console.log("Force update failed, trying moveDealToStage");
         const moveResult = await moveDealToStage(id, targetContainer);
-        
+
         if (moveResult) {
           console.log("Successfully moved deal with moveDealToStage");
           toast.success("Deal moved successfully");
           updateSuccess = true;
         } else {
           console.log("moveDealToStage failed, trying direct update");
-          
+
           // Last resort: direct Supabase update with retries
           let retryCount = 0;
-          
+
           while (!updateSuccess && retryCount < 3) {
             try {
               const { data, error } = await supabase
@@ -475,11 +479,11 @@ function PipelineContent() {
                 .update(updatePayload)
                 .eq('id', id)
                 .select();
-                
+
               if (error) {
                 console.error(`Database update error (attempt ${retryCount + 1}):`, error);
                 retryCount++;
-                
+
                 if (retryCount >= 3) {
                   // Final retry failed
                   setLocalDealsByStage(previousLocalDealsByStage);
@@ -488,18 +492,18 @@ function PipelineContent() {
                   });
                   return;
                 }
-                
+
                 // Wait before retrying
                 await new Promise(resolve => setTimeout(resolve, 500));
               } else {
                 console.log("Database update successful:", data);
                 updateSuccess = true;
-                
+
                 // Verify the returned data has the correct stage_id
                 const updatedDeal = Array.isArray(data) ? data[0] : data;
                 if (updatedDeal && updatedDeal.stage_id !== targetContainer) {
                   console.warn(`Stage ID mismatch after update - expected ${targetContainer}, got ${updatedDeal.stage_id}`);
-                  
+
                   // Try one more focused update
                   console.log("Attempting focused stage_id update");
                   await supabase
@@ -507,7 +511,7 @@ function PipelineContent() {
                     .update({ stage_id: targetContainer })
                     .eq('id', id);
                 }
-                
+
                 toast.success("Deal moved successfully", {
                   description: "Deal stage updated."
                 });
@@ -515,7 +519,7 @@ function PipelineContent() {
             } catch (err) {
               console.error(`Attempt ${retryCount + 1} error:`, err);
               retryCount++;
-              
+
               if (retryCount >= 3) {
                 setLocalDealsByStage(previousLocalDealsByStage);
                 toast.error("Failed to move the deal", {
@@ -527,10 +531,10 @@ function PipelineContent() {
           }
         }
       }
-      
+
       // Force a refresh to ensure UI reflects database state
       await refreshDeals();
-      
+
       // One final check after refreshing to verify stage was updated
       setTimeout(async () => {
         try {
@@ -539,10 +543,10 @@ function PipelineContent() {
             .select('id, stage_id')
             .eq('id', id)
             .single();
-            
+
           if (data && data.stage_id !== targetContainer) {
             console.error(`Final verification failed - expected ${targetContainer}, got ${data.stage_id}`);
-            
+
             // Make one last attempt to fix the issue
             console.log("Making final correction attempt");
             const finalFix = await forceUpdateDealStage(id, targetContainer);
@@ -568,14 +572,14 @@ function PipelineContent() {
         description: "An unexpected error occurred. Please try again."
       });
       // Force a refresh from the database
-      refreshDeals(); 
+      refreshDeals();
     }
   };
-  
+
   if (isLoading) {
     return <PipelineSkeleton />;
   }
-  
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
@@ -584,15 +588,15 @@ function PipelineContent() {
       </div>
     );
   }
-  
+
   return (
     <>
-      <PipelineHeader 
-        onAddDealClick={() => handleAddDealClick()} 
+      <PipelineHeader
+        onAddDealClick={() => handleAddDealClick()}
         view={view}
         onViewChange={setView}
       />
-      
+
       {view === 'kanban' ? (
         <>
           <div className="flex justify-between items-center mb-4">
@@ -608,7 +612,7 @@ function PipelineContent() {
               </button>
             </div>
           </div>
-          
+
           <DndContext
             sensors={sensors}
             collisionDetection={rectIntersection}
@@ -627,16 +631,16 @@ function PipelineContent() {
                 />
               ))}
             </div>
-            
+
             <DragOverlay>
               {activeDeal && <DealCard deal={activeDeal} onClick={() => {}} isDragOverlay={true} />}
             </DragOverlay>
           </DndContext>
         </>
       ) : (
-        <PipelineTable 
-          onDealClick={handleDealClick} 
-          onDeleteDeal={(id) => deleteDeal(id)} 
+        <PipelineTable
+          onDealClick={handleDealClick}
+          onDeleteDeal={(id) => deleteDeal(id)}
         />
       )}
 
@@ -664,4 +668,4 @@ export function Pipeline() {
       </div>
     </PipelineProvider>
   );
-} 
+}
