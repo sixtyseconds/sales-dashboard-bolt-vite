@@ -17,19 +17,19 @@ interface PipelineColumnProps {
   onAddDealClick: (stageId: string) => void;
 }
 
-export function PipelineColumn({ 
-  stage, 
-  deals, 
-  onDealClick, 
-  onAddDealClick 
+export function PipelineColumn({
+  stage,
+  deals,
+  onDealClick,
+  onAddDealClick
 }: PipelineColumnProps) {
   // Set up droppable behavior
   const { setNodeRef, isOver } = useDroppable({
     id: stage.id
   });
-  
+
   // Get deal IDs for sortable context
-  const dealIds = deals.map(deal => deal.id);
+  const dealIds = deals.map(deal => String(deal.id));
 
   // Calculate total value of deals in this stage
   const totalValue = useMemo(() => {
@@ -43,23 +43,23 @@ export function PipelineColumn({
   }, [totalValue, stage.default_probability]);
 
   return (
-    <div 
-      className="min-w-[320px] max-w-[320px] bg-gray-900/50 backdrop-blur-xl 
+    <div
+      className="min-w-[320px] max-w-[320px] bg-gray-900/50 backdrop-blur-xl
         rounded-xl border border-gray-800/50 flex flex-col max-h-[calc(100vh-200px)]"
-      style={{ 
+      style={{
         isolation: 'isolate',
         transition: 'border-color 150ms ease'
       }}
     >
       {/* Column Header */}
-      <div 
+      <div
         className="p-4 border-b border-gray-800/50 flex items-center justify-between sticky top-0 z-10 bg-gray-900/80 backdrop-blur-xl"
-        style={{ 
-          borderBottomColor: isOver ? `${stage.color}80` : undefined 
+        style={{
+          borderBottomColor: isOver ? `${stage.color}80` : undefined
         }}
       >
         <div className="flex items-center gap-3">
-          <div 
+          <div
             className="w-4 h-4 rounded-md"
             style={{ backgroundColor: stage.color }}
           />
@@ -69,7 +69,7 @@ export function PipelineColumn({
           {deals.length}
         </div>
       </div>
-      
+
       {/* Droppable Deal Container */}
       <div
         ref={setNodeRef}
@@ -79,10 +79,10 @@ export function PipelineColumn({
           scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent
           transition-all duration-150
         `}
-        style={{ 
-          position: 'relative', 
+        style={{
+          position: 'relative',
           zIndex: 1,
-          ringColor: isOver ? `${stage.color}40` : 'transparent'
+          ...(isOver ? { '--ring-color': `${stage.color}40` } as any : {})
         }}
       >
         {/* Empty state when no deals */}
@@ -91,10 +91,10 @@ export function PipelineColumn({
             Drop deals here
           </div>
         )}
-        
+
         <SortableContext items={dealIds} strategy={verticalListSortingStrategy}>
           {deals.map((deal, index) => (
-            <DealCard 
+            <DealCard
               key={deal.id}
               deal={deal}
               index={index}
@@ -102,7 +102,7 @@ export function PipelineColumn({
             />
           ))}
         </SortableContext>
-        
+
         {/* Add Deal Button */}
         <button
           onClick={() => onAddDealClick(stage.id)}
@@ -136,4 +136,4 @@ export function PipelineColumn({
       )}
     </div>
   );
-} 
+}

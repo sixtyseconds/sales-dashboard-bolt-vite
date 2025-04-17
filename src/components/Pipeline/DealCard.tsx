@@ -18,6 +18,10 @@ interface DealCardProps {
 }
 
 export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps) {
+
+  // Assurer que l'ID est une chaîne de caractères
+  const dealId = String(deal.id);
+
   // Set up sortable drag behavior
   const {
     attributes,
@@ -27,8 +31,11 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
     transition,
     isDragging,
   } = useSortable({
-    id: deal.id,
-    data: deal,
+    id: dealId,
+    data: {
+      ...deal,
+      id: dealId // Assurer que l'ID dans les données est aussi une chaîne
+    },
     disabled: isDragOverlay
   });
 
