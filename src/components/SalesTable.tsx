@@ -33,7 +33,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths, differenceInDays, addDays } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths } from 'date-fns';
 import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
 
@@ -43,7 +43,7 @@ type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'cust
 interface StatCardProps {
   title: string;
   value: string | number;
-  trend: string;
+  trendPercentage: number;
   icon: React.ElementType;
   color: string;
 }
@@ -61,56 +61,49 @@ export function SalesTable() {
   // State for custom date range (implement date pickers later if needed)
   // const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
 
-  // Calculate the current date range based on the selected type
-  const currentDateRange = useMemo(() => {
+  // Calculate the current and previous date ranges based on the selected type
+  const { currentDateRange, previousDateRange } = useMemo(() => {
     const now = new Date();
-    switch (selectedRangeType) {
-      case 'today':
-        return { start: startOfDay(now), end: endOfDay(now) };
-      case 'thisWeek':
-        // Assuming week starts on Sunday for startOfWeek
-        return { start: startOfWeek(now, { weekStartsOn: 0 }), end: endOfWeek(now, { weekStartsOn: 0 }) }; 
-      case 'thisMonth':
-        return { start: startOfMonth(now), end: endOfMonth(now) };
-      case 'last30Days':
-        return { start: startOfDay(subDays(now, 29)), end: endOfDay(now) }; // Include today
-      // case 'custom':
-      //   return customRange || { start: startOfMonth(now), end: endOfMonth(now) }; // Fallback to thisMonth if custom not set
-      default:
-        return { start: startOfMonth(now), end: endOfMonth(now) }; // Default to this month
-    }
-  }, [selectedRangeType]); // Removed customRange dependency for now
-
-  // Calculate the PREVIOUS date range based on the selected type
-  const previousDateRange = useMemo(() => {
-    const { start: currentStart, end: currentEnd } = currentDateRange;
-    const duration = differenceInDays(currentEnd, currentStart) + 1; // Get duration in days
+    let currentStart, currentEnd, previousStart, previousEnd;
 
     switch (selectedRangeType) {
       case 'today':
-        const yesterday = subDays(currentStart, 1);
-        return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
+        currentStart = startOfDay(now);
+        currentEnd = endOfDay(now);
+        const yesterday = subDays(now, 1);
+        previousStart = startOfDay(yesterday);
+        previousEnd = endOfDay(yesterday);
+        break;
       case 'thisWeek':
-        const startOfLastWeek = subWeeks(currentStart, 1);
-        return { start: startOfLastWeek, end: endOfWeek(startOfLastWeek, { weekStartsOn: 0 }) };
-      case 'thisMonth':
-        const startOfLastMonth = subMonths(currentStart, 1);
-        return { start: startOfLastMonth, end: endOfMonth(startOfLastMonth) };
+        currentStart = startOfWeek(now, { weekStartsOn: 0 });
+        currentEnd = endOfWeek(now, { weekStartsOn: 0 });
+        const lastWeek = subWeeks(now, 1);
+        previousStart = startOfWeek(lastWeek, { weekStartsOn: 0 });
+        previousEnd = endOfWeek(lastWeek, { weekStartsOn: 0 });
+        break;
       case 'last30Days':
-        // Previous 30 days before the current 30-day window started
-        const previousEnd = subDays(currentStart, 1); // Day before current window started
-        const previousStart = subDays(previousEnd, 29); // Go back 29 more days
-        return { start: startOfDay(previousStart), end: endOfDay(previousEnd) };
+        currentStart = startOfDay(subDays(now, 29));
+        currentEnd = endOfDay(now);
+        previousStart = startOfDay(subDays(now, 59)); // 30 days before the current start
+        previousEnd = endOfDay(subDays(now, 30)); // Day before the current start
+        break;
+      case 'thisMonth': // Default case
       default:
-        // Default case (e.g., custom range) - for now, mirror current logic for simplicity
-        // A proper implementation for custom would need more logic
-        const startOfLastMonthDefault = subMonths(currentStart, 1);
-        return { start: startOfLastMonthDefault, end: endOfMonth(startOfLastMonthDefault) };
+        currentStart = startOfMonth(now);
+        currentEnd = endOfMonth(now);
+        const lastMonth = subMonths(now, 1);
+        previousStart = startOfMonth(lastMonth);
+        previousEnd = endOfMonth(lastMonth);
+        break;
     }
-  }, [currentDateRange, selectedRangeType]);
+    return {
+      currentDateRange: { start: currentStart, end: currentEnd },
+      previousDateRange: { start: previousStart, end: previousEnd }
+    };
+  }, [selectedRangeType]);
 
-  // Filter activities based on the CURRENT calculated date range
-  const currentPeriodActivities = useMemo(() => {
+  // Filter activities for the CURRENT selected period
+  const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
       try {
         const activityDate = new Date(activity.date);
@@ -122,83 +115,91 @@ export function SalesTable() {
     });
   }, [activities, currentDateRange]);
 
-  // Filter activities based on the PREVIOUS calculated date range
+  // Filter activities for the PREVIOUS equivalent period
   const previousPeriodActivities = useMemo(() => {
+    if (!previousDateRange) return []; // Should not happen with default
     return activities.filter(activity => {
       try {
         const activityDate = new Date(activity.date);
-        // Ensure the date is within the previous period bounds
-        return activityDate >= previousDateRange.start && activityDate <= previousDateRange.end;
+        // Ensure previous range dates are valid before comparing
+        return previousDateRange.start && previousDateRange.end && 
+               activityDate >= previousDateRange.start && activityDate <= previousDateRange.end;
       } catch (e) {
-        console.error("Error parsing previous period activity date:", activity.date, e);
+        console.error("Error parsing activity date for previous period:", activity.date, e);
         return false; 
       }
     });
   }, [activities, previousDateRange]);
 
-  // Calculate stats from CURRENT filtered activities
-  const currentPeriodStats = useMemo(() => {
-    const totalRevenue = currentPeriodActivities // Use currentPeriodActivities
+  // Calculate stats for the CURRENT period including meeting -> proposal rate
+  const currentStats = useMemo(() => {
+    const totalRevenue = filteredActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
-
-    const activeDeals = currentPeriodActivities // Use currentPeriodActivities
-      .filter(a => a.status === 'completed').length;
-
-    const winRate = Math.round(
-      (currentPeriodActivities.filter(a => a.type === 'sale').length / // Use currentPeriodActivities
-      Math.max(1, currentPeriodActivities.filter(a => a.type === 'proposal').length)) * 100 // Use currentPeriodActivities
+    const activeDeals = filteredActivities
+      .filter(a => a.status === 'completed').length; // Assuming completed = won deal
+    const salesActivities = filteredActivities.filter(a => a.type === 'sale').length;
+    const proposalActivities = filteredActivities.filter(a => a.type === 'proposal').length;
+    const meetingActivities = filteredActivities.filter(a => a.type === 'meeting').length;
+    const proposalWinRate = Math.round( // Renamed for clarity: Proposal -> Deal (Sale)
+      (salesActivities / Math.max(1, proposalActivities)) * 100
     ) || 0;
-
-    const avgDeal = totalRevenue / 
-      (currentPeriodActivities.filter(a => a.type === 'sale').length || 1); // Use currentPeriodActivities
-
+    const meetingToProposalRate = Math.round(
+      (proposalActivities / Math.max(1, meetingActivities)) * 100
+    ) || 0;
+    const avgDeal = totalRevenue / (salesActivities || 1); // Prevent division by zero
     return {
       totalRevenue,
       activeDeals,
-      winRate,
+      proposalWinRate, // Use the more descriptive name
+      meetingToProposalRate,
       avgDeal
     };
-  }, [currentPeriodActivities]); // Depend only on currentPeriodActivities
+  }, [filteredActivities]);
 
-  // Calculate stats from PREVIOUS filtered activities
-  const previousPeriodStats = useMemo(() => {
-    const totalRevenue = previousPeriodActivities // Use previousPeriodActivities
+  // Calculate stats for the PREVIOUS period including meeting -> proposal rate
+  const previousStats = useMemo(() => {
+    const totalRevenue = previousPeriodActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
-
-    const activeDeals = previousPeriodActivities // Use previousPeriodActivities
+    const activeDeals = previousPeriodActivities
       .filter(a => a.status === 'completed').length;
-
-    const winRate = Math.round(
-      (previousPeriodActivities.filter(a => a.type === 'sale').length / // Use previousPeriodActivities
-      Math.max(1, previousPeriodActivities.filter(a => a.type === 'proposal').length)) * 100 // Use previousPeriodActivities
+    const salesActivities = previousPeriodActivities.filter(a => a.type === 'sale').length;
+    const proposalActivities = previousPeriodActivities.filter(a => a.type === 'proposal').length;
+    const meetingActivities = previousPeriodActivities.filter(a => a.type === 'meeting').length;
+    const proposalWinRate = Math.round( // Renamed for clarity: Proposal -> Deal (Sale)
+      (salesActivities / Math.max(1, proposalActivities)) * 100
     ) || 0;
-
-    const avgDeal = totalRevenue / 
-      (previousPeriodActivities.filter(a => a.type === 'sale').length || 1); // Use previousPeriodActivities
-
+    const meetingToProposalRate = Math.round(
+        (proposalActivities / Math.max(1, meetingActivities)) * 100
+      ) || 0;
+    const avgDeal = totalRevenue / (salesActivities || 1); // Prevent division by zero
     return {
       totalRevenue,
       activeDeals,
-      winRate,
+      proposalWinRate, // Use the more descriptive name
+      meetingToProposalRate,
       avgDeal
     };
-  }, [previousPeriodActivities]); // Depend only on previousPeriodActivities
+  }, [previousPeriodActivities]);
 
-  // Helper function to calculate percentage change and format it
-  const calculatePercentageChange = (current: number, previous: number): string => {
+  // Calculate percentage change
+  const calculatePercentageChange = (current: number, previous: number): number => {
     if (previous === 0) {
-      // If previous value is 0, can't calculate percentage.
-      // Return increase if current > 0, otherwise no change.
-      return current > 0 ? "+100%" : "0%"; // Or consider returning "N/A" or similar
+      // If previous is 0, return 100% if current is positive, -100% if negative, 0% if both are 0.
+      // Or simply return 0 to avoid infinity/large numbers. Let's go with 0 for simplicity.
+      return current === 0 ? 0 : (current > 0 ? 100 : -100); // Alternative: return 0;
     }
     const change = ((current - previous) / previous) * 100;
-    const roundedChange = Math.round(change); // Round to nearest integer
-    
-    if (roundedChange === 0) return "0%";
-    return `${roundedChange > 0 ? '+' : ''}${roundedChange}%`;
+    return Math.round(change); // Round to nearest integer
   };
+
+  // Calculate trend percentages
+  const revenueTrend = calculatePercentageChange(currentStats.totalRevenue, previousStats.totalRevenue);
+  const dealsTrend = calculatePercentageChange(currentStats.activeDeals, previousStats.activeDeals);
+  const proposalWinRateTrend = calculatePercentageChange(currentStats.proposalWinRate, previousStats.proposalWinRate); // Updated trend name
+  const meetingToProposalRateTrend = calculatePercentageChange(currentStats.meetingToProposalRate, previousStats.meetingToProposalRate);
+  const avgDealTrend = calculatePercentageChange(currentStats.avgDeal, previousStats.avgDeal);
 
   const handleEdit = (activity: Activity) => {
     setEditingActivity(activity);
@@ -470,24 +471,27 @@ export function SalesTable() {
   );
 
   // Define StatCard component here, before the return statement
-  const StatCard = ({ title, value, trend, icon: Icon, color }: StatCardProps) => (
-    <div
-      className={`bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-800/50`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg bg-${color}-500/10`}>
-          <Icon className={`w-5 h-5 text-${color}-500`} />
-        </div>
-        <div>
-          <p className="text-sm text-gray-400">{title}</p>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold text-white">{value}</span>
-            <span className={`text-xs font-medium text-${color}-500`}>{trend}</span>
+  const StatCard = ({ title, value, trendPercentage, icon: Icon, color }: StatCardProps) => {
+    const trendText = trendPercentage > 0 ? `+${trendPercentage}%` : `${trendPercentage}%`;
+    const trendColor = trendPercentage > 0 ? `text-emerald-500` : trendPercentage < 0 ? `text-red-500` : `text-gray-500`;
+
+    return (
+      <div className={`bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-800/50`}>
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg bg-${color}-500/10`}>
+            <Icon className={`w-5 h-5 text-${color}-500`} />
+          </div>
+          <div>
+            <p className="text-sm text-gray-400">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-xl font-bold text-white">{value}</span>
+              <span className={`text-xs font-medium ${trendColor}`}>{trendText}</span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
@@ -537,36 +541,44 @@ export function SalesTable() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4 sm:px-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 px-4 sm:px-0">
             <StatCard
               key="revenue"
               title="Total Revenue"
-              value={`£${currentPeriodStats.totalRevenue.toLocaleString()}`}
-              trend={calculatePercentageChange(currentPeriodStats.totalRevenue, previousPeriodStats.totalRevenue)}
+              value={`£${currentStats.totalRevenue.toLocaleString()}`}
+              trendPercentage={revenueTrend}
               icon={PoundSterling}
               color="emerald"
             />
             <StatCard
+              key="meetingConversion"
+              title="Meeting Conversion"
+              value={`${currentStats.meetingToProposalRate}%`}
+              trendPercentage={meetingToProposalRateTrend}
+              icon={Users}
+              color="cyan"
+            />
+            <StatCard
+              key="proposalWinRate"
+              title="Proposal Win Rate"
+              value={`${currentStats.proposalWinRate}%`}
+              trendPercentage={proposalWinRateTrend}
+              icon={FileText}
+              color="blue"
+            />
+            <StatCard
               key="deals"
-              title="Active Deals"
-              value={currentPeriodStats.activeDeals.toString()}
-              trend={calculatePercentageChange(currentPeriodStats.activeDeals, previousPeriodStats.activeDeals)}
+              title="Won Deals"
+              value={currentStats.activeDeals.toString()}
+              trendPercentage={dealsTrend}
               icon={BarChartIcon}
               color="violet"
             />
             <StatCard
-              key="winrate"
-              title="Win Rate"
-              value={`${currentPeriodStats.winRate}%`}
-              trend={calculatePercentageChange(currentPeriodStats.winRate, previousPeriodStats.winRate)}
-              icon={ArrowUpRight}
-              color="blue"
-            />
-            <StatCard
               key="avgdeal"
-              title="Average Deal"
-              value={`£${Math.round(currentPeriodStats.avgDeal).toLocaleString()}`}
-              trend={calculatePercentageChange(currentPeriodStats.avgDeal, previousPeriodStats.avgDeal)}
+              title="Average Deal Value"
+              value={`£${Math.round(currentStats.avgDeal).toLocaleString()}`}
+              trendPercentage={avgDealTrend}
               icon={TrendingUp}
               color="amber"
             />
@@ -589,7 +601,7 @@ export function SalesTable() {
                   </tr>
                 </thead>
                 <tbody>
-                  {currentPeriodActivities.map((activity, index) => (
+                  {filteredActivities.map((activity, index) => (
                     <motion.tr 
                       key={activity.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -620,7 +632,7 @@ export function SalesTable() {
                   ))}
                 </tbody>
               </table>
-              {currentPeriodActivities.length === 0 && (
+              {filteredActivities.length === 0 && (
                 <div className="text-center py-8">
                   <div className="text-gray-400">No activities found for the selected period.</div>
                 </div>

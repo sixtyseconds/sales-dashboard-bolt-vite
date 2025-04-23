@@ -54,7 +54,8 @@ function useFunnelMetrics(activities: any[] | undefined) {
       meetings: 0,
       proposals: 0,
       closed: 0,
-      overallConversion: 0,
+      meetingToProposalRate: 0,
+      proposalWinRate: 0,
       avgDealSize: 0,
       avgSalesVelocity: 18
     };
@@ -78,7 +79,14 @@ function useFunnelMetrics(activities: any[] | undefined) {
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.quantity || 1), 0);
 
-    const overallConversion = closedCount > 0 ? Math.round((closedCount / outboundCount) * 100) : 0;
+    const meetingToProposalRate = meetingsCount > 0 
+        ? Math.round((proposalsCount / meetingsCount) * 100) 
+        : 0;
+
+    const proposalWinRate = proposalsCount > 0 
+        ? Math.round((closedCount / proposalsCount) * 100) 
+        : 0;
+
     const totalRevenue = monthActivities
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
@@ -89,7 +97,8 @@ function useFunnelMetrics(activities: any[] | undefined) {
       meetings: meetingsCount,
       proposals: proposalsCount,
       closed: closedCount,
-      overallConversion,
+      meetingToProposalRate,
+      proposalWinRate,
       avgDealSize,
       avgSalesVelocity: 18
     };
@@ -262,38 +271,32 @@ export default function SalesFunnel() {
           })}
         </div>
 
-        {/* Conversion Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-8 sm:mt-10 lg:mt-12">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 hover:border-[#37bd7e]/30 transition-all duration-300 hover:shadow-lg hover:shadow-[#37bd7e]/20 group"
-          >
-            <h3 className="text-lg font-medium mb-2">Overall Conversion</h3>
-            <div className="text-3xl font-bold text-[#37bd7e] group-hover:scale-105 transition-transform duration-300">{funnelMetrics.overallConversion}%</div>
-            <p className="text-sm text-gray-400 mt-1">Outbound to Closed Won</p>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 hover:border-[#37bd7e]/30 transition-all duration-300 hover:shadow-lg hover:shadow-[#37bd7e]/20 group"
-          >
-            <h3 className="text-lg font-medium mb-2">Avg. Deal Size</h3>
-            <div className="text-3xl font-bold text-[#37bd7e] group-hover:scale-105 transition-transform duration-300">£{funnelMetrics.avgDealSize.toLocaleString()}</div>
-            <p className="text-sm text-gray-400 mt-1">Per closed deal</p>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 hover:border-[#37bd7e]/30 transition-all duration-300 hover:shadow-lg hover:shadow-[#37bd7e]/20 group"
-          >
-            <h3 className="text-lg font-medium mb-2">Sales Velocity</h3>
-            <div className="text-3xl font-bold text-[#37bd7e] group-hover:scale-105 transition-transform duration-300">{funnelMetrics.avgSalesVelocity} days</div>
-            <p className="text-sm text-gray-400 mt-1">Average sales cycle</p>
-          </motion.div>
+        {/* Key Metrics Display */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-8 lg:mt-12">
+          {/* Meeting Conversion Rate Card */}
+          <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 sm:p-6 border border-gray-800/50">
+            <p className="text-sm text-gray-400 mb-1">Meeting Conversion</p>
+            <p className="text-3xl font-bold text-white">{funnelMetrics.meetingToProposalRate}%</p>
+            <p className="text-xs text-gray-500 mt-0.5">Meetings to Proposals</p>
+          </div>
+          {/* Proposal Win Rate Card (was Overall Conversion) */}
+          <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 sm:p-6 border border-gray-800/50">
+            <p className="text-sm text-gray-400 mb-1">Proposal Win Rate</p>
+            <p className="text-3xl font-bold text-white">{funnelMetrics.proposalWinRate}%</p>
+            <p className="text-xs text-gray-500 mt-0.5">Proposals to Signed</p>
+          </div>
+          {/* Average Deal Size Card */}
+          <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 sm:p-6 border border-gray-800/50">
+            <p className="text-sm text-gray-400 mb-1">Avg. Deal Size</p>
+            <p className="text-3xl font-bold text-white">£{funnelMetrics.avgDealSize?.toLocaleString() || 0}</p>
+            <p className="text-xs text-gray-500 mt-0.5">Average value of signed deals</p>
+          </div>
+          {/* Sales Velocity Card */}
+          <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 sm:p-6 border border-gray-800/50">
+            <p className="text-sm text-gray-400 mb-1">Sales Velocity</p>
+            <p className="text-3xl font-bold text-white">{funnelMetrics.avgSalesVelocity || '-'} Days</p>
+            <p className="text-xs text-gray-500 mt-0.5">Average time to close deal</p>
+          </div>
         </div>
       </div>
     </motion.div>
