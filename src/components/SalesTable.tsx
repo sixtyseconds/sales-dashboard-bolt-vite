@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/dialog';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { IdentifierType } from '../components/IdentifierField';
+import { EditActivityForm } from './EditActivityForm';
 
 // Define type for date range presets
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'custom';
@@ -51,7 +52,6 @@ export function SalesTable() {
   // Removed unused sorting state
   // const [sorting, setSorting] = useState<SortingState>([]); 
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const { activities, removeActivity, updateActivity } = useActivities();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
@@ -119,10 +119,6 @@ export function SalesTable() {
     };
   }, [filteredActivities]); // Depend only on filteredActivities
 
-  const handleRowClick = (id: string) => {
-    setExpandedRow(expandedRow === id ? null : id);
-  };
-
   const handleEdit = (activity: Activity) => {
     setEditingActivity(activity);
   };
@@ -144,42 +140,13 @@ export function SalesTable() {
     setDeleteDialogOpen(true);
   };
 
-  const handleUpdate = async (activityToUpdate: Activity) => {
-    const clientNameInput = document.querySelector(`dialog[open] input[data-field="clientName"][data-id="${activityToUpdate.id}"]`) as HTMLInputElement;
-    const detailsInput = document.querySelector(`dialog[open] input[data-field="details"][data-id="${activityToUpdate.id}"]`) as HTMLInputElement;
-    const amountInput = document.querySelector(`dialog[open] input[data-field="amount"][data-id="${activityToUpdate.id}"]`) as HTMLInputElement;
-    const statusSelect = document.querySelector(`dialog[open] select[data-field="status"][data-id="${activityToUpdate.id}"]`) as HTMLSelectElement;
-    const contactIdentifierInput = document.querySelector(`dialog[open] input[data-field="contactIdentifier"][data-id="${activityToUpdate.id}"]`) as HTMLInputElement;
-    const contactIdentifierTypeInput = document.querySelector(`dialog[open] input[data-field="contactIdentifierType"][data-id="${activityToUpdate.id}"]`) as HTMLInputElement;
-
-    if (!clientNameInput || !detailsInput || !statusSelect) {
-        toast.error("Could not find form fields. Please try again.");
-        return;
+  const handleSave = async (activityId: string, updates: Partial<Activity>) => {
+    if (updates.amount === undefined) {
+      delete updates.amount;
     }
-
-    const updates: Partial<Activity> = {
-      client_name: clientNameInput.value,
-      details: detailsInput.value,
-      status: statusSelect.value as Activity['status'],
-    };
-
-    if (amountInput) {
-      const amountValue = parseFloat(amountInput.value);
-      if (!isNaN(amountValue)) {
-        updates.amount = amountValue;
-      } else {
-         console.warn("Invalid amount entered");
-      }
-    }
-
-    if (contactIdentifierInput && contactIdentifierTypeInput) {
-       updates.contactIdentifier = contactIdentifierInput.value;
-       updates.contactIdentifierType = contactIdentifierTypeInput.value as IdentifierType;
-     }
 
     try {
-      await updateActivity({ id: activityToUpdate.id, updates });
-
+      await updateActivity({ id: activityId, updates });
       setEditingActivity(null);
     } catch (error) {
       console.error("Failed to update activity:", error);
@@ -250,10 +217,7 @@ export function SalesTable() {
           const quantity = activity.quantity || 1;
           const type = getValue() as Activity['type'];
           return (
-            <div 
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => handleRowClick(activity.id)}
-            >
+            <div className="flex items-center gap-2">
               <div className={`p-1.5 sm:p-2 rounded-lg ${
                 getActivityColor(type) === 'blue'
                   ? 'bg-blue-400/5'
@@ -290,37 +254,6 @@ export function SalesTable() {
                 <div className="ml-auto text-sm font-medium text-emerald-500">
                   £{activity.amount.toLocaleString()}
                 </div>
-              )}
-              {expandedRow === activity.id && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="absolute left-0 right-0 top-full bg-gray-800/90 backdrop-blur-sm p-4 rounded-lg border border-gray-700/50 shadow-xl z-50 space-y-3"
-                >
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Client</span>
-                    <span className="text-sm text-white">{activity.client_name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Sales Rep</span>
-                    <span className="text-sm text-white">{activity.sales_rep}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Details</span>
-                    <span className="text-sm text-white">{activity.details}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-400">Date</span>
-                    <span className="text-sm text-white">{format(new Date(activity.date), 'MMM d, yyyy')}</span>
-                  </div>
-                  {activity.quantity && activity.quantity > 1 && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Quantity</span>
-                      <span className="text-sm text-white">{activity.quantity}</span>
-                    </div>
-                  )}
-                </motion.div>
               )}
             </div>
           );
@@ -407,7 +340,14 @@ export function SalesTable() {
           if (!activity) return null;
           return (
             <div className="flex items-center justify-end gap-2">
-              <Dialog open={editingActivity?.id === activity.id} onOpenChange={(isOpen) => !isOpen && setEditingActivity(null)}>
+              <Dialog 
+                open={editingActivity?.id === activity.id} 
+                onOpenChange={(isOpen) => {
+                  if (!isOpen) {
+                    setEditingActivity(null);
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <motion.button
                     whileHover={{ scale: 1.1 }}
@@ -419,81 +359,13 @@ export function SalesTable() {
                   </motion.button>
                 </DialogTrigger>
                 <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-gray-800/50 text-white p-6 rounded-xl">
-                  <DialogHeader>
-                    <DialogTitle>Edit Activity</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Client Name</label>
-                      <input
-                        type="text"
-                        defaultValue={activity.client_name}
-                        data-field="clientName"
-                        data-id={activity.id}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Details</label>
-                      <input
-                        type="text"
-                        defaultValue={activity.details}
-                        data-field="details"
-                        data-id={activity.id}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                      />
-                    </div>
-                    {activity.amount !== undefined && activity.amount !== null && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-400">Amount</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          defaultValue={activity.amount}
-                          data-field="amount"
-                          data-id={activity.id}
-                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                        />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Status</label>
-                      <select
-                        data-field="status"
-                        data-id={activity.id}
-                        defaultValue={activity.status}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent appearance-none"
-                      >
-                        <option value="completed">Completed</option>
-                        <option value="pending">Pending</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="no_show">No Show</option>
-                      </select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-400">Contact Identifier</label>
-                      <input
-                        type="text"
-                        placeholder="Enter email or phone"
-                        defaultValue={activity.contactIdentifier || ''}
-                        data-field="contactIdentifier"
-                        data-id={activity.id}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent mb-2"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Identifier Type (e.g., email, phone)"
-                        defaultValue={activity.contactIdentifierType || ''}
-                        data-field="contactIdentifierType"
-                        data-id={activity.id}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent"
-                      />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setEditingActivity(null)}>Cancel</Button>
-                    <Button onClick={() => handleUpdate(activity)}>Save Changes</Button>
-                  </DialogFooter>
+                  {editingActivity && editingActivity.id === activity.id && (
+                    <EditActivityForm 
+                      activity={editingActivity}
+                      onSave={handleSave}
+                      onCancel={() => setEditingActivity(null)}
+                    />
+                  )}
                 </DialogContent>
               </Dialog>
               
@@ -513,7 +385,7 @@ export function SalesTable() {
         },
       },
     ],
-    [editingActivity, expandedRow]
+    [editingActivity]
   );
 
   // Define StatCard component here, before the return statement
@@ -638,7 +510,6 @@ export function SalesTable() {
                 <tbody>
                   {filteredActivities.map((activity, index) => (
                     <motion.tr 
-                      onClick={() => handleRowClick(activity.id)}
                       key={activity.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
