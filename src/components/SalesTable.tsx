@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   // useReactTable, // Unused
   // getCoreRowModel, // Unused
@@ -36,6 +36,7 @@ import {
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, subWeeks, subMonths } from 'date-fns';
 import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
+import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 
 // Define type for date range presets
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'custom';
@@ -55,6 +56,7 @@ export function SalesTable() {
   const { activities, removeActivity, updateActivity } = useActivities();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
+  const { filters, setFilters, resetFilters } = useActivityFilters();
   
   // State for date filtering
   const [selectedRangeType, setSelectedRangeType] = useState<DateRangePreset>('thisMonth');
@@ -102,18 +104,31 @@ export function SalesTable() {
     };
   }, [selectedRangeType]);
 
-  // Filter activities for the CURRENT selected period
+  // Sync selected date range with filters
+  useEffect(() => {
+    setFilters({ 
+      dateRange: { 
+        start: currentDateRange.start, 
+        end: currentDateRange.end 
+      }
+    });
+  }, [currentDateRange, setFilters]);
+
+  // Filter activities combining both date range and type filter
   const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
       try {
         const activityDate = new Date(activity.date);
-        return activityDate >= currentDateRange.start && activityDate <= currentDateRange.end;
+        const matchesType = !filters.type || activity.type === filters.type;
+        return activityDate >= currentDateRange.start && 
+               activityDate <= currentDateRange.end &&
+               matchesType;
       } catch (e) {
         console.error("Error parsing activity date:", activity.date, e);
         return false; // Exclude activities with invalid dates
       }
     });
-  }, [activities, currentDateRange]);
+  }, [activities, currentDateRange, filters.type]);
 
   // Filter activities for the PREVIOUS equivalent period
   const previousPeriodActivities = useMemo(() => {
@@ -121,15 +136,18 @@ export function SalesTable() {
     return activities.filter(activity => {
       try {
         const activityDate = new Date(activity.date);
+        const matchesType = !filters.type || activity.type === filters.type;
         // Ensure previous range dates are valid before comparing
         return previousDateRange.start && previousDateRange.end && 
-               activityDate >= previousDateRange.start && activityDate <= previousDateRange.end;
+               activityDate >= previousDateRange.start && 
+               activityDate <= previousDateRange.end &&
+               matchesType;
       } catch (e) {
         console.error("Error parsing activity date for previous period:", activity.date, e);
         return false; 
       }
     });
-  }, [activities, previousDateRange]);
+  }, [activities, previousDateRange, filters.type]);
 
   // Calculate stats for the CURRENT period including meeting -> proposal rate
   const currentStats = useMemo(() => {
@@ -265,6 +283,14 @@ export function SalesTable() {
         return 'gray';
     }
   };
+
+  // Handle type filter changes via UI
+  const handleFilterByType = (type: Activity['type'] | undefined) => {
+    setFilters({ type });
+  };
+
+  // Derived state for whether current view is filtered by type
+  const isTypeFiltered = !!filters.type;
 
   const columns = useMemo(
     () => [
@@ -476,7 +502,27 @@ export function SalesTable() {
     const trendColor = trendPercentage > 0 ? `text-emerald-500` : trendPercentage < 0 ? `text-red-500` : `text-gray-500`;
 
     return (
-      <div className={`bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-800/50`}>
+      <div 
+        className={`bg-gray-900/50 backdrop-blur-xl rounded-xl p-4 border border-gray-800/50 cursor-pointer hover:border-${color}-500/50 transition-all duration-300`}
+        onClick={() => {
+          // When clicking a stat card, filter by its corresponding type
+          const typeMap: Record<string, Activity['type'] | undefined> = {
+            'Total Revenue': 'sale',
+            'Meeting Conversion': 'meeting',
+            'Proposal Win Rate': 'proposal',
+            'Won Deals': 'sale',
+            'Average Deal Value': 'sale',
+          };
+          
+          const newType = typeMap[title];
+          if (newType === filters.type) {
+            // Toggle off if already filtered
+            handleFilterByType(undefined);
+          } else {
+            handleFilterByType(newType);
+          }
+        }}
+      >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg bg-${color}-500/10`}>
             <Icon className={`w-5 h-5 text-${color}-500`} />
@@ -501,13 +547,29 @@ export function SalesTable() {
             <div>
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold text-white">Activity Log</h1>
-                  <p className="text-sm text-gray-400 mt-1">Track and manage your sales activities</p>
+                  <h1 className="text-2xl font-bold text-white">
+                    {isTypeFiltered ? `${filters.type?.charAt(0).toUpperCase() ?? ''}${filters.type?.slice(1) ?? ''} Activities` : 'Activity Log'}
+                  </h1>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {isTypeFiltered ? `Showing ${filters.type || ''} activities for the selected period` : 'Track and manage your sales activities'}
+                  </p>
                 </div>
               </div>
             </div>
-            {/* Date Range Filter Buttons */} 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Type filter pills/buttons */}
+              {isTypeFiltered && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleFilterByType(undefined)}
+                  className="bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-700/70 hover:text-white"
+                >
+                  Clear Filter
+                </Button>
+              )}
+              
+              {/* Date Range Filter Buttons */} 
               {(['today', 'thisWeek', 'thisMonth', 'last30Days'] as DateRangePreset[]).map((range) => (
                   <Button
                     key={range}

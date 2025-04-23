@@ -96,7 +96,7 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
   const handleClick = () => {
     if (type) {
       setFilters({ type, dateRange });
-      navigate('/activity');
+      navigate('/activity', { state: { preserveFilters: true } });
     }
   };
 

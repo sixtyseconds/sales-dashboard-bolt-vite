@@ -30,11 +30,8 @@ export const useActivityFilters = create<ActivityFiltersStore>((set) => ({
   setFilters: (newFilters) => 
     set((state) => ({
       filters: { 
-        // Start with default state
-        type: undefined,
-        salesRep: undefined,
-        dateRange: state.filters.dateRange,
-        searchQuery: '',
+        // Keep existing filters
+        ...state.filters,
         // Override with new filters
         ...newFilters
       }
