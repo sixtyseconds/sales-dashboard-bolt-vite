@@ -19,10 +19,12 @@ import {
   TrendingUp,
   BarChart as BarChartIcon,
   Phone,
-  FileText
+  FileText,
+  UploadCloud // Added for potential use in import component
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useActivities, Activity } from '@/lib/hooks/useActivities';
+import { useUser } from '@/lib/hooks/useUser'; // Import useUser hook
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -37,6 +39,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
+import BulkActivityImport from './admin/BulkActivityImport'; // Import the bulk import component
 
 // Define type for date range presets
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'custom';
@@ -54,6 +57,7 @@ export function SalesTable() {
   // const [sorting, setSorting] = useState<SortingState>([]); 
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
   const { activities, removeActivity, updateActivity } = useActivities();
+  const { userData } = useUser(); // Get user data for admin check
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [activityToDelete, setActivityToDelete] = useState<string | null>(null);
   const { filters, setFilters, resetFilters } = useActivityFilters();
@@ -543,6 +547,9 @@ export function SalesTable() {
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="space-y-6">
+          {/* Conditionally render Bulk Import for Admins */}
+          {userData?.is_admin && <BulkActivityImport />}
+
           <div className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -556,50 +563,22 @@ export function SalesTable() {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Type filter pills/buttons */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               {isTypeFiltered && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleFilterByType(undefined)}
-                  className="bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-700/70 hover:text-white"
-                >
-                  Clear Filter
+                <Button variant="secondary" onClick={resetFilters} size="sm">
+                  Show All Types
                 </Button>
               )}
-              
-              {/* Date Range Filter Buttons */} 
-              {(['today', 'thisWeek', 'thisMonth', 'last30Days'] as DateRangePreset[]).map((range) => (
-                  <Button
-                    key={range}
-                    variant={selectedRangeType === range ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedRangeType(range)}
-                    className={`
-                      ${selectedRangeType === range 
-                        ? 'bg-[#37bd7e] text-white border-[#37bd7e]/50 hover:bg-[#2da76c]' 
-                        : 'bg-gray-800/50 border-gray-700/50 text-gray-300 hover:bg-gray-700/70 hover:text-white'}
-                    `}
-                  >
-                    {/* Simple label generation */} 
-                    {range === 'today' && 'Today'}
-                    {range === 'thisWeek' && 'This Week'}
-                    {range === 'thisMonth' && 'This Month'}
-                    {range === 'last30Days' && 'Last 30 Days'}
-                  </Button>
-              ))}
-              {/* Placeholder for Custom Date button/trigger */}
-              {/* 
-              <Button 
-                variant={selectedRangeType === 'custom' ? "default" : "outline"} 
-                size="sm" 
-                onClick={() => setSelectedRangeType('custom')}
-                className={`...'}
+              <select
+                value={selectedRangeType}
+                onChange={(e) => setSelectedRangeType(e.target.value as DateRangePreset)}
+                className="bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm focus:ring-offset-gray-900 focus:ring-offset-2 focus:ring-emerald-500"
               >
-                Custom
-              </Button> 
-              */}
+                <option value="today">Today</option>
+                <option value="thisWeek">This Week</option>
+                <option value="thisMonth">This Month</option>
+                <option value="last30Days">Last 30 Days</option>
+              </select>
             </div>
           </div>
 
