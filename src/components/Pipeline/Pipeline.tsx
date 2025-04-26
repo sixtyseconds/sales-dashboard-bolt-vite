@@ -293,7 +293,10 @@ function PipelineContent() {
       const overItems = prev[overContainer] ? [...prev[overContainer]] : [];
 
       const activeIndex = activeItems.findIndex(item => item.id === activeId);
-      if (activeIndex === -1) return prev; // Item not found
+      if (activeIndex === -1) {
+        console.warn("DragOver: Item not found in active container", activeId, activeContainer);
+        return prev; // Item not found, bail out
+      }
 
       const [movedItem] = activeItems.splice(activeIndex, 1);
 
@@ -318,12 +321,20 @@ function PipelineContent() {
           overIndex = overItems.length;
       }
 
+      // Check if the item is already in the target list before adding
+      const alreadyInOverItems = overItems.some(item => item.id === movedItem.id);
+      
+      if (!alreadyInOverItems) {
       // If dropping onto another item
       if (overIndex !== -1) {
           overItems.splice(overIndex, 0, movedItem);
       } else {
           // If overIndex is -1 (likely dropping on container or empty space), add to end
           overItems.push(movedItem);
+          }
+      } else {
+          console.warn("DragOver: Item already exists in target container", movedItem.id, overContainer);
+          // Optionally, update position if needed, but avoid adding duplicate
       }
 
       return {

@@ -18,7 +18,9 @@ import {
   UserX,
   Kanban,
   PanelLeft,
-  Users as UsersIcon
+  Users as UsersIcon,
+  Link2,
+  CheckSquare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
@@ -66,6 +68,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: Kanban, label: 'Pipeline', href: '/pipeline' },
     { icon: Activity, label: 'Heatmap', href: '/heatmap' },
     { icon: FileText, label: 'Activity Log', href: '/activity' },
+    { icon: Link2, label: 'Unmatched Activities', href: '/unmatched-activities' },
+    { icon: CheckSquare, label: 'Process Ready', href: '/process-ready-activities' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
     ...(userData?.is_admin ? [
       { 
