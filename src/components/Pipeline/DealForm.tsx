@@ -109,7 +109,13 @@ export function DealForm({
       return;
     }
     
-    onSave(formData);
+    // Prepare data for saving, ensuring empty date is null
+    const dataToSave = {
+      ...formData,
+      expected_close_date: formData.expected_close_date === '' ? null : formData.expected_close_date
+    };
+    
+    onSave(dataToSave); // Pass the cleaned data
   };
   
   return (

@@ -35,7 +35,7 @@ export interface OriginalActivityFilters {
   contact_identifier?: 'IS_NULL' | 'IS_NOT_NULL' | string; // Allow checking for null
   is_processed?: boolean;
   type_neq?: string; // Added for not-equal filter on type
-  // Add other filters as needed (e.g., user_id, type)
+  user_id?: string; // Add user_id filter type
 }
 
 export function useOriginalActivities(filters?: OriginalActivityFilters) {
@@ -59,13 +59,13 @@ export function useOriginalActivities(filters?: OriginalActivityFilters) {
       setIsLoading(true);
       setError(null);
       
-      // Query the new VIEW
+      // Query the BASE activities table - it should contain sales_rep
       let query = supabase
-        .from('activities_with_profile') // Query the VIEW
-        .select('*') // Select all columns from the view
+        .from('activities') // Query the BASE table
+        .select('*') // Select all columns, including sales_rep
         .order('date', { ascending: false }); 
 
-      // Apply filters dynamically (using view columns)
+      // Apply filters dynamically (using base table columns)
       if (filters) {
           if (filters.contact_identifier === 'IS_NULL') {
               console.log('[useOriginalActivities] Applying filter: contact_identifier IS NULL');
@@ -85,6 +85,12 @@ export function useOriginalActivities(filters?: OriginalActivityFilters) {
           if (filters.type_neq !== undefined) {
              console.log(`[useOriginalActivities] Applying filter: type ILIKE not ${filters.type_neq}`);
              query = query.not('type', 'ilike', filters.type_neq);
+          }
+
+          // Apply user_id filter if present
+          if (filters.user_id) {
+             console.log(`[useOriginalActivities] Applying filter: user_id = ${filters.user_id}`);
+             query = query.eq('user_id', filters.user_id);
           }
       }
       

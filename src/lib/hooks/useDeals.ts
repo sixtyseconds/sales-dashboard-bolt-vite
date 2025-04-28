@@ -144,6 +144,10 @@ export function useDeals() {
         ? { ...updates, stage_changed_at: new Date().toISOString() }
         : updates;
       
+      // --- Add Log --- 
+      console.log('Data being sent to Supabase update:', JSON.stringify(updatedData, null, 2));
+      // --- End Log --- 
+      
       const { data, error } = await supabase
         .from('deals')
         .update(updatedData)
@@ -151,7 +155,16 @@ export function useDeals() {
         .select()
         .single();
         
-      if (error) throw error;
+      // --- Add Log ---
+      console.log('Supabase update successful. Returned data:', data);
+      // --- End Log ---
+
+      if (error) {
+         // --- Add Log --- 
+         console.error('Supabase update error details:', error);
+         // --- End Log ---
+         throw error;
+      }
       
       // If stage changed, add entry to stage history
       if (stageChanging) {

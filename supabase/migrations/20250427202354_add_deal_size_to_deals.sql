@@ -1,0 +1,2 @@
+ALTER TABLE deals
+ADD COLUMN deal_size TEXT NULL;

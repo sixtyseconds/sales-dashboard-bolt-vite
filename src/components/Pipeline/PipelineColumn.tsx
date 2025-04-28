@@ -44,6 +44,7 @@ export function PipelineColumn({
 
   return (
     <div
+      data-testid={`pipeline-column-${stage.id}`}
       className="min-w-[320px] max-w-[320px] bg-gray-900/50 backdrop-blur-xl
         rounded-xl border border-gray-800/50 flex flex-col max-h-[calc(100vh-200px)]"
       style={{

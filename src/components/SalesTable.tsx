@@ -39,7 +39,7 @@ import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, end
 import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
-import BulkActivityImport from './admin/BulkActivityImport'; // Import the bulk import component
+import { ActivityUploadModal } from './admin/ActivityUploadModal'; // Import the new modal
 
 // Define type for date range presets
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'custom';
@@ -66,6 +66,7 @@ export function SalesTable() {
   const [selectedRangeType, setSelectedRangeType] = useState<DateRangePreset>('thisMonth');
   // State for custom date range (implement date pickers later if needed)
   // const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false); // State for upload modal
 
   // Calculate the current and previous date ranges based on the selected type
   const { currentDateRange, previousDateRange } = useMemo(() => {
@@ -543,13 +544,16 @@ export function SalesTable() {
     );
   };
 
+  // Format currency helper (reuse if needed or import from utils)
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '-';
+    return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
+  };
+
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="space-y-6">
-          {/* Conditionally render Bulk Import for Admins */}
-          {userData?.is_admin && <BulkActivityImport />}
-
           <div className="flex flex-col gap-4 sm:gap-6 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -714,6 +718,12 @@ export function SalesTable() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {userData?.is_admin && (
+         <ActivityUploadModal 
+            open={isUploadModalOpen} 
+            setOpen={setIsUploadModalOpen} 
+         />
+      )}
     </div>
   );
 }

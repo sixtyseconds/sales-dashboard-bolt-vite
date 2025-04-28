@@ -1,6 +1,6 @@
 import React from 'react';
 import { Map, AlertCircle } from 'lucide-react';
-import { useEditDeal, LeadSource } from '../../contexts/EditDealContext';
+import { useFormContext } from 'react-hook-form';
 import ChannelOption from './ChannelOption';
 
 interface SourceType {
@@ -18,8 +18,11 @@ interface ChannelsMap {
 }
 
 const LeadSourceSection: React.FC = () => {
-  const { state, updateLeadSource } = useEditDeal();
-  
+  const { register, watch, setValue, formState: { errors } } = useFormContext();
+
+  const currentSourceType = watch('leadSourceType');
+  const currentChannel = watch('leadSourceChannel');
+
   const sourceTypes: SourceType[] = [
     { id: 'inbound', label: 'Inbound' },
     { id: 'outbound', label: 'Outbound' },
@@ -56,10 +59,13 @@ const LeadSourceSection: React.FC = () => {
     ]
   };
   
-  const handleSourceTypeChange = (sourceType: LeadSource['type']) => {
-    updateLeadSource('type', sourceType);
-    // Reset channel when changing source type
-    updateLeadSource('channel', '');
+  const handleSourceTypeChange = (sourceType: string) => {
+    setValue('leadSourceType', sourceType, { shouldValidate: true });
+    setValue('leadSourceChannel', '', { shouldValidate: true });
+  };
+  
+  const handleChannelChange = (channelId: string) => {
+    setValue('leadSourceChannel', channelId, { shouldValidate: true });
   };
   
   return (
@@ -69,18 +75,21 @@ const LeadSourceSection: React.FC = () => {
         title="Lead Source"
       />
       
+      <input type="hidden" {...register("leadSourceType")} />
+      <input type="hidden" {...register("leadSourceChannel")} />
+
       <div className="flex flex-wrap gap-2 mb-4">
         {sourceTypes.map(source => (
           <button
             key={source.id}
             type="button"
             className={`px-3 py-1.5 text-xs font-medium rounded border transition-all
-              ${state.leadSource.type === source.id
+              ${currentSourceType === source.id
                 ? 'bg-violet-500/10 border-violet-500/30 text-violet-400'
                 : 'bg-gray-900/80 border-gray-700 text-gray-400 hover:bg-gray-800 hover:border-gray-600'
               }`}
             onClick={() => handleSourceTypeChange(source.id)}
-            aria-pressed={state.leadSource.type === source.id}
+            aria-pressed={currentSourceType === source.id}
           >
             {source.label}
           </button>
@@ -88,13 +97,13 @@ const LeadSourceSection: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mb-6">
-        {channels[state.leadSource.type]?.map(channel => (
+        {channels[currentSourceType]?.map(channel => (
           <ChannelOption
             key={channel.id}
             id={channel.id}
             label={channel.label}
-            isSelected={state.leadSource.channel === channel.id}
-            onClick={() => updateLeadSource('channel', channel.id)}
+            isSelected={currentChannel === channel.id}
+            onClick={() => handleChannelChange(channel.id)}
           />
         ))}
       </div>

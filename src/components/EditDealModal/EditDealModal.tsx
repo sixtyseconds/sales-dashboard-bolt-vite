@@ -88,6 +88,9 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       notes: deal?.notes || deal?.description || '',
       probability: deal?.probability || 20,
       nextAction: deal?.next_steps || deal?.nextAction || '',
+      dealSize: deal?.deal_size || '',
+      leadSourceType: deal?.lead_source_type || '',
+      leadSourceChannel: deal?.lead_source_channel || ''
     }
   });
   
@@ -175,6 +178,23 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
     }
   };
   
+  // Helper function to format date string to YYYY-MM-DD
+  const formatDateForInput = (dateString: string | null | undefined): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid before formatting
+      if (isNaN(date.getTime())) return ''; 
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      console.error("Error formatting date:", e);
+      return ''; // Return empty string on error
+    }
+  };
+
   // Handle save with form validation
   const handleSave = async () => {
     try {
@@ -194,6 +214,8 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       }
       
       const formData = methods.getValues();
+      console.log(">>> DEBUG: Form data in handleSave:", formData);
+      console.log(">>> DEBUG: nextAction value:", formData.nextAction);
       
       // Ensure we're using a valid stage ID
       let stageId = currentStage;
@@ -201,17 +223,25 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       // Map form field names to database column names
       const dataToSave = {
         name: formData.name,
+        company: formData.company || null,
         value: formData.amount ? parseFloat(formData.amount as string) : null,
-        expected_close_date: formData.closeDate,
-        notes: formData.notes,
-        stage_id: stageId, // Use stage ID from pipeline context
+        expected_close_date: formData.closeDate === '' ? null : formData.closeDate,
+        description: formData.notes || null,
+        stage_id: stageId,
         probability: formData.probability ? parseInt(formData.probability.toString()) : null,
-        next_steps: formData.nextAction,
+        priority: formData.priority === '' ? null : formData.priority,
+        next_steps: formData.nextAction, // Always include nextAction even if empty
+        contact_name: formData.contactName || null,
+        deal_size: formData.dealSize === '' ? null : formData.dealSize,
+        lead_source_type: formData.leadSourceType === '' ? null : formData.leadSourceType,
+        lead_source_channel: formData.leadSourceChannel === '' ? null : formData.leadSourceChannel
       };
 
-      // Filter out null or undefined values
+      console.log(">>> DEBUG: dataToSave next_steps value:", dataToSave.next_steps);
+
+      // Filter out null or undefined values, but keep empty strings
       const cleanedData = Object.fromEntries(
-        Object.entries(dataToSave).filter(([_, v]) => v != null)
+        Object.entries(dataToSave).filter(([_, v]) => v !== null && v !== undefined)
       );
 
       console.log("Saving deal with data:", cleanedData);
@@ -265,19 +295,63 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
 
   // Reset active tab when modal opens
   useEffect(() => {
-    if (open) {
-      setActiveTab('details');
-      
-      // Reset form with deal data
-      methods.reset({
-        name: deal?.name || deal?.dealName || '',
-        amount: deal?.value || '',
-        closeDate: deal?.expected_close_date || deal?.closeDate || '',
-        notes: deal?.notes || deal?.description || '',
-        probability: deal?.probability || 20,
-        nextAction: deal?.next_steps || deal?.nextAction || '',
-      });
-      
+    if (open && deal) {
+      // Calculate values first
+      const nameValue = deal.name || '';
+      const companyValue = deal.company || '';
+      const contactNameValue = deal.contact_name || '';
+      const amountValue = deal.value ?? '';
+      const closeDateValue = formatDateForInput(deal.expected_close_date);
+      const notesValue = deal.notes || deal.description || '';
+      const probabilityValue = deal.probability ?? 0;
+      const nextActionValue = deal.next_steps || '';
+      const dealSizeValue = deal.deal_size || '';
+      const leadSourceTypeValue = deal.lead_source_type || '';
+      const leadSourceChannelValue = deal.lead_source_channel || '';
+      const priorityValue = deal.priority || '';
+
+      console.log('>>> DEBUG: Resetting form with deal:', deal);
+      console.log('>>> DEBUG: Deal size value:', dealSizeValue);
+      console.log('>>> DEBUG: Priority value:', priorityValue);
+
+      const resetValues = {
+        name: nameValue,
+        company: companyValue,
+        contactName: contactNameValue,
+        amount: amountValue,
+        closeDate: closeDateValue,
+        notes: notesValue,
+        probability: probabilityValue,
+        nextAction: nextActionValue,
+        dealSize: dealSizeValue,
+        leadSourceType: leadSourceTypeValue,
+        leadSourceChannel: leadSourceChannelValue,
+        priority: priorityValue
+      };
+
+      methods.reset(resetValues);
+      console.log('>>> DEBUG: Called methods.reset with:', resetValues);
+
+      // *** Explicitly set values for all fields after reset ***
+      const setValueOptions = { shouldValidate: false, shouldDirty: false };
+      methods.setValue('name', nameValue, setValueOptions);
+      methods.setValue('company', companyValue, setValueOptions);
+      methods.setValue('contactName', contactNameValue, setValueOptions);
+      methods.setValue('amount', amountValue, setValueOptions);
+      methods.setValue('closeDate', closeDateValue, setValueOptions);
+      methods.setValue('notes', notesValue, setValueOptions);
+      methods.setValue('probability', probabilityValue, setValueOptions);
+      methods.setValue('nextAction', nextActionValue, setValueOptions);
+      methods.setValue('dealSize', dealSizeValue, setValueOptions);
+      methods.setValue('leadSourceType', leadSourceTypeValue, setValueOptions);
+      methods.setValue('leadSourceChannel', leadSourceChannelValue, setValueOptions);
+      methods.setValue('priority', priorityValue, setValueOptions);
+      console.log('>>> DEBUG: Explicitly called setValue for all fields.');
+
+      // *** Log the form state AFTER setting values ***
+      const currentFormValues = methods.getValues();
+      console.log('>>> DEBUG: Form state values AFTER all setValue calls:', currentFormValues);
+
       // Focus the first interactive element after opening
       setTimeout(() => {
         if (initialFocusRef.current) {
