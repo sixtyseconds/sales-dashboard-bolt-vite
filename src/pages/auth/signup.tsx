@@ -27,8 +27,10 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
+      // Ensure email is lowercased for case-insensitive registration
+      const email = formData.email.toLowerCase();
       const { error } = await supabase.auth.signUp({
-        email: formData.email,
+        email,
         password: formData.password,
         options: {
           data: {

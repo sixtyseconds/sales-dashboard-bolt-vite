@@ -37,6 +37,21 @@ async function fetchActivities() {
   return data?.filter(activity => activity.user_id === user.id) || [];
 }
 
+// Helper to process activity if ready
+async function processActivityIfReady(activityId: string, contactIdentifier?: string) {
+  if (!contactIdentifier) return;
+  try {
+    const { error } = await supabase.functions.invoke('process-single-activity', {
+      body: { activityId },
+    });
+    if (error) {
+      toast.error('Failed to auto-process activity: ' + (error.message || 'Unknown error'));
+    }
+  } catch (err: any) {
+    toast.error('Failed to auto-process activity: ' + (err.message || 'Unknown error'));
+  }
+}
+
 async function createActivity(activity: {
   type: Activity['type'];
   client_name: string;
@@ -80,6 +95,11 @@ async function createActivity(activity: {
     .single();
 
   if (error) throw error;
+
+  // Automatically process if ready
+  if (data) {
+    await processActivityIfReady(data.id, data.contact_identifier);
+  }
 
   return data;
 }
@@ -126,6 +146,11 @@ async function createSale(sale: {
 
   if (error) throw error;
   if (!data) throw new Error('Failed to create sale');
+
+  // Automatically process if ready
+  if (data) {
+    await processActivityIfReady(data.id, data.contact_identifier);
+  }
 
   return data;
 }

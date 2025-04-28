@@ -18,8 +18,10 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+      // Ensure email is lowercased for case-insensitive authentication
+      const email = formData.email.toLowerCase();
       const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
+        email,
         password: formData.password,
       });
 
