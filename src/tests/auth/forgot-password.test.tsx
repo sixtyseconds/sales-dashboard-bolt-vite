@@ -1,3 +1,8 @@
+/**
+ * Tests for the Forgot Password flow.
+ * Ensures correct form rendering, submission, error handling,
+ * and that email addresses are handled in a case-insensitive manner (lowercased before sending to Supabase).
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
@@ -107,5 +112,38 @@ describe('ForgotPassword', () => {
 
     // Form should still be visible (not switched to success state)
     expect(screen.getByText('Send Reset Link')).toBeInTheDocument();
+  });
+
+  it('handles email with uppercase letters by lowercasing before sending to Supabase', async () => {
+    // Mock successful response
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+      data: {},
+      error: null,
+    });
+
+    render(
+      <BrowserRouter>
+        <ForgotPassword />
+      </BrowserRouter>
+    );
+
+    // Fill in the form with uppercase email
+    const emailInput = screen.getByLabelText('Email Address');
+    fireEvent.change(emailInput, { target: { value: 'Test@Example.COM' } });
+
+    // Submit the form
+    const submitButton = screen.getByText('Send Reset Link');
+    fireEvent.click(submitButton);
+
+    // Check that the Supabase method was called with the lowercased email
+    await waitFor(() => {
+      expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        {
+          redirectTo: expect.stringContaining('/auth/reset-password'),
+        }
+      );
+      expect(toast.success).toHaveBeenCalled();
+    });
   });
 }); 

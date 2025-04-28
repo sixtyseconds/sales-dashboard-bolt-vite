@@ -16,7 +16,9 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      // Ensure email is lowercased for case-insensitive password reset
+      const lowerEmail = email.toLowerCase();
+      const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
 

@@ -103,6 +103,9 @@ export function ActivityProcessingPage() {
   // State to track processing activity (for process-ready view)
   const [processingActivityId, setProcessingActivityId] = useState<string | null>(null);
 
+  // State to track processing all activities
+  const [isProcessingAll, setIsProcessingAll] = useState(false);
+
   // --- Handlers for Missing Email View ---
   const handleEditClick = (activity: OriginalActivity) => {
     setEditingActivity(activity);
@@ -158,6 +161,31 @@ export function ActivityProcessingPage() {
     } finally {
       setProcessingActivityId(null);
     }
+  };
+
+  // Handler to process all ready activities
+  const handleProcessAllReady = async () => {
+    if (!activities || activities.length === 0) return;
+    setIsProcessingAll(true);
+    let processedCount = 0;
+    let errorCount = 0;
+    const toastId = toast.loading('Processing all ready activities...');
+    for (const activity of activities) {
+      try {
+        await handleProcessClick(activity.id);
+        processedCount++;
+      } catch (err) {
+        errorCount++;
+        // Optionally, log or handle individual errors
+      }
+    }
+    setIsProcessingAll(false);
+    if (errorCount === 0) {
+      toast.success(`Successfully processed all (${processedCount}) activities.`, { id: toastId });
+    } else {
+      toast.error(`Processed ${processedCount} activities, but ${errorCount} failed.`, { id: toastId });
+    }
+    refreshActivities();
   };
 
   // Determine overall loading state
@@ -236,6 +264,24 @@ export function ActivityProcessingPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Process All Ready Button - only show in process-ready view and if there are activities */}
+      {currentView === 'process-ready' && activities.length > 0 && (
+        <div className="mb-4 flex justify-end">
+          <Button
+            variant="default"
+            onClick={handleProcessAllReady}
+            disabled={isProcessingAll || isHookLoading || activities.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg shadow"
+          >
+            {isProcessingAll ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing All...</>
+            ) : (
+              'Process All Ready'
+            )}
+          </Button>
+        </div>
+      )}
 
       {(isHookLoading && activities.length === 0 && !error) ? (
          <div className="text-center p-6">{loadingMessage}</div>
