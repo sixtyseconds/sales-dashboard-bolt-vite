@@ -15,8 +15,7 @@ import Signup from '@/pages/auth/signup';
 import ForgotPassword from '@/pages/auth/forgot-password';
 import ResetPassword from '@/pages/auth/reset-password';
 import { PipelinePage } from '@/pages/PipelinePage';
-import MissingEmailActivitiesPage from '@/pages/UnmatchedActivitiesPage';
-import { UnprocessedReadyActivitiesPage } from '@/pages/UnprocessedReadyActivitiesPage';
+import ActivityProcessingPage from '@/pages/ActivityProcessingPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,8 +49,7 @@ function App() {
           <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
           <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
           <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
-          <Route path="/unmatched-activities" element={<AppLayout><MissingEmailActivitiesPage /></AppLayout>} />
-          <Route path="/process-ready-activities" element={<AppLayout><UnprocessedReadyActivitiesPage /></AppLayout>} />
+          <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
           <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
           <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
         </Routes>
