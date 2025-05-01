@@ -19,9 +19,10 @@ import {
   UserCheck,
   Trash2,
   PlusCircle,
-  History
+  History,
+  X
 } from 'lucide-react';
-import { useUsers } from '@/lib/hooks/useUsers';
+import { useUsers, User, Target as TargetType } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -36,15 +37,21 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
-import { format, parseISO } from 'date-fns';
-import { User } from '@/lib/hooks/useUsers';
+import { format, isValid, parseISO } from 'date-fns';
+
+// Define more specific types for the editing state using discriminated union pattern
+type EditingUserState =
+  | { mode: 'closed' }
+  | { mode: 'newUser' }
+  | { mode: 'editTargets'; user: User }
+  | { mode: 'editDetails'; user: User };
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStage, setSelectedStage] = useState('all');
-  const [editingUser, setEditingUser] = useState<User | null | { isNew?: boolean; editingTargets?: boolean }>(null);
-  const [modalTargets, setModalTargets] = useState<Target[]>([]);
+  const [editingState, setEditingState] = useState<EditingUserState>({ mode: 'closed' });
+  const [modalTargets, setModalTargets] = useState<TargetType[]>([]);
   const [historyUser, setHistoryUser] = useState<User | null>(null);
   const { users, updateUser, impersonateUser, deleteUser } = useUsers();
   const navigate = useNavigate();
@@ -63,10 +70,9 @@ export default function Users() {
   }, [users, searchQuery, selectedStage]);
 
   useEffect(() => {
-    if (editingUser && !(editingUser as any).isNew && (editingUser as any).editingTargets && 'targets' in editingUser && Array.isArray(editingUser.targets)) {
-      const user = editingUser as User;
+    if (editingState.mode === 'editTargets') {
+      const user = editingState.user;
       const now = new Date();
-
       const activeTargets = user.targets.filter(target => {
         const startDate = target.start_date ? new Date(target.start_date) : null;
         if (startDate instanceof Date && isNaN(startDate.getTime())) {
@@ -90,24 +96,24 @@ export default function Users() {
 
       setModalTargets(JSON.parse(JSON.stringify(activeTargets)));
 
-    } else if (editingUser && (editingUser as any).editingTargets) {
+    } else if (editingState.mode === 'editTargets') {
        console.log("[Users Modal] Initializing with empty targets array (no valid user/targets found).");
        setModalTargets([]);
     }
-  }, [editingUser]);
+  }, [editingState]);
 
   const handleModalTargetChange = (index: number, field: string, value: string) => {
     setModalTargets(currentTargets => {
       const updatedTargets = [...currentTargets];
       if (!updatedTargets[index]) {
-        updatedTargets[index] = { id: undefined };
+        updatedTargets[index] = { id: undefined } as TargetType;
       }
       const parsedValue = value === '' ? null : (field.includes('target') ? (field === 'revenue_target' ? parseFloat(value) : parseInt(value)) : value);
 
       updatedTargets[index] = {
         ...updatedTargets[index],
         [field]: parsedValue
-      };
+      } as TargetType;
       return updatedTargets;
     });
   };
@@ -140,6 +146,7 @@ export default function Users() {
     }
     try {
       await updateUser({ userId, updates });
+      setEditingState({ mode: 'closed' });
     } catch (error) {
       console.error('Update error caught in component handleUpdateUser:', error);
     }
@@ -206,7 +213,7 @@ export default function Users() {
             <p className="text-sm text-gray-400 mt-1">Manage users, roles, and permissions</p>
           </div>
           <button
-            onClick={() => setEditingUser({ isNew: true })}
+            onClick={() => setEditingState({ mode: 'newUser' })}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50"
           >
             <UserPlus className="w-4 h-4" />
@@ -342,7 +349,7 @@ export default function Users() {
                           {user.avatar_url ? (
                             <img
                               src={user.avatar_url}
-                              alt={user.first_name}
+                              alt={user.first_name ?? 'User Avatar'}
                               className="w-full h-full object-cover rounded-lg"
                             />
                           ) : (
@@ -372,7 +379,7 @@ export default function Users() {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <button
-                        onClick={() => setEditingUser({ ...(user as User), editingTargets: true })}
+                        onClick={() => setEditingState({ mode: 'editTargets', user: user })}
                         className="flex items-center gap-2 px-3 py-1 rounded-lg bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 transition-all duration-300 text-sm border border-violet-500/30"
                       >
                         <Target className="w-4 h-4" />
@@ -410,7 +417,7 @@ export default function Users() {
                           <UserCheck className="w-4 h-4 text-violet-500" />
                         </button>
                         <button
-                          onClick={() => setEditingUser(user)}
+                          onClick={() => setEditingState({ mode: 'editDetails', user: user })}
                           className="p-2 hover:bg-[#37bd7e]/20 rounded-lg transition-colors"
                           title="Edit User Details"
                         >
@@ -454,24 +461,22 @@ export default function Users() {
       </div>
 
       {/* Edit User Modal */}
-      {editingUser && (
+      {editingState.mode !== 'closed' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4 text-white">
-              {editingUser.isNew ? 'Add User' : (editingUser as User).editingTargets ? `Edit Targets for ${(editingUser as User).first_name}` : 'Edit User'}
+              {editingState.mode === 'newUser' ? 'Add User'
+               : editingState.mode === 'editTargets' ? `Edit Targets for ${editingState.user.first_name}`
+               : editingState.mode === 'editDetails' ? `Edit User Details for ${editingState.user.first_name}`
+               : 'Edit User'}
             </h2>
 
-            {(editingUser as any).editingTargets ? (
+            {editingState.mode === 'editTargets' && (
               <form onSubmit={(e) => {
                 e.preventDefault();
-                if (editingUser && 'id' in editingUser) {
-                    handleUpdateUser(editingUser.id, { targets: modalTargets });
-                } else {
-                    console.error("Cannot update targets: editingUser is not a valid User object.");
-                    toast.error("Error saving targets: Invalid user data.");
-                }
+                handleUpdateUser(editingState.user.id, { targets: modalTargets });
               }} className="space-y-6">
-                {modalTargets.map((target, index) => (
+                {modalTargets.map((target: TargetType, index) => (
                   <div key={target.id || index} className="p-4 rounded-lg border border-gray-700/50 bg-gray-800/20 space-y-4 relative">
                     <button
                       type="button"
@@ -485,38 +490,38 @@ export default function Users() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Revenue Target</label>
-                  <input
-                    type="number"
+                        <input
+                          type="number"
                           placeholder="e.g., 20000"
                           value={target.revenue_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'revenue_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                  />
-                </div>
+                        />
+                      </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Outbound Target</label>
-                  <input
-                    type="number"
+                        <input
+                          type="number"
                           placeholder="e.g., 100"
                           value={target.outbound_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'outbound_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                  />
-                </div>
+                        />
+                      </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Meetings Target</label>
-                  <input
-                    type="number"
+                        <input
+                          type="number"
                           placeholder="e.g., 20"
                           value={target.meetings_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'meetings_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                  />
-                </div>
+                        />
+                      </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Proposal Target</label>
-                  <input
-                    type="number"
+                        <input
+                          type="number"
                           placeholder="e.g., 15"
                           value={target.proposal_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'proposal_target', e.target.value)}
@@ -539,8 +544,8 @@ export default function Users() {
                           value={target.end_date ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'end_date', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                  />
-                </div>
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -557,7 +562,7 @@ export default function Users() {
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => { setEditingUser(null); setModalTargets([]); }}
+                    onClick={() => setEditingState({ mode: 'closed' })}
                     className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
                   >
                     Cancel
@@ -570,16 +575,16 @@ export default function Users() {
                   </button>
                 </div>
               </form>
-            ) : (
+            )}
+
+            {(editingState.mode === 'newUser' || editingState.mode === 'editDetails') && (
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target as HTMLFormElement);
-                if (editingUser.isNew) {
-                  console.warn("New user creation not implemented yet.");
+                if (editingState.mode === 'newUser') {
                   toast.info("New user creation not implemented.");
                 } else {
-                  const userToUpdate = editingUser as User;
-                  handleUpdateUser(userToUpdate.id, {
+                  handleUpdateUser(editingState.user.id, {
                     first_name: formData.get('first_name') as string,
                     last_name: formData.get('last_name') as string,
                     email: formData.get('email') as string,
@@ -592,7 +597,7 @@ export default function Users() {
                   <input
                     type="text"
                     name="first_name"
-                    defaultValue={(editingUser as User)?.first_name || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.first_name ?? '' : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -601,7 +606,7 @@ export default function Users() {
                   <input
                     type="text"
                     name="last_name"
-                    defaultValue={(editingUser as User)?.last_name || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.last_name ?? '' : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -610,16 +615,16 @@ export default function Users() {
                   <input
                     type="email"
                     name="email"
-                    defaultValue={(editingUser as User)?.email || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.email : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                    readOnly={!editingUser.isNew}
+                    readOnly={editingState.mode === 'editDetails'}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-400">Stage</label>
                   <select
                     name="stage"
-                    defaultValue={(editingUser as User)?.stage || USER_STAGES[0]}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.stage : USER_STAGES[0]}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   >
                     {USER_STAGES.map(stage => (
@@ -630,7 +635,7 @@ export default function Users() {
                 <div className="flex justify-end gap-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setEditingUser(null)}
+                    onClick={() => setEditingState({ mode: 'closed' })}
                     className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
                   >
                     Cancel
@@ -639,7 +644,7 @@ export default function Users() {
                     type="submit"
                     className="px-4 py-2 rounded-xl bg-[#37bd7e] text-white hover:bg-[#2da76c] transition-colors"
                   >
-                    {editingUser.isNew ? 'Create User' : 'Save Changes'}
+                    {editingState.mode === 'newUser' ? 'Create User' : 'Save Changes'}
                   </button>
                 </div>
               </form>
@@ -662,14 +667,38 @@ interface TargetHistoryModalProps {
 }
 
 function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
-  const sortedTargets = useMemo(() => {
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
+  const [filterEndDate, setFilterEndDate] = useState<string>('');
+
+  const filteredSortedTargets = useMemo(() => {
     if (!user.targets) return [];
-    return [...user.targets].sort((a, b) => {
+
+    const filterStart = filterStartDate ? new Date(`${filterStartDate}T00:00:00`) : null;
+    const filterEnd = filterEndDate ? new Date(`${filterEndDate}T23:59:59`) : null;
+
+    const isValidFilterStart = filterStart && isValid(filterStart);
+    const isValidFilterEnd = filterEnd && isValid(filterEnd);
+
+    const filtered = user.targets.filter(target => {
+      const targetStart = target.start_date ? new Date(target.start_date) : null;
+      const targetEnd = target.end_date ? new Date(target.end_date) : null;
+
+      const isValidTargetStart = targetStart && isValid(targetStart);
+      if (!isValidTargetStart) return false;
+      const isValidTargetEnd = !targetEnd || isValid(targetEnd);
+
+      const startsBeforeFilterEnd = !isValidFilterEnd || (isValidTargetStart && targetStart <= filterEnd);
+      const endsAfterFilterStart = !isValidFilterStart || !isValidTargetEnd || targetEnd === null || (targetEnd >= filterStart);
+
+      return startsBeforeFilterEnd && endsAfterFilterStart;
+    });
+
+    return filtered.sort((a, b) => {
       const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
       const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
       return dateB - dateA;
     });
-  }, [user.targets]);
+  }, [user.targets, filterStartDate, filterEndDate]);
 
   const isTargetCurrentlyActive = (target: TargetType): boolean => {
     const now = new Date();
@@ -680,21 +709,79 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
     return isStarted && isNotEnded;
   };
 
+  const handleExportHistory = () => {
+    if (filteredSortedTargets.length === 0) {
+      toast.info("No history data to export.");
+      return;
+    }
+
+    const headers = ["Revenue Target", "Outbound Target", "Meetings Target", "Proposal Target", "Start Date", "End Date", "Status"];
+    const csvData = filteredSortedTargets.map(target => {
+      const isActive = isTargetCurrentlyActive(target);
+      return [
+        target.revenue_target ?? '',
+        target.outbound_target ?? '',
+        target.meetings_target ?? '',
+        target.proposal_target ?? '',
+        target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '',
+        target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : '',
+        isActive ? 'Active' : 'Inactive'
+      ].map(value => `"${value.toString().replace(/"/g, '""')}"`).join(',');
+    });
+
+    const csvContent = [headers.join(','), ...csvData].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const filename = `target_history_${user.first_name}_${user.last_name}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('History export complete');
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
           <h2 className="text-xl font-bold text-white">
             Target History for {user.first_name} {user.last_name}
           </h2>
-          <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700">
-            <Trash2 className="w-5 h-5" />
-          </button>
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white w-full sm:w-auto"
+              aria-label="Filter Start Date"
+            />
+            <span className="text-gray-500">to</span>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white w-full sm:w-auto"
+              aria-label="Filter End Date"
+            />
+            <button
+                onClick={handleExportHistory}
+                className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50 w-full sm:w-auto"
+                title="Export Filtered History"
+            >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+            </button>
+            <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-700">
+                 <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-grow">
-          {sortedTargets.length === 0 ? (
-            <p className="text-gray-400 text-center py-10">No target history found for this user.</p>
+          {filteredSortedTargets.length === 0 ? (
+            <p className="text-gray-400 text-center py-10">No target history matches the selected filters.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -708,7 +795,7 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {sortedTargets.map((target, index) => {
+                {filteredSortedTargets.map((target, index) => {
                   const isActive = isTargetCurrentlyActive(target);
                   return (
                     <tr key={target.id || `history-${index}`} className="border-b border-gray-800/50">
@@ -719,12 +806,12 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                       <td className="px-4 py-2 text-white">{target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '-'}</td>
                       <td className="px-4 py-2">
                         <span className={cn(
-                          "px-2 py-0.5 rounded",
+                          "px-2 py-0.5 rounded text-xs font-medium",
                           isActive
-                            ? "bg-emerald-500/50 text-emerald-100"
-                            : "text-gray-400"
+                            ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/50"
+                            : target.end_date ? "bg-red-600/20 text-red-200 border border-red-500/50" : "text-gray-500"
                         )}>
-                          {target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : '-')}
+                          {target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : 'No End Date')}
                         </span>
                       </td>
                     </tr>
