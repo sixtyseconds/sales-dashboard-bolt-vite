@@ -49,28 +49,33 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate if contact identifier is provided and valid
-    if (!formData.contactIdentifier) {
-      toast.error('Please provide a contact identifier (email, phone number, or LinkedIn URL)');
-      return;
+    // For non-outbound, require identifier
+    if (selectedAction !== 'outbound') {
+      if (!formData.contactIdentifier) {
+        toast.error('Please provide a contact identifier (email, phone number, or LinkedIn URL)');
+        return;
+      }
+      if (formData.contactIdentifierType === 'unknown') {
+        toast.error('Please enter a valid email, phone number, or LinkedIn URL');
+        return;
+      }
     }
-    
-    if (formData.contactIdentifierType === 'unknown') {
-      toast.error('Please enter a valid email, phone number, or LinkedIn URL');
-      return;
-    }
-    
     try {
       if (selectedAction === 'outbound') {
+        // Always add the activity, but only pass identifier fields if present
         await addActivity({
           type: 'outbound',
           client_name: formData.client_name || 'Unknown',
           details: formData.outboundType,
           quantity: parseInt(formData.outboundCount) || 1,
           date: selectedDate.toISOString(),
-          contactIdentifier: formData.contactIdentifier,
-          contactIdentifierType: formData.contactIdentifierType
+          // Only include identifier fields if present
+          ...(formData.contactIdentifier
+            ? {
+                contactIdentifier: formData.contactIdentifier,
+                contactIdentifierType: formData.contactIdentifierType
+              }
+            : {})
         });
       } else if (selectedAction === 'sale') {
         const saleData = {
@@ -82,7 +87,6 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           contactIdentifier: formData.contactIdentifier,
           contactIdentifierType: formData.contactIdentifierType
         };
-        
         await addSale(saleData);
       } else if (selectedAction) {
         await addActivity({
@@ -96,7 +100,6 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
           status: selectedAction === 'meeting' ? formData.status : 'completed'
         });
       }
-      
       // Reset form
       setFormData({
         type: 'outbound',
@@ -295,7 +298,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-400/90 flex items-center">
                     Email Address
-                    <span className="text-red-500 ml-1">*</span>
+                    {selectedAction !== 'outbound' && <span className="text-red-500 ml-1">*</span>}
                   </label>
                   <IdentifierField
                     value={formData.contactIdentifier}
@@ -306,8 +309,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                         contactIdentifierType: type
                       })
                     }
-                    required={true}
-                    placeholder="Required: Enter email address"
+                    required={selectedAction !== 'outbound'}
+                    placeholder={selectedAction !== 'outbound' ? 'Required: Enter email address' : 'Optional: Enter email address'}
                     label={null}
                   />
                 </div>
