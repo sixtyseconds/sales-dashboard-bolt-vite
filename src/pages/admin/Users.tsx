@@ -38,6 +38,8 @@ import {
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
 import { format, isValid, parseISO } from 'date-fns';
+import UserAvatar from '@/components/ui/UserAvatar';
+import Tooltip from '@/components/ui/Tooltip';
 
 // Define more specific types for the editing state using discriminated union pattern
 type EditingUserState =
@@ -69,37 +71,32 @@ export default function Users() {
     });
   }, [users, searchQuery, selectedStage]);
 
+  // Effect to initialize modalTargets based on editingState
   useEffect(() => {
+    let activeTargetsForModal: TargetType[] = [];
+
     if (editingState.mode === 'editTargets') {
       const user = editingState.user;
       const now = new Date();
-      const activeTargets = user.targets.filter(target => {
+      activeTargetsForModal = user.targets.filter(target => {
         const startDate = target.start_date ? new Date(target.start_date) : null;
-        if (startDate instanceof Date && isNaN(startDate.getTime())) {
-            console.warn(`[Users Modal] Invalid start_date found for target ID ${target.id}: ${target.start_date}`);
-            return false;
-        }
-
+        if (startDate instanceof Date && isNaN(startDate.getTime())) return false;
         const endDate = target.end_date ? new Date(target.end_date) : null;
-        if (endDate instanceof Date && isNaN(endDate.getTime())) {
-            console.warn(`[Users Modal] Invalid end_date found for target ID ${target.id}: ${target.end_date}`);
-            return false;
-        }
-
+        if (endDate instanceof Date && isNaN(endDate.getTime())) return false;
         const isStarted = startDate instanceof Date && startDate <= now;
         const isNotEnded = !endDate || (endDate instanceof Date && endDate > now);
-
-        const isActive = isStarted && isNotEnded;
-        return isActive;
+        return isStarted && isNotEnded;
       });
-      console.log("[Users Modal] Initializing with active targets:", activeTargets);
-
-      setModalTargets(JSON.parse(JSON.stringify(activeTargets)));
-
-    } else if (editingState.mode === 'editTargets') {
-       console.log("[Users Modal] Initializing with empty targets array (no valid user/targets found).");
-       setModalTargets([]);
+      console.log("[Users Modal] Determined active targets for modal:", activeTargetsForModal);
+    } else {
+      // For modes 'closed', 'newUser', 'editDetails', ensure targets are empty
+      console.log(`[Users Modal] Clearing targets for mode: ${editingState.mode}`);
+      // activeTargetsForModal is already initialized to []
     }
+
+    // Set the state based on the determined targets (could be empty or filtered)
+    setModalTargets(JSON.parse(JSON.stringify(activeTargetsForModal)));
+
   }, [editingState]);
 
   const handleModalTargetChange = (index: number, field: string, value: string) => {
@@ -345,19 +342,11 @@ export default function Users() {
                   <tr key={user.id} className="border-b border-gray-800/50 hover:bg-gray-800/20">
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center">
-                          {user.avatar_url ? (
-                            <img
-                              src={user.avatar_url}
-                              alt={user.first_name ?? 'User Avatar'}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          ) : (
-                            <span className="text-sm font-medium text-[#37bd7e]">
-                              {user.first_name?.[0]}{user.last_name?.[0]}
-                            </span>
-                          )}
-                        </div>
+                        <UserAvatar
+                           firstName={user.first_name}
+                           lastName={user.last_name}
+                           avatarUrl={user.avatar_url}
+                        />
                         <div>
                           <div className="font-medium text-white">
                             {user.first_name} {user.last_name}
@@ -490,38 +479,38 @@ export default function Users() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Revenue Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20000"
                           value={target.revenue_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'revenue_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Outbound Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 100"
                           value={target.outbound_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'outbound_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Meetings Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20"
                           value={target.meetings_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'meetings_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Proposal Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 15"
                           value={target.proposal_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'proposal_target', e.target.value)}
@@ -544,8 +533,8 @@ export default function Users() {
                           value={target.end_date ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'end_date', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                     </div>
                   </div>
                 ))}
@@ -667,8 +656,74 @@ interface TargetHistoryModalProps {
 }
 
 function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
+  // State for date filters
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
+  // State for fetched profiles and loading status
+  const [profileMap, setProfileMap] = useState<Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>>(new Map());
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+
+  // Effect to fetch profiles based on target history user IDs
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!user.targets || user.targets.length === 0) {
+        setProfileMap(new Map()); // Ensure map is empty if no targets
+        return;
+      }
+
+      // Collect unique, non-null user IDs from created_by and closed_by
+      const userIds = new Set<string>();
+      user.targets.forEach(target => {
+        if (target.created_by) userIds.add(target.created_by);
+        if (target.closed_by) userIds.add(target.closed_by);
+      });
+
+      const uniqueIdsArray = Array.from(userIds);
+
+      if (uniqueIdsArray.length === 0) {
+        setProfileMap(new Map()); // Ensure map is empty if no IDs found
+        return;
+      }
+
+      console.log('[TargetHistoryModal] Fetching profiles for IDs:', uniqueIdsArray);
+      setIsLoadingProfiles(true);
+      try {
+        // Use the global supabase client instance
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', uniqueIdsArray);
+
+        if (error) {
+          console.error('[TargetHistoryModal] Error fetching profiles:', error);
+          toast.error(`Failed to load profile details: ${error.message}`);
+          setProfileMap(new Map()); // Clear map on error
+        } else if (profiles) {
+          const newProfileMap = new Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>();
+          profiles.forEach(profile => {
+            newProfileMap.set(profile.id, {
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              avatar_url: profile.avatar_url
+            });
+          });
+          console.log('[TargetHistoryModal] Profiles fetched successfully:', newProfileMap);
+          setProfileMap(newProfileMap);
+        }
+      } catch (err) {
+        console.error('[TargetHistoryModal] Unexpected error fetching profiles:', err);
+        toast.error('An unexpected error occurred while loading profile details.');
+        setProfileMap(new Map()); // Clear map on unexpected error
+      } finally {
+        setIsLoadingProfiles(false);
+      }
+    };
+
+    fetchProfiles();
+
+    // Dependency: Run when the user whose history we are showing changes
+  }, [user]); // Depend on the user prop
 
   const filteredSortedTargets = useMemo(() => {
     if (!user.targets) return [];
@@ -709,37 +764,77 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
     return isStarted && isNotEnded;
   };
 
+  // Handle Export - Updated for formats and richer data
   const handleExportHistory = () => {
+    if (isLoadingProfiles) {
+        toast.info("Please wait for profile details to load before exporting.");
+        return;
+    }
     if (filteredSortedTargets.length === 0) {
-      toast.info("No history data to export.");
+      toast.info("No history data to export based on current filters.");
       return;
     }
 
-    const headers = ["Revenue Target", "Outbound Target", "Meetings Target", "Proposal Target", "Start Date", "End Date", "Status"];
-    const csvData = filteredSortedTargets.map(target => {
+    // Prepare enriched data for export
+    const dataToExport = filteredSortedTargets.map(target => {
+      const creatorProfile = profileMap.get(target.created_by || '');
+      const closerProfile = profileMap.get(target.closed_by || '');
       const isActive = isTargetCurrentlyActive(target);
-      return [
-        target.revenue_target ?? '',
-        target.outbound_target ?? '',
-        target.meetings_target ?? '',
-        target.proposal_target ?? '',
-        target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '',
-        target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : '',
-        isActive ? 'Active' : 'Inactive'
-      ].map(value => `"${value.toString().replace(/"/g, '""')}"`).join(',');
+      return {
+        target_id: target.id,
+        revenue_target: target.revenue_target,
+        outbound_target: target.outbound_target,
+        meetings_target: target.meetings_target,
+        proposal_target: target.proposal_target,
+        start_date: target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '',
+        end_date: target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : '',
+        status: isActive ? 'Active' : 'Inactive',
+        user_id: user.id,
+        user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        creator_id: target.created_by,
+        creator_name: creatorProfile ? `${creatorProfile.first_name || ''} ${creatorProfile.last_name || ''}`.trim() : 'Unknown',
+        closer_id: target.closed_by,
+        closer_name: closerProfile ? `${closerProfile.first_name || ''} ${closerProfile.last_name || ''}`.trim() : '' // Empty if not closed
+      };
     });
 
-    const csvContent = [headers.join(','), ...csvData].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    let blobContent: string;
+    let blobType: string;
+    let fileExtension: string;
+
+    if (exportFormat === 'json') {
+      blobContent = JSON.stringify(dataToExport, null, 2); // Pretty print JSON
+      blobType = 'application/json;charset=utf-8;';
+      fileExtension = 'json';
+      toast.success('Exporting history as JSON...');
+    } else { // Default to CSV
+      // Define headers based on the keys of dataToExport object
+      const headers = Object.keys(dataToExport[0] || {});
+      const csvData = dataToExport.map(row =>
+        headers.map(header => {
+          // Access value safely using keyof type assertion
+          const value = row[header as keyof typeof row] ?? '';
+          // Escape quotes and enclose in quotes
+          return `"${value.toString().replace(/"/g, '""')}"`;
+        }).join(',')
+      );
+      blobContent = [headers.join(','), ...csvData].join('\n');
+      blobType = 'text/csv;charset=utf-8;';
+      fileExtension = 'csv';
+      toast.success('Exporting history as CSV...');
+    }
+
+    // Trigger download
+    const blob = new Blob([blobContent], { type: blobType });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    const filename = `target_history_${user.first_name}_${user.last_name}_${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `target_history_${user.first_name}_${user.last_name}_${new Date().toISOString().split('T')[0]}.${fileExtension}`;
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('History export complete');
+    // Consider removing the success toast here as it was already shown above
   };
 
   return (
@@ -765,10 +860,24 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
               className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white w-full sm:w-auto"
               aria-label="Filter End Date"
             />
+            <div className="flex items-center gap-1 border border-gray-700/50 rounded-lg p-0.5">
+              <button
+                onClick={() => setExportFormat('csv')}
+                className={cn("px-2 py-1 rounded text-xs", exportFormat === 'csv' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800')}
+              >CSV</button>
+              <button
+                onClick={() => setExportFormat('json')}
+                className={cn("px-2 py-1 rounded text-xs", exportFormat === 'json' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800')}
+              >JSON</button>
+            </div>
             <button
                 onClick={handleExportHistory}
-                className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50 w-full sm:w-auto"
-                title="Export Filtered History"
+                disabled={isLoadingProfiles} // Disable if profiles are loading
+                className={cn(
+                    "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50 w-full sm:w-auto",
+                    isLoadingProfiles && "opacity-50 cursor-not-allowed"
+                )}
+                title={`Export Filtered History as ${exportFormat.toUpperCase()}`}
             >
                 <Download className="w-4 h-4" />
                 <span>Export</span>
@@ -792,19 +901,25 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                   <th className="px-4 py-2">Proposals</th>
                   <th className="px-4 py-2">Start Date</th>
                   <th className="px-4 py-2">End Date</th>
+                  <th className="px-4 py-2">Created By</th>
+                  <th className="px-4 py-2">Closed By</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSortedTargets.map((target, index) => {
                   const isActive = isTargetCurrentlyActive(target);
+                  console.log(`[TargetHistoryModal] Rendering row ${index}, target ID: ${target.id}, created_by: ${target.created_by}, closed_by: ${target.closed_by}`);
                   return (
                     <tr key={target.id || `history-${index}`} className="border-b border-gray-800/50">
+                      {/* Target Value Cells */}
                       <td className="px-4 py-2 text-white">{target.revenue_target?.toLocaleString() ?? '-'}</td>
                       <td className="px-4 py-2 text-white">{target.outbound_target ?? '-'}</td>
                       <td className="px-4 py-2 text-white">{target.meetings_target ?? '-'}</td>
                       <td className="px-4 py-2 text-white">{target.proposal_target ?? '-'}</td>
+                      {/* Date Cells */}
                       <td className="px-4 py-2 text-white">{target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '-'}</td>
                       <td className="px-4 py-2">
+                        {/* End Date Badge */}
                         <span className={cn(
                           "px-2 py-0.5 rounded text-xs font-medium",
                           isActive
@@ -813,6 +928,22 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                         )}>
                           {target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : 'No End Date')}
                         </span>
+                      </td>
+                      {/* Created By Cell - Remove flex */}
+                      <td className="px-4 py-2">
+                         <UserAvatarBadge
+                            userId={target.created_by}
+                            profileMap={profileMap}
+                            isLoading={isLoadingProfiles}
+                         />
+                      </td>
+                      {/* Closed By Cell - Remove flex */}
+                      <td className="px-4 py-2">
+                         <UserAvatarBadge
+                            userId={target.closed_by}
+                            profileMap={profileMap}
+                            isLoading={isLoadingProfiles}
+                         />
                       </td>
                     </tr>
                   );
@@ -834,3 +965,42 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
     </div>
   );
 }
+
+// --- User Avatar Badge with Tooltip --- //
+interface UserAvatarBadgeProps {
+  userId: string | null | undefined;
+  profileMap: Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>;
+  isLoading: boolean;
+}
+
+const UserAvatarBadge: React.FC<UserAvatarBadgeProps> = ({ userId, profileMap, isLoading }) => {
+  if (isLoading) {
+    return <div className="w-6 h-6 bg-gray-700 rounded-full animate-pulse"></div>; // Simple pulse placeholder
+  }
+
+  if (!userId) {
+    return <span className="text-gray-500 text-xs">-</span>;
+  }
+
+  const profile = profileMap.get(userId);
+
+  if (!profile) {
+    return <span className="text-gray-500 text-xs" title={`ID: ${userId}`}>Unknown</span>;
+  }
+
+  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+
+  return (
+    <Tooltip content={userName || 'User'} position="top">
+       {/* Adjust sizeClasses and textClasses as needed for the badge size */}
+      <UserAvatar
+        firstName={profile.first_name}
+        lastName={profile.last_name}
+        avatarUrl={profile.avatar_url}
+        sizeClasses="w-6 h-6" // Smaller size for the badge
+        textClasses="text-[10px]" // Smaller text for initials
+        className="rounded-full bg-gray-600/30 border border-gray-500/50 flex items-center justify-center cursor-default"
+      />
+    </Tooltip>
+  );
+};

@@ -15,6 +15,8 @@ export interface Target {
   end_date: string | null;   // Assuming YYYY-MM-DD string format from input
   created_at?: string;
   updated_at?: string;
+  created_by?: string | null; // Add creator field
+  closed_by?: string | null;  // Add closer field
 }
 
 // Update User interface to use the Target array type
@@ -54,7 +56,9 @@ async function fetchUsers(): Promise<User[]> {
         start_date,
         end_date,
         created_at,
-        updated_at
+        updated_at,
+        created_by,
+        closed_by
       )
     `)
     .order('created_at', { ascending: false });
@@ -113,7 +117,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
       // 1. Fetch currently active targets (unchanged)
       console.log(`[updateUser HISTORICAL AUDIT V2] Fetching active targets for user: ${userId}`);
       const { data: activeDbTargets, error: fetchError } = await supabase
-        .from('targets')
+      .from('targets')
         .select('*')
         .eq('user_id', userId)
         .lte('start_date', now)
@@ -163,7 +167,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
               operations.push(
                 supabase.from('targets').insert({
                   ...insertData,
-                  user_id: userId,
+        user_id: userId,
                   created_by: adminUserId // Set creator for the new version
                   // closed_by remains NULL for the new version
                 })
@@ -207,7 +211,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
         console.log('[updateUser HISTORICAL AUDIT V2] No target DB operations needed.');
       }
 
-      if (targetError) throw targetError;
+    if (targetError) throw targetError;
       console.log('[updateUser HISTORICAL AUDIT V2] Target operations successful.');
 
     } catch (error) {
@@ -224,12 +228,12 @@ async function updateUser(userId: string, updates: Partial<User>) {
     console.log('[updateUser HISTORICAL AUDIT V2] Updating profile with:', profileUpdates);
     try {
       const { data: profileUpdateData, error } = await supabase
-        .from('profiles')
+      .from('profiles')
         .update(profileUpdates)
         .eq('id', userId)
         .select();
       console.log('[updateUser HISTORICAL AUDIT V2] Profile update result:', { profileUpdateData, error });
-      if (error) throw error;
+    if (error) throw error;
     } catch(error) {
       console.error("[updateUser HISTORICAL AUDIT V2] Error updating profile:", error);
       profileError = error instanceof Error ? error : new Error(String(error));
