@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
@@ -17,7 +17,8 @@ import {
   Star,
   Target,
   UserCheck,
-  Trash2
+  Trash2,
+  PlusCircle
 } from 'lucide-react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
@@ -34,35 +35,87 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
+import { format, parseISO } from 'date-fns';
+import { User } from '@/lib/hooks/useUsers';
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStage, setSelectedStage] = useState('all');
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] = useState<User | null | { isNew?: boolean; editingTargets?: boolean }>(null);
+  const [modalTargets, setModalTargets] = useState<Target[]>([]);
   const { users, updateUser, impersonateUser, deleteUser } = useUsers();
   const navigate = useNavigate();
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
-      const matchesSearch = 
+      const matchesSearch =
         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.last_name?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesStage = selectedStage === 'all' || user.stage === selectedStage;
-      
+
       return matchesSearch && matchesStage;
     });
   }, [users, searchQuery, selectedStage]);
 
-  const handleUpdateUser = async (userId: string, updates: any) => {
+  useEffect(() => {
+    if (editingUser?.editingTargets && Array.isArray(editingUser.targets)) {
+      setModalTargets(JSON.parse(JSON.stringify(editingUser.targets)));
+    } else if (editingUser?.editingTargets) {
+      setModalTargets([]);
+    }
+  }, [editingUser]);
+
+  const handleModalTargetChange = (index: number, field: string, value: string) => {
+    setModalTargets(currentTargets => {
+      const updatedTargets = [...currentTargets];
+      if (!updatedTargets[index]) {
+        updatedTargets[index] = { id: undefined };
+      }
+      const parsedValue = value === '' ? null : (field.includes('target') ? (field === 'revenue_target' ? parseFloat(value) : parseInt(value)) : value);
+
+      updatedTargets[index] = {
+        ...updatedTargets[index],
+        [field]: parsedValue
+      };
+      return updatedTargets;
+    });
+  };
+
+  const addTargetSet = () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    setModalTargets(currentTargets => [
+      ...currentTargets,
+      {
+        id: `new_${Date.now()}`,
+        revenue_target: null,
+        outbound_target: null,
+        meetings_target: null,
+        proposal_target: null,
+        start_date: today,
+        end_date: null
+      }
+    ]);
+  };
+
+  const removeTargetSet = (index: number) => {
+    setModalTargets(currentTargets => currentTargets.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
+    if (!userId) {
+      console.error("handleUpdateUser called without userId");
+      toast.error("Cannot update user: User ID missing.");
+      return;
+    }
     try {
-      await updateUser(userId, updates);
-      toast.success('User updated successfully');
+      await updateUser({ userId, updates });
+      setEditingUser(null);
+      setModalTargets([]);
     } catch (error) {
-      toast.error('Failed to update user');
-      console.error('Update error:', error);
+      console.error('Update error in component:', error);
     }
   };
 
@@ -78,7 +131,16 @@ export default function Users() {
   };
 
   const handleExport = () => {
-    const data = filteredUsers.map(user => ({
+    type ExportRow = {
+      'First Name': string | null;
+      'Last Name': string | null;
+      'Email': string;
+      'Stage': string;
+      'Admin': string;
+      'Created': string;
+    };
+
+    const data: ExportRow[] = filteredUsers.map(user => ({
       'First Name': user.first_name,
       'Last Name': user.last_name,
       'Email': user.email,
@@ -87,11 +149,11 @@ export default function Users() {
       'Created': new Date(user.created_at).toLocaleDateString()
     }));
 
-    const headers = Object.keys(data[0]);
+    const headers: (keyof ExportRow)[] = Object.keys(data[0] || {}) as (keyof ExportRow)[];
     const csvContent = [
       headers.join(','),
-      ...data.map(row => 
-        headers.map(header => 
+      ...data.map(row =>
+        headers.map(header =>
           JSON.stringify(row[header] || '')
         ).join(',')
       )
@@ -284,7 +346,7 @@ export default function Users() {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <button
-                        onClick={() => setEditingUser({ ...user, editingTargets: true })}
+                        onClick={() => setEditingUser({ ...(user as User), editingTargets: true })}
                         className="flex items-center gap-2 px-3 py-1 rounded-lg bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 transition-all duration-300 text-sm border border-violet-500/30"
                       >
                         <Target className="w-4 h-4" />
@@ -358,66 +420,104 @@ export default function Users() {
 
       {/* Edit User Modal */}
       {editingUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-md mx-4">
-            <h2 className="text-xl font-bold mb-4">
-              {editingUser.isNew ? 'Add User' : editingUser.editingTargets ? 'Edit Targets' : 'Edit User'}
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4 text-white">
+              {editingUser.isNew ? 'Add User' : (editingUser as User).editingTargets ? `Edit Targets for ${(editingUser as User).first_name}` : 'Edit User'}
             </h2>
-            
-            {editingUser.editingTargets ? (
+
+            {(editingUser as User).editingTargets ? (
               <form onSubmit={(e) => {
                 e.preventDefault();
-                const formData = new FormData(e.target);
-                handleUpdateUser(editingUser.id, {
-                  targets: {
-                    revenue_target: parseFloat(formData.get('revenue_target')),
-                    outbound_target: parseInt(formData.get('outbound_target')),
-                    meetings_target: parseInt(formData.get('meetings_target')),
-                    proposal_target: parseInt(formData.get('proposal_target'))
-                  }
-                });
-                setEditingUser(null);
-              }} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Revenue Target</label>
-                  <input
-                    type="number"
-                    name="revenue_target"
-                    defaultValue={editingUser.targets?.revenue_target || 20000}
-                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Outbound Target</label>
-                  <input
-                    type="number"
-                    name="outbound_target"
-                    defaultValue={editingUser.targets?.outbound_target || 100}
-                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Meetings Target</label>
-                  <input
-                    type="number"
-                    name="meetings_target"
-                    defaultValue={editingUser.targets?.meetings_target || 20}
-                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Proposal Target</label>
-                  <input
-                    type="number"
-                    name="proposal_target"
-                    defaultValue={editingUser.targets?.proposal_target || 15}
-                    className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                  />
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
+                handleUpdateUser((editingUser as User).id, { targets: modalTargets });
+              }} className="space-y-6">
+                {modalTargets.map((target, index) => (
+                  <div key={target.id || index} className="p-4 rounded-lg border border-gray-700/50 bg-gray-800/20 space-y-4 relative">
+                    <button
+                      type="button"
+                      onClick={() => removeTargetSet(index)}
+                      className="absolute top-2 right-2 p-1 text-red-500 hover:bg-red-500/20 rounded"
+                      aria-label="Remove target set"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">Revenue Target</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 20000"
+                          value={target.revenue_target ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'revenue_target', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">Outbound Target</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 100"
+                          value={target.outbound_target ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'outbound_target', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">Meetings Target</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 20"
+                          value={target.meetings_target ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'meetings_target', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">Proposal Target</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 15"
+                          value={target.proposal_target ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'proposal_target', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">Start Date</label>
+                        <input
+                          type="date"
+                          value={target.start_date ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'start_date', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-400">End Date</label>
+                        <input
+                          type="date"
+                          value={target.end_date ?? ''}
+                          onChange={(e) => handleModalTargetChange(index, 'end_date', e.target.value)}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addTargetSet}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-dashed border-gray-700/50 text-gray-400 hover:border-[#37bd7e]/50 hover:text-[#37bd7e] transition-colors duration-200"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Add New Target Set
+                </button>
+
+                <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setEditingUser(null)}
+                    onClick={() => { setEditingUser(null); setModalTargets([]); }}
                     className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
                   >
                     Cancel
@@ -426,32 +526,33 @@ export default function Users() {
                     type="submit"
                     className="px-4 py-2 rounded-xl bg-[#37bd7e] text-white hover:bg-[#2da76c] transition-colors"
                   >
-                    Save Changes
+                    Save Target Changes
                   </button>
                 </div>
               </form>
             ) : (
               <form onSubmit={(e) => {
                 e.preventDefault();
-                const formData = new FormData(e.target);
+                const formData = new FormData(e.target as HTMLFormElement);
                 if (editingUser.isNew) {
-                  // Handle new user creation
+                  console.warn("New user creation not implemented yet.");
+                  toast.info("New user creation not implemented.");
                 } else {
-                  handleUpdateUser(editingUser.id, {
-                    first_name: formData.get('first_name'),
-                    last_name: formData.get('last_name'),
-                    email: formData.get('email'),
-                    stage: formData.get('stage')
+                  const userToUpdate = editingUser as User;
+                  handleUpdateUser(userToUpdate.id, {
+                    first_name: formData.get('first_name') as string,
+                    last_name: formData.get('last_name') as string,
+                    email: formData.get('email') as string,
+                    stage: formData.get('stage') as string
                   });
                 }
-                setEditingUser(null);
               }} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-400">First Name</label>
                   <input
                     type="text"
                     name="first_name"
-                    defaultValue={editingUser.first_name}
+                    defaultValue={(editingUser as User)?.first_name || ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -460,7 +561,7 @@ export default function Users() {
                   <input
                     type="text"
                     name="last_name"
-                    defaultValue={editingUser.last_name}
+                    defaultValue={(editingUser as User)?.last_name || ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -469,15 +570,16 @@ export default function Users() {
                   <input
                     type="email"
                     name="email"
-                    defaultValue={editingUser.email}
+                    defaultValue={(editingUser as User)?.email || ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
+                    readOnly={!editingUser.isNew}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-400">Stage</label>
                   <select
                     name="stage"
-                    defaultValue={editingUser.stage}
+                    defaultValue={(editingUser as User)?.stage || USER_STAGES[0]}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   >
                     {USER_STAGES.map(stage => (

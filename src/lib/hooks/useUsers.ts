@@ -3,67 +3,208 @@ import { supabase, supabaseAdmin } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
+// Define the Target structure accurately
+export interface Target {
+  id?: string; // ID is optional for new targets
+  user_id?: string; // user_id might not be present on client-side objects initially
+  revenue_target: number | null;
+  outbound_target: number | null;
+  meetings_target: number | null;
+  proposal_target: number | null;
+  start_date: string | null; // Assuming YYYY-MM-DD string format from input
+  end_date: string | null;   // Assuming YYYY-MM-DD string format from input
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Update User interface to use the Target array type
 export interface User {
   id: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   stage: string;
   avatar_url: string | null;
   is_admin: boolean;
   created_at: string;
   last_sign_in_at: string | null;
-  targets?: {
-    revenue_target: number;
-    outbound_target: number;
-    meetings_target: number;
-    proposal_target: number;
-  };
+  targets: Target[]; // Change to non-optional, default to [] later
 }
 
-async function fetchUsers() {
-  const { data: users, error } = await supabase
+// Fetch users with properly structured targets
+async function fetchUsers(): Promise<User[]> {
+  // Fetch profiles and their associated targets. Use a left join implicitly.
+  const { data, error } = await supabase
     .from('profiles')
     .select(`
-      *,
+      id,
+      email,
+      first_name,
+      last_name,
+      stage,
+      avatar_url,
+      is_admin,
+      created_at,
       targets (
+        id,
         revenue_target,
         outbound_target,
         meetings_target,
-        proposal_target
+        proposal_target,
+        start_date,
+        end_date,
+        created_at,
+        updated_at
       )
     `)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return users;
+  if (error) {
+    console.error("Error fetching users:", error);
+    throw error;
+  }
+
+  // Ensure targets is always an array, even if null/undefined from DB
+  const usersWithEnsuredTargets = data?.map(user => ({
+    ...user,
+    targets: user.targets || [],
+  })) || [];
+
+  // Now cast to User[]
+  return usersWithEnsuredTargets as User[];
 }
 
-async function updateUser(userId: string, updates: any) {
-  // If updating targets, handle separately
-  if (updates.targets) {
-    const { error: targetError } = await supabase
-      .from('targets')
-      .upsert({
-        user_id: userId,
-        ...updates.targets,
-        start_date: new Date(),
-        end_date: new Date(new Date().setMonth(new Date().getMonth() + 1))
-      });
+// Refactored updateUser function
+async function updateUser(userId: string, updates: Partial<User>) {
+  console.log('[updateUser] Called with:', { userId, updates }); // Log entry
+  let profileUpdates = { ...updates };
+  let targetError: Error | null = null;
 
-    if (targetError) throw targetError;
-    delete updates.targets;
+  // Handle targets update if present
+  if (profileUpdates.targets) {
+    const submittedTargets = profileUpdates.targets;
+    console.log('[updateUser] Processing targets:', submittedTargets); // Log submitted targets
+    delete profileUpdates.targets; // Remove targets from profile updates
+
+    try {
+      // 1. Fetch current target IDs for the user
+      console.log(`[updateUser] Fetching current targets for user: ${userId}`);
+      const { data: currentTargets, error: fetchError } = await supabase
+        .from('targets')
+        .select('id')
+        .eq('user_id', userId);
+
+      if (fetchError) {
+          console.error('[updateUser] Error fetching current targets:', fetchError);
+          throw fetchError;
+      }
+      console.log('[updateUser] Current targets fetched:', currentTargets);
+
+      const currentTargetIds = new Set(currentTargets?.map(t => t.id) || []);
+      console.log('[updateUser] Current target IDs:', currentTargetIds);
+
+      const submittedTargetIds = new Set(submittedTargets.filter(t => t.id && !t.id.startsWith('new_')).map(t => t.id));
+      console.log('[updateUser] Submitted target IDs (existing):', submittedTargetIds);
+
+
+      // 2. Identify targets to insert, update, delete
+      const targetsToInsert = submittedTargets
+          .filter(t => !t.id || t.id.startsWith('new_'))
+          .map(({ id, ...rest }) => ({ ...rest, user_id: userId })); // Add user_id, remove temp id
+      console.log('[updateUser] Targets to insert:', targetsToInsert);
+
+      const targetsToUpdate = submittedTargets
+          .filter(t => t.id && !t.id.startsWith('new_') && currentTargetIds.has(t.id))
+          .map(t => ({ ...t, user_id: userId })); // Ensure user_id
+      console.log('[updateUser] Targets to update:', targetsToUpdate);
+
+      const targetIdsToDelete = Array.from(currentTargetIds)
+          .filter(id => !submittedTargetIds.has(id));
+      console.log('[updateUser] Target IDs to delete:', targetIdsToDelete);
+
+
+      // 3. Perform database operations
+      const operations = [];
+
+      if (targetsToInsert.length > 0) {
+        console.log('[updateUser] Pushing insert operation');
+        operations.push(supabase.from('targets').insert(targetsToInsert));
+      }
+
+      if (targetsToUpdate.length > 0) {
+          console.log('[updateUser] Pushing update operations');
+          for (const target of targetsToUpdate) {
+              const { id, ...updateData } = target;
+              console.log(`[updateUser] -- Updating target ID: ${id} with data:`, updateData);
+              operations.push(supabase.from('targets').update(updateData).eq('id', id));
+          }
+      }
+
+      if (targetIdsToDelete.length > 0) {
+        console.log('[updateUser] Pushing delete operation');
+        operations.push(supabase.from('targets').delete().in('id', targetIdsToDelete));
+      }
+
+      // Execute all operations
+      if (operations.length > 0) {
+        console.log('[updateUser] Executing DB operations...');
+        const results = await Promise.all(operations);
+        console.log('[updateUser] DB operations results:', results); // Log results
+        results.forEach(result => {
+          if (result.error) {
+            console.error('[updateUser] Target DB operation failed:', result.error);
+            // Collect the first error encountered
+            if (!targetError) targetError = result.error;
+          }
+        });
+      } else {
+          console.log('[updateUser] No target DB operations to execute.');
+      }
+
+      if (targetError) throw targetError; // Throw if any target operation failed
+      console.log('[updateUser] Target operations successful.');
+
+    } catch (error) {
+      console.error("[updateUser] Error processing targets:", error);
+      // Assign error to handle it after profile update attempt
+      targetError = error instanceof Error ? error : new Error(String(error));
+    }
+  } else {
+      console.log('[updateUser] No targets included in updates.');
   }
 
-  // Update other user data
-  if (Object.keys(updates).length > 0) {
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId);
+  // Update other user data in 'profiles' table
+  let profileError: Error | null = null;
+  if (Object.keys(profileUpdates).length > 0) {
+    console.log('[updateUser] Updating profile with:', profileUpdates);
+    try {
+        const { data: profileUpdateData, error } = await supabase
+          .from('profiles')
+          .update(profileUpdates)
+          .eq('id', userId)
+          .select(); // Add select() to potentially see what was updated or if RLS blocked it
 
-    if (error) throw error;
+        console.log('[updateUser] Profile update result:', { profileUpdateData, error }); // Log profile update result
+        if (error) throw error;
+    } catch(error) {
+        console.error("[updateUser] Error updating profile:", error);
+        profileError = error instanceof Error ? error : new Error(String(error));
+    }
+  } else {
+      console.log('[updateUser] No profile updates to apply.');
   }
+
+  // Handle combined errors
+  if (targetError || profileError) {
+      const errorMessage = [
+          targetError ? `Targets Error: ${targetError.message}` : null,
+          profileError ? `Profile Error: ${profileError.message}` : null
+      ].filter(Boolean).join('; ');
+      console.error(`[updateUser] Failing with combined error: ${errorMessage}`);
+      throw new Error(errorMessage || 'Update failed');
+  }
+
+  console.log('[updateUser] Update process completed successfully.');
 }
 
 async function impersonateUser(userId: string) {
@@ -112,7 +253,7 @@ async function deleteUser(userId: string) {
       .from('activities')
       .delete()
       .eq('user_id', userId);
-    
+
     if (activitiesError) {
       console.error('[Users] Delete activities:', activitiesError);
       throw activitiesError;
@@ -123,7 +264,7 @@ async function deleteUser(userId: string) {
       .from('targets')
       .delete()
       .eq('user_id', userId);
-    
+
     if (targetsError) {
       console.error('[Users] Delete targets:', targetsError);
       throw targetsError;
@@ -134,7 +275,7 @@ async function deleteUser(userId: string) {
       .from('profiles')
       .delete()
       .eq('id', userId);
-    
+
     if (profileError) {
       console.error('[Users] Delete profile:', profileError);
       throw profileError;
@@ -142,12 +283,12 @@ async function deleteUser(userId: string) {
 
     // Delete auth user using admin client
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    
+
     if (authError) {
       console.error('[Users] Delete auth user:', authError);
       throw authError;
     }
-    
+
     toast.success('User deleted successfully');
   } catch (error) {
     console.error('[Users] Delete operation failed:', error);
@@ -159,21 +300,34 @@ async function deleteUser(userId: string) {
 export function useUsers() {
   const queryClient = useQueryClient();
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: users = [], isLoading, error: usersError } = useQuery<User[], Error>({
     queryKey: ['users'],
     queryFn: fetchUsers,
   });
 
-  const updateUserMutation = useMutation({
-    mutationFn: ({ userId, updates }: { userId: string; updates: any }) =>
-      updateUser(userId, updates),
-    onSuccess: () => {
+  // Handle potential initial fetch error
+  if (usersError) {
+      console.error("[useUsers] Initial fetch error:", usersError);
+      // Optionally inform the user, depending on desired UX
+      // toast.error("Failed to load users data.");
+  }
+
+  const updateUserMutation = useMutation<
+    void, // Return type on success (void if no specific return)
+    Error, // Error type
+    { userId: string; updates: Partial<User> } // Variables type
+  >({
+    mutationFn: ({ userId, updates }) => updateUser(userId, updates),
+    onSuccess: (_, variables) => {
+      // Invalidate queries to refetch
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      // Maybe invalidate specific user query if you have one
+      // queryClient.invalidateQueries({ queryKey: ['user', variables.userId] });
       toast.success('User updated successfully');
     },
     onError: (error: Error) => {
-      toast.error('Failed to update user');
-      console.error('[Users]', error);
+      toast.error(`Update failed: ${error.message}`);
+      console.error('[Users Update Mutation]', error);
     },
   });
 
@@ -202,9 +356,8 @@ export function useUsers() {
   return {
     users,
     isLoading,
-    updateUser: (userId: string, updates: any) =>
-      updateUserMutation.mutate({ userId, updates }),
-    deleteUser: (userId: string) => deleteUserMutation.mutate(userId),
-    impersonateUser: (userId: string) => impersonateUserMutation.mutate(userId),
+    updateUser: updateUserMutation.mutateAsync,
+    deleteUser: deleteUserMutation.mutateAsync,
+    impersonateUser: impersonateUserMutation.mutateAsync,
   };
 }
