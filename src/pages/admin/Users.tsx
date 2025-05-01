@@ -18,7 +18,8 @@ import {
   Target,
   UserCheck,
   Trash2,
-  PlusCircle
+  PlusCircle,
+  History
 } from 'lucide-react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ export default function Users() {
   const [selectedStage, setSelectedStage] = useState('all');
   const [editingUser, setEditingUser] = useState<User | null | { isNew?: boolean; editingTargets?: boolean }>(null);
   const [modalTargets, setModalTargets] = useState<Target[]>([]);
+  const [historyUser, setHistoryUser] = useState<User | null>(null);
   const { users, updateUser, impersonateUser, deleteUser } = useUsers();
   const navigate = useNavigate();
 
@@ -394,14 +396,23 @@ export default function Users() {
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setHistoryUser(user)}
+                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors"
+                          title="View Target History"
+                        >
+                          <History className="w-4 h-4 text-blue-500" />
+                        </button>
+                        <button
                           onClick={() => handleImpersonate(user.id)}
                           className="p-2 hover:bg-violet-500/20 rounded-lg transition-colors"
+                          title="Impersonate User"
                         >
                           <UserCheck className="w-4 h-4 text-violet-500" />
                         </button>
                         <button
                           onClick={() => setEditingUser(user)}
                           className="p-2 hover:bg-[#37bd7e]/20 rounded-lg transition-colors"
+                          title="Edit User Details"
                         >
                           <Edit2 className="w-4 h-4 text-[#37bd7e]" />
                         </button>
@@ -636,6 +647,103 @@ export default function Users() {
           </div>
         </div>
       )}
+
+      {/* Target History Modal */}
+      {historyUser && (
+        <TargetHistoryModal user={historyUser} onClose={() => setHistoryUser(null)} />
+      )}
+    </div>
+  );
+}
+
+interface TargetHistoryModalProps {
+  user: User;
+  onClose: () => void;
+}
+
+function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
+  const sortedTargets = useMemo(() => {
+    if (!user.targets) return [];
+    return [...user.targets].sort((a, b) => {
+      const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+      const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [user.targets]);
+
+  const isTargetCurrentlyActive = (target: TargetType): boolean => {
+    const now = new Date();
+    const startDate = target.start_date ? new Date(target.start_date) : null;
+    const endDate = target.end_date ? new Date(target.end_date) : null;
+    const isStarted = startDate instanceof Date && !isNaN(startDate.getTime()) && startDate <= now;
+    const isNotEnded = !endDate || (endDate instanceof Date && !isNaN(endDate.getTime()) && endDate > now);
+    return isStarted && isNotEnded;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-white">
+            Target History for {user.first_name} {user.last_name}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700">
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-grow">
+          {sortedTargets.length === 0 ? (
+            <p className="text-gray-400 text-center py-10">No target history found for this user.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800/50 text-left text-xs font-medium text-gray-400">
+                  <th className="px-4 py-2">Revenue</th>
+                  <th className="px-4 py-2">Outbound</th>
+                  <th className="px-4 py-2">Meetings</th>
+                  <th className="px-4 py-2">Proposals</th>
+                  <th className="px-4 py-2">Start Date</th>
+                  <th className="px-4 py-2">End Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedTargets.map((target, index) => {
+                  const isActive = isTargetCurrentlyActive(target);
+                  return (
+                    <tr key={target.id || `history-${index}`} className="border-b border-gray-800/50">
+                      <td className="px-4 py-2 text-white">{target.revenue_target?.toLocaleString() ?? '-'}</td>
+                      <td className="px-4 py-2 text-white">{target.outbound_target ?? '-'}</td>
+                      <td className="px-4 py-2 text-white">{target.meetings_target ?? '-'}</td>
+                      <td className="px-4 py-2 text-white">{target.proposal_target ?? '-'}</td>
+                      <td className="px-4 py-2 text-white">{target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '-'}</td>
+                      <td className="px-4 py-2">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded",
+                          isActive
+                            ? "bg-emerald-500/50 text-emerald-100"
+                            : "text-gray-400"
+                        )}>
+                          {target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : '-')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-6 border-t border-gray-800/50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
