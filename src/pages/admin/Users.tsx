@@ -61,10 +61,36 @@ export default function Users() {
   }, [users, searchQuery, selectedStage]);
 
   useEffect(() => {
-    if (editingUser?.editingTargets && Array.isArray(editingUser.targets)) {
-      setModalTargets(JSON.parse(JSON.stringify(editingUser.targets)));
-    } else if (editingUser?.editingTargets) {
-      setModalTargets([]);
+    if (editingUser && !(editingUser as any).isNew && (editingUser as any).editingTargets && 'targets' in editingUser && Array.isArray(editingUser.targets)) {
+      const user = editingUser as User;
+      const now = new Date();
+
+      const activeTargets = user.targets.filter(target => {
+        const startDate = target.start_date ? new Date(target.start_date) : null;
+        if (startDate instanceof Date && isNaN(startDate.getTime())) {
+            console.warn(`[Users Modal] Invalid start_date found for target ID ${target.id}: ${target.start_date}`);
+            return false;
+        }
+
+        const endDate = target.end_date ? new Date(target.end_date) : null;
+        if (endDate instanceof Date && isNaN(endDate.getTime())) {
+            console.warn(`[Users Modal] Invalid end_date found for target ID ${target.id}: ${target.end_date}`);
+            return false;
+        }
+
+        const isStarted = startDate instanceof Date && startDate <= now;
+        const isNotEnded = !endDate || (endDate instanceof Date && endDate > now);
+
+        const isActive = isStarted && isNotEnded;
+        return isActive;
+      });
+      console.log("[Users Modal] Initializing with active targets:", activeTargets);
+
+      setModalTargets(JSON.parse(JSON.stringify(activeTargets)));
+
+    } else if (editingUser && (editingUser as any).editingTargets) {
+       console.log("[Users Modal] Initializing with empty targets array (no valid user/targets found).");
+       setModalTargets([]);
     }
   }, [editingUser]);
 
@@ -112,10 +138,8 @@ export default function Users() {
     }
     try {
       await updateUser({ userId, updates });
-      setEditingUser(null);
-      setModalTargets([]);
     } catch (error) {
-      console.error('Update error in component:', error);
+      console.error('Update error caught in component handleUpdateUser:', error);
     }
   };
 
@@ -426,10 +450,15 @@ export default function Users() {
               {editingUser.isNew ? 'Add User' : (editingUser as User).editingTargets ? `Edit Targets for ${(editingUser as User).first_name}` : 'Edit User'}
             </h2>
 
-            {(editingUser as User).editingTargets ? (
+            {(editingUser as any).editingTargets ? (
               <form onSubmit={(e) => {
                 e.preventDefault();
-                handleUpdateUser((editingUser as User).id, { targets: modalTargets });
+                if (editingUser && 'id' in editingUser) {
+                    handleUpdateUser(editingUser.id, { targets: modalTargets });
+                } else {
+                    console.error("Cannot update targets: editingUser is not a valid User object.");
+                    toast.error("Error saving targets: Invalid user data.");
+                }
               }} className="space-y-6">
                 {modalTargets.map((target, index) => (
                   <div key={target.id || index} className="p-4 rounded-lg border border-gray-700/50 bg-gray-800/20 space-y-4 relative">
@@ -445,38 +474,38 @@ export default function Users() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Revenue Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20000"
                           value={target.revenue_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'revenue_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Outbound Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 100"
                           value={target.outbound_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'outbound_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Meetings Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20"
                           value={target.meetings_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'meetings_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Proposal Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 15"
                           value={target.proposal_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'proposal_target', e.target.value)}
@@ -499,8 +528,8 @@ export default function Users() {
                           value={target.end_date ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'end_date', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                     </div>
                   </div>
                 ))}
