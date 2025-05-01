@@ -98,4 +98,59 @@ describe('QuickAdd Component - Outbound Activity Types', () => {
       }));
     });
   });
+
+  it('should add outbound activity to activity table even if no identifier is provided', async () => {
+    render(
+      <BrowserRouter>
+        <QuickAdd isOpen={true} onClose={() => {}} />
+      </BrowserRouter>
+    );
+    // Select the outbound action
+    const outboundButton = screen.getByText('Add Outbound');
+    await userEvent.click(outboundButton);
+    // Fill the form with test data, but leave identifier blank
+    await userEvent.type(screen.getByLabelText('Prospect Name'), 'No Identifier Prospect');
+    // Submit the form
+    const submitButton = screen.getByRole('button', { name: /submit/i });
+    await userEvent.click(submitButton);
+    // Wait to ensure activity is added (without identifier fields)
+    await waitFor(() => {
+      expect(mockAddActivity).toHaveBeenCalledTimes(1);
+      expect(mockAddActivity).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'outbound',
+        client_name: 'No Identifier Prospect',
+      }));
+      // Should NOT have contactIdentifier or contactIdentifierType
+      expect(mockAddActivity.mock.calls[0][0].contactIdentifier).toBeUndefined();
+      expect(mockAddActivity.mock.calls[0][0].contactIdentifierType).toBeUndefined();
+    });
+  });
+
+  it('should add outbound activity to pipeline if identifier is provided', async () => {
+    render(
+      <BrowserRouter>
+        <QuickAdd isOpen={true} onClose={() => {}} />
+      </BrowserRouter>
+    );
+    // Select the outbound action
+    const outboundButton = screen.getByText('Add Outbound');
+    await userEvent.click(outboundButton);
+    // Fill the form with test data
+    await userEvent.type(screen.getByLabelText('Prospect Name'), 'With Identifier Prospect');
+    // Enter a valid identifier
+    const identifierInput = screen.getByPlaceholderText(/optional: enter email address/i);
+    await userEvent.type(identifierInput, 'test@example.com');
+    // Submit the form
+    const submitButton = screen.getByRole('button', { name: /submit/i });
+    await userEvent.click(submitButton);
+    // Wait for addActivity to be called
+    await waitFor(() => {
+      expect(mockAddActivity).toHaveBeenCalledTimes(1);
+      expect(mockAddActivity).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'outbound',
+        client_name: 'With Identifier Prospect',
+        contactIdentifier: 'test@example.com',
+      }));
+    });
+  });
 }); 
