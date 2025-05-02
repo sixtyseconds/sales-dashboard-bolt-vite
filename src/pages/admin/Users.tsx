@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
@@ -6,9 +6,7 @@ import { toast } from 'sonner';
 import {
   Users as UsersIcon,
   Shield,
-  UserCog,
   ChevronDown,
-  ChevronUp,
   Search,
   Filter,
   Download,
@@ -18,9 +16,11 @@ import {
   Target,
   UserCheck,
   Trash2,
-  PlusCircle
+  PlusCircle,
+  History,
+  ChevronRight
 } from 'lucide-react';
-import { useUsers } from '@/lib/hooks/useUsers';
+import { useUsers, User, Target as TargetType } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
 import {
   AlertDialog,
@@ -35,15 +35,24 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
-import { format, parseISO } from 'date-fns';
-import { User } from '@/lib/hooks/useUsers';
+import { format, isValid } from 'date-fns';
+import UserAvatar from '@/components/ui/UserAvatar';
+import Tooltip from '@/components/ui/Tooltip';
+
+// Define more specific types for the editing state using discriminated union pattern
+type EditingUserState =
+  | { mode: 'closed' }
+  | { mode: 'newUser' }
+  | { mode: 'editTargets'; user: User }
+  | { mode: 'editDetails'; user: User };
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedStage, setSelectedStage] = useState('all');
-  const [editingUser, setEditingUser] = useState<User | null | { isNew?: boolean; editingTargets?: boolean }>(null);
-  const [modalTargets, setModalTargets] = useState<Target[]>([]);
+  const [editingState, setEditingState] = useState<EditingUserState>({ mode: 'closed' });
+  const [modalTargets, setModalTargets] = useState<TargetType[]>([]);
+  const [historyUser, setHistoryUser] = useState<User | null>(null);
   const { users, updateUser, impersonateUser, deleteUser } = useUsers();
   const navigate = useNavigate();
 
@@ -60,26 +69,46 @@ export default function Users() {
     });
   }, [users, searchQuery, selectedStage]);
 
+  // Effect to initialize modalTargets based on editingState
   useEffect(() => {
-    if (editingUser?.editingTargets && Array.isArray(editingUser.targets)) {
-      setModalTargets(JSON.parse(JSON.stringify(editingUser.targets)));
-    } else if (editingUser?.editingTargets) {
-      setModalTargets([]);
+    let activeTargetsForModal: TargetType[] = [];
+
+    if (editingState.mode === 'editTargets') {
+      const user = editingState.user;
+      const now = new Date();
+      activeTargetsForModal = user.targets.filter(target => {
+        const startDate = target.start_date ? new Date(target.start_date) : null;
+        if (startDate instanceof Date && isNaN(startDate.getTime())) return false;
+        const endDate = target.end_date ? new Date(target.end_date) : null;
+        if (endDate instanceof Date && isNaN(endDate.getTime())) return false;
+        const isStarted = startDate instanceof Date && startDate <= now;
+        const isNotEnded = !endDate || (endDate instanceof Date && endDate > now);
+        return isStarted && isNotEnded;
+      });
+      console.log("[Users Modal] Determined active targets for modal:", activeTargetsForModal);
+    } else {
+      // For modes 'closed', 'newUser', 'editDetails', ensure targets are empty
+      console.log(`[Users Modal] Clearing targets for mode: ${editingState.mode}`);
+      // activeTargetsForModal is already initialized to []
     }
-  }, [editingUser]);
+
+    // Set the state based on the determined targets (could be empty or filtered)
+    setModalTargets(JSON.parse(JSON.stringify(activeTargetsForModal)));
+
+  }, [editingState]);
 
   const handleModalTargetChange = (index: number, field: string, value: string) => {
     setModalTargets(currentTargets => {
       const updatedTargets = [...currentTargets];
       if (!updatedTargets[index]) {
-        updatedTargets[index] = { id: undefined };
+        updatedTargets[index] = { id: undefined } as TargetType;
       }
       const parsedValue = value === '' ? null : (field.includes('target') ? (field === 'revenue_target' ? parseFloat(value) : parseInt(value)) : value);
 
       updatedTargets[index] = {
         ...updatedTargets[index],
         [field]: parsedValue
-      };
+      } as TargetType;
       return updatedTargets;
     });
   };
@@ -112,10 +141,9 @@ export default function Users() {
     }
     try {
       await updateUser({ userId, updates });
-      setEditingUser(null);
-      setModalTargets([]);
+      setEditingState({ mode: 'closed' });
     } catch (error) {
-      console.error('Update error in component:', error);
+      console.error('Update error caught in component handleUpdateUser:', error);
     }
   };
 
@@ -180,7 +208,7 @@ export default function Users() {
             <p className="text-sm text-gray-400 mt-1">Manage users, roles, and permissions</p>
           </div>
           <button
-            onClick={() => setEditingUser({ isNew: true })}
+            onClick={() => setEditingState({ mode: 'newUser' })}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50"
           >
             <UserPlus className="w-4 h-4" />
@@ -312,19 +340,11 @@ export default function Users() {
                   <tr key={user.id} className="border-b border-gray-800/50 hover:bg-gray-800/20">
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#37bd7e]/10 border border-[#37bd7e]/20 flex items-center justify-center">
-                          {user.avatar_url ? (
-                            <img
-                              src={user.avatar_url}
-                              alt={user.first_name}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                          ) : (
-                            <span className="text-sm font-medium text-[#37bd7e]">
-                              {user.first_name?.[0]}{user.last_name?.[0]}
-                            </span>
-                          )}
-                        </div>
+                        <UserAvatar
+                           firstName={user.first_name}
+                           lastName={user.last_name}
+                           avatarUrl={user.avatar_url}
+                        />
                         <div>
                           <div className="font-medium text-white">
                             {user.first_name} {user.last_name}
@@ -346,7 +366,7 @@ export default function Users() {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <button
-                        onClick={() => setEditingUser({ ...(user as User), editingTargets: true })}
+                        onClick={() => setEditingState({ mode: 'editTargets', user: user })}
                         className="flex items-center gap-2 px-3 py-1 rounded-lg bg-violet-500/10 text-violet-500 hover:bg-violet-500/20 transition-all duration-300 text-sm border border-violet-500/30"
                       >
                         <Target className="w-4 h-4" />
@@ -370,14 +390,23 @@ export default function Users() {
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => setHistoryUser(user)}
+                          className="p-2 hover:bg-blue-500/20 rounded-lg transition-colors"
+                          title="View Target History"
+                        >
+                          <History className="w-4 h-4 text-blue-500" />
+                        </button>
+                        <button
                           onClick={() => handleImpersonate(user.id)}
                           className="p-2 hover:bg-violet-500/20 rounded-lg transition-colors"
+                          title="Impersonate User"
                         >
                           <UserCheck className="w-4 h-4 text-violet-500" />
                         </button>
                         <button
-                          onClick={() => setEditingUser(user)}
+                          onClick={() => setEditingState({ mode: 'editDetails', user: user })}
                           className="p-2 hover:bg-[#37bd7e]/20 rounded-lg transition-colors"
+                          title="Edit User Details"
                         >
                           <Edit2 className="w-4 h-4 text-[#37bd7e]" />
                         </button>
@@ -419,19 +448,22 @@ export default function Users() {
       </div>
 
       {/* Edit User Modal */}
-      {editingUser && (
+      {editingState.mode !== 'closed' && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4 text-white">
-              {editingUser.isNew ? 'Add User' : (editingUser as User).editingTargets ? `Edit Targets for ${(editingUser as User).first_name}` : 'Edit User'}
+              {editingState.mode === 'newUser' ? 'Add User'
+               : editingState.mode === 'editTargets' ? `Edit Targets for ${editingState.user.first_name}`
+               : editingState.mode === 'editDetails' ? `Edit User Details for ${editingState.user.first_name}`
+               : 'Edit User'}
             </h2>
 
-            {(editingUser as User).editingTargets ? (
+            {editingState.mode === 'editTargets' && (
               <form onSubmit={(e) => {
                 e.preventDefault();
-                handleUpdateUser((editingUser as User).id, { targets: modalTargets });
+                handleUpdateUser(editingState.user.id, { targets: modalTargets });
               }} className="space-y-6">
-                {modalTargets.map((target, index) => (
+                {modalTargets.map((target: TargetType, index) => (
                   <div key={target.id || index} className="p-4 rounded-lg border border-gray-700/50 bg-gray-800/20 space-y-4 relative">
                     <button
                       type="button"
@@ -445,38 +477,38 @@ export default function Users() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Revenue Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20000"
                           value={target.revenue_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'revenue_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Outbound Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 100"
                           value={target.outbound_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'outbound_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Meetings Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 20"
                           value={target.meetings_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'meetings_target', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-gray-400">Proposal Target</label>
-                        <input
-                          type="number"
+                  <input
+                    type="number"
                           placeholder="e.g., 15"
                           value={target.proposal_target ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'proposal_target', e.target.value)}
@@ -499,8 +531,8 @@ export default function Users() {
                           value={target.end_date ?? ''}
                           onChange={(e) => handleModalTargetChange(index, 'end_date', e.target.value)}
                           className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white"
-                        />
-                      </div>
+                  />
+                </div>
                     </div>
                   </div>
                 ))}
@@ -517,7 +549,7 @@ export default function Users() {
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => { setEditingUser(null); setModalTargets([]); }}
+                    onClick={() => setEditingState({ mode: 'closed' })}
                     className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
                   >
                     Cancel
@@ -530,16 +562,16 @@ export default function Users() {
                   </button>
                 </div>
               </form>
-            ) : (
+            )}
+
+            {(editingState.mode === 'newUser' || editingState.mode === 'editDetails') && (
               <form onSubmit={(e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target as HTMLFormElement);
-                if (editingUser.isNew) {
-                  console.warn("New user creation not implemented yet.");
+                if (editingState.mode === 'newUser') {
                   toast.info("New user creation not implemented.");
                 } else {
-                  const userToUpdate = editingUser as User;
-                  handleUpdateUser(userToUpdate.id, {
+                  handleUpdateUser(editingState.user.id, {
                     first_name: formData.get('first_name') as string,
                     last_name: formData.get('last_name') as string,
                     email: formData.get('email') as string,
@@ -552,7 +584,7 @@ export default function Users() {
                   <input
                     type="text"
                     name="first_name"
-                    defaultValue={(editingUser as User)?.first_name || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.first_name ?? '' : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -561,7 +593,7 @@ export default function Users() {
                   <input
                     type="text"
                     name="last_name"
-                    defaultValue={(editingUser as User)?.last_name || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.last_name ?? '' : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   />
                 </div>
@@ -570,16 +602,16 @@ export default function Users() {
                   <input
                     type="email"
                     name="email"
-                    defaultValue={(editingUser as User)?.email || ''}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.email : ''}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
-                    readOnly={!editingUser.isNew}
+                    readOnly={editingState.mode === 'editDetails'}
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-400">Stage</label>
                   <select
                     name="stage"
-                    defaultValue={(editingUser as User)?.stage || USER_STAGES[0]}
+                    defaultValue={editingState.mode === 'editDetails' ? editingState.user.stage : USER_STAGES[0]}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white"
                   >
                     {USER_STAGES.map(stage => (
@@ -590,7 +622,7 @@ export default function Users() {
                 <div className="flex justify-end gap-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setEditingUser(null)}
+                    onClick={() => setEditingState({ mode: 'closed' })}
                     className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
                   >
                     Cancel
@@ -599,7 +631,7 @@ export default function Users() {
                     type="submit"
                     className="px-4 py-2 rounded-xl bg-[#37bd7e] text-white hover:bg-[#2da76c] transition-colors"
                   >
-                    {editingUser.isNew ? 'Create User' : 'Save Changes'}
+                    {editingState.mode === 'newUser' ? 'Create User' : 'Save Changes'}
                   </button>
                 </div>
               </form>
@@ -607,6 +639,532 @@ export default function Users() {
           </div>
         </div>
       )}
+
+      {/* Target History Modal */}
+      {historyUser && (
+        <TargetHistoryModal user={historyUser} onClose={() => setHistoryUser(null)} />
+      )}
     </div>
   );
 }
+
+interface TargetHistoryModalProps {
+  user: User;
+  onClose: () => void;
+}
+
+function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
+  // State for date filters
+  const [filterStartDate, setFilterStartDate] = useState<string>('');
+  const [filterEndDate, setFilterEndDate] = useState<string>('');
+  // State for fetched profiles and loading status
+  const [profileMap, setProfileMap] = useState<Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>>(new Map());
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+
+  // --- State for Expanded Rows --- //
+  const [expandedChains, setExpandedChains] = useState<Set<string>>(new Set());
+
+  // --- Data Preparation for Expandable Table --- //
+  const { latestTargetsData, fullChainsData } = useMemo(() => {
+    if (!user.targets) return { latestTargetsData: [], fullChainsData: new Map() };
+
+    // 1. Apply Date Filters (Same as before)
+    const filterStart = filterStartDate ? new Date(`${filterStartDate}T00:00:00`) : null;
+    const filterEnd = filterEndDate ? new Date(`${filterEndDate}T23:59:59`) : null;
+    const isValidFilterStart = filterStart && isValid(filterStart);
+    const isValidFilterEnd = filterEnd && isValid(filterEnd);
+
+    const filteredTargets = user.targets.filter(target => {
+      const targetStart = target.start_date ? new Date(target.start_date) : null;
+      const targetEnd = target.end_date ? new Date(target.end_date) : null;
+      const isValidTargetStart = targetStart && isValid(targetStart);
+      if (!isValidTargetStart) return false;
+      const isValidTargetEnd = !targetEnd || isValid(targetEnd);
+      const startsBeforeFilterEnd = !isValidFilterEnd || (isValidTargetStart && targetStart <= filterEnd);
+      const endsAfterFilterStart = !isValidFilterStart || !isValidTargetEnd || targetEnd === null || (targetEnd >= filterStart);
+      return startsBeforeFilterEnd && endsAfterFilterStart;
+    });
+
+    if (filteredTargets.length === 0) return { latestTargetsData: [], fullChainsData: new Map() };
+
+    // 2. Group targets into chains
+    const targetMap = new Map<string, TargetType>(filteredTargets.filter(t => t.id).map(t => [t.id!, t]));
+    const chains = new Map<string, TargetType[]>(); // Map<rootId, chainTargets[]>
+    const processedIds = new Set<string>();
+
+    for (const target of filteredTargets) {
+      if (!target.id || processedIds.has(target.id)) continue;
+
+      // Trace back to find root
+      let current: TargetType | undefined = target;
+      let root: TargetType = target;
+      const visitedInTraceback = new Set<string>();
+      while (current?.previous_target_id && targetMap.has(current.previous_target_id)) {
+        if (visitedInTraceback.has(current.id!)) break; // Cycle detected
+        visitedInTraceback.add(current.id!);
+        current = targetMap.get(current.previous_target_id);
+        if (current) root = current;
+        else break;
+      }
+
+      if (processedIds.has(root.id!)) continue; // Root already part of another chain
+
+      // Collect full chain forward from root
+      const currentChain: TargetType[] = [];
+      let chainMember: TargetType | undefined = root;
+      const visitedInChainBuild = new Set<string>();
+      while (chainMember) {
+        if (!chainMember.id || visitedInChainBuild.has(chainMember.id)) break; // Cycle/missing ID
+        visitedInChainBuild.add(chainMember.id);
+        processedIds.add(chainMember.id);
+        currentChain.push(chainMember);
+        // Find next (target whose previous_target_id is current id)
+        chainMember = filteredTargets.find(t => t.previous_target_id === chainMember?.id);
+      }
+
+      // Sort chain by start date ascending for internal consistency
+      currentChain.sort((a, b) =>
+        (a.start_date ? new Date(a.start_date).getTime() : 0) - (b.start_date ? new Date(b.start_date).getTime() : 0)
+      );
+      chains.set(root.id!, currentChain);
+    }
+
+    // 3. Prepare data for rendering
+    const latestTargetsData: (TargetType & { rootId: string; hasHistory: boolean })[] = [];
+    const fullChainsData = new Map<string, TargetType[]>(chains); // Keep the full chains
+
+    chains.forEach((chain, rootId) => {
+        if (chain.length > 0) {
+            // The last element in the date-sorted chain is the latest
+            const latestTarget = chain[chain.length - 1];
+            latestTargetsData.push({
+                ...latestTarget,
+                rootId: rootId,
+                hasHistory: chain.length > 1,
+            });
+        }
+    });
+
+    // 4. Sort the latest targets array by start_date descending
+    latestTargetsData.sort((a, b) => {
+        const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+        const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+        return dateB - dateA; // Descending order
+    });
+
+    console.log("[TargetHistoryModal] Processed data for table:", { latestTargetsData, fullChainsData });
+    return { latestTargetsData, fullChainsData };
+
+  }, [user.targets, filterStartDate, filterEndDate]);
+
+  // Toggle expand state for a chain
+  const toggleExpand = (rootId: string) => {
+    setExpandedChains(current => {
+        const newSet = new Set(current);
+        if (newSet.has(rootId)) {
+            newSet.delete(rootId);
+        } else {
+            newSet.add(rootId);
+        }
+        return newSet;
+    });
+  };
+
+  // Effect to fetch profiles based on target history user IDs
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!user.targets || user.targets.length === 0) {
+        setProfileMap(new Map()); // Ensure map is empty if no targets
+        return;
+      }
+
+      // Collect unique, non-null user IDs from created_by and closed_by
+      const userIds = new Set<string>();
+      user.targets.forEach(target => {
+        if (target.created_by) userIds.add(target.created_by);
+        if (target.closed_by) userIds.add(target.closed_by);
+      });
+
+      const uniqueIdsArray = Array.from(userIds);
+
+      if (uniqueIdsArray.length === 0) {
+        setProfileMap(new Map()); // Ensure map is empty if no IDs found
+        return;
+      }
+
+      console.log('[TargetHistoryModal] Fetching profiles for IDs:', uniqueIdsArray);
+      setIsLoadingProfiles(true);
+      try {
+        // Use the global supabase client instance
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, avatar_url')
+          .in('id', uniqueIdsArray);
+
+        if (error) {
+          console.error('[TargetHistoryModal] Error fetching profiles:', error);
+          toast.error(`Failed to load profile details: ${error.message}`);
+          setProfileMap(new Map()); // Clear map on error
+        } else if (profiles) {
+          const newProfileMap = new Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>();
+          profiles.forEach(profile => {
+            newProfileMap.set(profile.id, {
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              avatar_url: profile.avatar_url
+            });
+          });
+          console.log('[TargetHistoryModal] Profiles fetched successfully:', newProfileMap);
+          setProfileMap(newProfileMap);
+        }
+      } catch (err) {
+        console.error('[TargetHistoryModal] Unexpected error fetching profiles:', err);
+        toast.error('An unexpected error occurred while loading profile details.');
+        setProfileMap(new Map()); // Clear map on unexpected error
+      } finally {
+        setIsLoadingProfiles(false);
+      }
+    };
+
+    fetchProfiles();
+
+    // Dependency: Run when the user whose history we are showing changes
+  }, [user]); // Depend on the user prop
+
+  const filteredSortedTargets = useMemo(() => {
+    if (!user.targets) return [];
+
+    const filterStart = filterStartDate ? new Date(`${filterStartDate}T00:00:00`) : null;
+    const filterEnd = filterEndDate ? new Date(`${filterEndDate}T23:59:59`) : null;
+
+    const isValidFilterStart = filterStart && isValid(filterStart);
+    const isValidFilterEnd = filterEnd && isValid(filterEnd);
+
+    const filtered = user.targets.filter(target => {
+      const targetStart = target.start_date ? new Date(target.start_date) : null;
+      const targetEnd = target.end_date ? new Date(target.end_date) : null;
+
+      const isValidTargetStart = targetStart && isValid(targetStart);
+      if (!isValidTargetStart) return false;
+      const isValidTargetEnd = !targetEnd || isValid(targetEnd);
+
+      const startsBeforeFilterEnd = !isValidFilterEnd || (isValidTargetStart && targetStart <= filterEnd);
+      const endsAfterFilterStart = !isValidFilterStart || !isValidTargetEnd || targetEnd === null || (targetEnd >= filterStart);
+
+      return startsBeforeFilterEnd && endsAfterFilterStart;
+    });
+
+    return filtered.sort((a, b) => {
+      const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+      const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [user.targets, filterStartDate, filterEndDate]);
+
+  const isTargetCurrentlyActive = (target: TargetType): boolean => {
+    const now = new Date();
+    const startDate = target.start_date ? new Date(target.start_date) : null;
+    const endDate = target.end_date ? new Date(target.end_date) : null;
+    const isStarted = startDate instanceof Date && !isNaN(startDate.getTime()) && startDate <= now;
+    const isNotEnded = !endDate || (endDate instanceof Date && !isNaN(endDate.getTime()) && endDate > now);
+    return isStarted && isNotEnded;
+  };
+
+  // Handle Export - Updated for formats and richer data
+  const handleExportHistory = () => {
+    if (isLoadingProfiles) {
+        toast.info("Please wait for profile details to load before exporting.");
+        return;
+    }
+    if (filteredSortedTargets.length === 0) {
+      toast.info("No history data to export based on current filters.");
+      return;
+    }
+
+    // Prepare enriched data for export
+    const dataToExport = filteredSortedTargets.map(target => {
+      const creatorProfile = profileMap.get(target.created_by || '');
+      const closerProfile = profileMap.get(target.closed_by || '');
+      const isActive = isTargetCurrentlyActive(target);
+      return {
+        target_id: target.id,
+        revenue_target: target.revenue_target,
+        outbound_target: target.outbound_target,
+        meetings_target: target.meetings_target,
+        proposal_target: target.proposal_target,
+        start_date: target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '',
+        end_date: target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : '',
+        status: isActive ? 'Active' : 'Inactive',
+        user_id: user.id,
+        user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
+        creator_id: target.created_by,
+        creator_name: creatorProfile ? `${creatorProfile.first_name || ''} ${creatorProfile.last_name || ''}`.trim() : 'Unknown',
+        closer_id: target.closed_by,
+        closer_name: closerProfile ? `${closerProfile.first_name || ''} ${closerProfile.last_name || ''}`.trim() : '' // Empty if not closed
+      };
+    });
+
+    let blobContent: string;
+    let blobType: string;
+    let fileExtension: string;
+
+    if (exportFormat === 'json') {
+      blobContent = JSON.stringify(dataToExport, null, 2); // Pretty print JSON
+      blobType = 'application/json;charset=utf-8;';
+      fileExtension = 'json';
+      toast.success('Exporting history as JSON...');
+    } else { // Default to CSV
+      // Define headers based on the keys of dataToExport object
+      const headers = Object.keys(dataToExport[0] || {});
+      const csvData = dataToExport.map(row =>
+        headers.map(header => {
+          // Access value safely using keyof type assertion
+          const value = row[header as keyof typeof row] ?? '';
+          // Escape quotes and enclose in quotes
+          return `"${value.toString().replace(/"/g, '""')}"`;
+        }).join(',')
+      );
+      blobContent = [headers.join(','), ...csvData].join('\n');
+      blobType = 'text/csv;charset=utf-8;';
+      fileExtension = 'csv';
+      toast.success('Exporting history as CSV...');
+    }
+
+    // Trigger download
+    const blob = new Blob([blobContent], { type: blobType });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const filename = `target_history_${user.first_name}_${user.last_name}_${new Date().toISOString().split('T')[0]}.${fileExtension}`;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    // Consider removing the success toast here as it was already shown above
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
+        <div className="flex flex-col justify-between items-start sm:items-center mb-4 xl:mb-8 gap-4 xl:gap-8">
+          <h2 className="text-xl font-bold text-white">
+            Target History for {user.first_name} {user.last_name}
+          </h2>
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white w-full sm:w-auto"
+              aria-label="Filter Start Date"
+            />
+            <span className="text-gray-500">to</span>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-white w-full sm:w-auto"
+              aria-label="Filter End Date"
+            />
+            <div className="flex items-center gap-1 border border-gray-700/50 rounded-lg p-0.5">
+              <button
+                onClick={() => setExportFormat('csv')}
+                className={cn("px-2 py-1 rounded text-xs", exportFormat === 'csv' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800')}
+              >CSV</button>
+              <button
+                onClick={() => setExportFormat('json')}
+                className={cn("px-2 py-1 rounded text-xs", exportFormat === 'json' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:bg-gray-800')}
+              >JSON</button>
+            </div>
+            <button
+                onClick={handleExportHistory}
+                disabled={isLoadingProfiles} // Disable if profiles are loading
+                className={cn(
+                    "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-[#37bd7e]/10 text-[#37bd7e] hover:bg-[#37bd7e]/20 transition-all duration-300 text-sm border border-[#37bd7e]/30 hover:border-[#37bd7e]/50 w-full sm:w-auto",
+                    isLoadingProfiles && "opacity-50 cursor-not-allowed"
+                )}
+                title={`Export Filtered History as ${exportFormat.toUpperCase()}`}
+            >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+            </button>
+            {/* <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-700">
+                 <X className="w-5 h-5" />
+            </button> */}
+          </div>
+        </div>
+
+        <div className="overflow-y-auto flex-grow">
+          {latestTargetsData.length === 0 ? (
+            <p className="text-gray-400 text-center py-10">No target history matches the selected filters.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-800/50 text-left text-xs font-medium text-gray-400">
+                  <th className="px-1 py-2 w-10"></th>
+                  <th className="px-4 py-2">Revenue</th>
+                  <th className="px-4 py-2">Outbound</th>
+                  <th className="px-4 py-2">Meetings</th>
+                  <th className="px-4 py-2">Proposals</th>
+                  <th className="px-4 py-2">Start Date</th>
+                  <th className="px-4 py-2">End Date</th>
+                  <th className="px-4 py-2">Created By</th>
+                  <th className="px-4 py-2">Closed By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestTargetsData.map((latestTarget, index) => {
+                  const isExpanded = expandedChains.has(latestTarget.rootId);
+                  const isActive = isTargetCurrentlyActive(latestTarget);
+
+                  // Determine alternating background color for expanded state
+                  const expandedBgColor = index % 2 === 0 ? 'bg-blue-950/50' : 'bg-teal-950/50';
+                  const expandedBorderColor = index % 2 === 0 ? 'border-blue-900/60' : 'border-teal-900/60';
+
+                  // Get historical targets for this chain if expanded
+                  const chainHistory = fullChainsData.get(latestTarget.rootId) as TargetType[] | undefined;
+                  const historicalTargets = isExpanded && chainHistory
+                    ? chainHistory
+                        .filter((t) => t.id !== latestTarget.id)
+                        .sort((a, b) => (
+                            (b.start_date ? new Date(b.start_date).getTime() : 0) -
+                            (a.start_date ? new Date(a.start_date).getTime() : 0)
+                        ))
+                    : [];
+
+                  return (
+                    <Fragment key={latestTarget.rootId}>
+                      {/* Main Row (Latest Target) - Apply alternating background if expanded */}
+                      <tr className={cn(
+                        "border-b", // Keep base border style?
+                        isExpanded ? `${expandedBgColor} ${expandedBorderColor}` : "border-gray-800/50 hover:bg-gray-800/10"
+                      )}>
+                        {/* Expand/Collapse Cell */}
+                        <td className="px-1 py-2 text-center">
+                          {latestTarget.hasHistory && (
+                            <button
+                              onClick={() => toggleExpand(latestTarget.rootId)}
+                              className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-white"
+                            >
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+                          )}
+                        </td>
+                        {/* Data Cells for Latest Target */}
+                        <td className="px-4 py-2 text-white">{latestTarget.revenue_target?.toLocaleString() ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.outbound_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.meetings_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.proposal_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.start_date ? format(new Date(latestTarget.start_date), 'yyyy-MM-dd') : '-'}</td>
+                        <td className="px-4 py-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-xs font-medium",
+                            isActive
+                              ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/50"
+                              : latestTarget.end_date ? "bg-red-600/20 text-red-200 border border-red-500/50" : "text-gray-500"
+                          )}>
+                            {latestTarget.end_date ? format(new Date(latestTarget.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : 'No End Date')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <UserAvatarBadge userId={latestTarget.created_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                        </td>
+                        <td className="px-4 py-2">
+                          <UserAvatarBadge userId={latestTarget.closed_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                        </td>
+                      </tr>
+
+                      {/* Historical Rows (Rendered if expanded) - Apply same alternating background */}
+                      {isExpanded && historicalTargets && historicalTargets.map((historyTarget, histIndex) => {
+                         const isHistoryActive = isTargetCurrentlyActive(historyTarget);
+                         return (
+                            <tr
+                              key={historyTarget.id || `hist-${histIndex}`}
+                              // Apply the determined expanded background and border
+                              className={`${expandedBgColor} border-b ${expandedBorderColor}`}
+                            >
+                                <td className="px-1 py-2 text-center">{/* Empty or indent marker? */}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.revenue_target?.toLocaleString() ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.outbound_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.meetings_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.proposal_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.start_date ? format(new Date(historyTarget.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                <td className="px-4 py-2">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded text-xs font-medium",
+                                    isHistoryActive
+                                      ? "bg-emerald-700/30 text-emerald-300 border border-emerald-600/50"
+                                      : historyTarget.end_date ? "bg-red-700/20 text-red-300 border border-red-600/50" : "text-gray-500"
+                                  )}>
+                                    {historyTarget.end_date ? format(new Date(historyTarget.end_date), 'yyyy-MM-dd') : (isHistoryActive ? 'Active' : 'No End Date')}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <UserAvatarBadge userId={historyTarget.created_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <UserAvatarBadge userId={historyTarget.closed_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                                </td>
+                            </tr>
+                         );
+                      })}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-6 border-t border-gray-800/50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-gray-800/50 text-gray-300 hover:bg-gray-800 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- User Avatar Badge with Tooltip --- //
+interface UserAvatarBadgeProps {
+  userId: string | null | undefined;
+  profileMap: Map<string, { first_name: string | null; last_name: string | null; avatar_url: string | null }>;
+  isLoading: boolean;
+}
+
+const UserAvatarBadge: React.FC<UserAvatarBadgeProps> = ({ userId, profileMap, isLoading }) => {
+  if (isLoading) {
+    return <div className="w-6 h-6 bg-gray-700 rounded-full animate-pulse"></div>; // Simple pulse placeholder
+  }
+
+  if (!userId) {
+    return <span className="text-gray-500 text-xs">-</span>;
+  }
+
+  const profile = profileMap.get(userId);
+
+  if (!profile) {
+    return <span className="text-gray-500 text-xs" title={`ID: ${userId}`}>Unknown</span>;
+  }
+
+  const userName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
+
+  return (
+    <Tooltip content={userName || 'User'} position="top">
+       {/* Adjust sizeClasses and textClasses as needed for the badge size */}
+      <UserAvatar
+        firstName={profile.first_name}
+        lastName={profile.last_name}
+        avatarUrl={profile.avatar_url}
+        sizeClasses="w-6 h-6" // Smaller size for the badge
+        textClasses="text-[10px]" // Smaller text for initials
+        className="rounded-full bg-gray-600/30 border border-gray-500/50 flex items-center justify-center cursor-default"
+      />
+    </Tooltip>
+  );
+};

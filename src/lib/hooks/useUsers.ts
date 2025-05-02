@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, supabaseAdmin } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 // Define the Target structure accurately
 export interface Target {
@@ -15,6 +14,9 @@ export interface Target {
   end_date: string | null;   // Assuming YYYY-MM-DD string format from input
   created_at?: string;
   updated_at?: string;
+  created_by?: string | null; // Add creator field
+  closed_by?: string | null;  // Add closer field
+  previous_target_id?: string | null; // Add previous link field
 }
 
 // Update User interface to use the Target array type
@@ -54,7 +56,10 @@ async function fetchUsers(): Promise<User[]> {
         start_date,
         end_date,
         created_at,
-        updated_at
+        updated_at,
+        created_by,
+        closed_by,
+        previous_target_id
       )
     `)
     .order('created_at', { ascending: false });
@@ -74,141 +79,185 @@ async function fetchUsers(): Promise<User[]> {
   return usersWithEnsuredTargets as User[];
 }
 
-// Refactored updateUser function
+// Helper function to compare target data (excluding id, user_id, created_at, updated_at)
+function targetsAreEqual(t1: Target, t2: Target): boolean {
+  return (
+    t1.revenue_target === t2.revenue_target &&
+    t1.outbound_target === t2.outbound_target &&
+    t1.meetings_target === t2.meetings_target &&
+    t1.proposal_target === t2.proposal_target &&
+    // Normalize date strings for comparison, handle nulls
+    (t1.start_date || '') === (t2.start_date || '') &&
+    (t1.end_date || '') === (t2.end_date || '')
+  );
+}
+
+// Refactored updateUser function for historical tracking & detailed auditing
 async function updateUser(userId: string, updates: Partial<User>) {
-  console.log('[updateUser] Called with:', { userId, updates }); // Log entry
+  console.log('[updateUser HISTORICAL AUDIT V2] Called with:', { userId, updates });
+
+  // Get Current Admin User ID
+  const { data: { user: adminUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !adminUser) {
+    console.error("[updateUser HISTORICAL AUDIT V2] Error fetching admin user:", authError);
+    throw new Error("Could not identify the authenticated user performing the action.");
+  }
+  const adminUserId = adminUser.id;
+  console.log(`[updateUser HISTORICAL AUDIT V2] Action performed by admin user: ${adminUserId}`);
+
   let profileUpdates = { ...updates };
   let targetError: Error | null = null;
+  const now = new Date().toISOString();
 
-  // Handle targets update if present
   if (profileUpdates.targets) {
-    const submittedTargets = profileUpdates.targets;
-    console.log('[updateUser] Processing targets:', submittedTargets); // Log submitted targets
-    delete profileUpdates.targets; // Remove targets from profile updates
+    const submittedTargets: Target[] = profileUpdates.targets;
+    console.log('[updateUser HISTORICAL AUDIT V2] Processing targets:', submittedTargets);
+    delete profileUpdates.targets;
 
     try {
-      // 1. Fetch current target IDs for the user
-      console.log(`[updateUser] Fetching current targets for user: ${userId}`);
-      const { data: currentTargets, error: fetchError } = await supabase
-        .from('targets')
-        .select('id')
-        .eq('user_id', userId);
+      // 1. Fetch currently active targets (unchanged)
+      console.log(`[updateUser HISTORICAL AUDIT V2] Fetching active targets for user: ${userId}`);
+      const { data: activeDbTargets, error: fetchError } = await supabase
+      .from('targets')
+        .select('*')
+        .eq('user_id', userId)
+        .lte('start_date', now)
+        .or(`end_date.is.null,end_date.gt.${now}`);
 
       if (fetchError) {
-          console.error('[updateUser] Error fetching current targets:', fetchError);
-          throw fetchError;
+        console.error('[updateUser HISTORICAL AUDIT V2] Error fetching active targets:', fetchError);
+        throw fetchError;
       }
-      console.log('[updateUser] Current targets fetched:', currentTargets);
+      const activeTargetsMap = new Map(activeDbTargets?.map(t => [t.id, t]) || []);
+      console.log('[updateUser HISTORICAL AUDIT V2] Active DB targets fetched:', activeDbTargets);
 
-      const currentTargetIds = new Set(currentTargets?.map(t => t.id) || []);
-      console.log('[updateUser] Current target IDs:', currentTargetIds);
-
-      const submittedTargetIds = new Set(submittedTargets.filter(t => t.id && !t.id.startsWith('new_')).map(t => t.id));
-      console.log('[updateUser] Submitted target IDs (existing):', submittedTargetIds);
-
-
-      // 2. Identify targets to insert, update, delete
-      const targetsToInsert = submittedTargets
-          .filter(t => !t.id || t.id.startsWith('new_'))
-          .map(({ id, ...rest }) => ({ ...rest, user_id: userId })); // Add user_id, remove temp id
-      console.log('[updateUser] Targets to insert:', targetsToInsert);
-
-      const targetsToUpdate = submittedTargets
-          .filter(t => t.id && !t.id.startsWith('new_') && currentTargetIds.has(t.id))
-          .map(t => ({ ...t, user_id: userId })); // Ensure user_id
-      console.log('[updateUser] Targets to update:', targetsToUpdate);
-
-      const targetIdsToDelete = Array.from(currentTargetIds)
-          .filter(id => !submittedTargetIds.has(id));
-      console.log('[updateUser] Target IDs to delete:', targetIdsToDelete);
-
-
-      // 3. Perform database operations
       const operations = [];
+      const submittedTargetIds = new Set<string>();
 
-      if (targetsToInsert.length > 0) {
-        console.log('[updateUser] Pushing insert operation');
-        operations.push(supabase.from('targets').insert(targetsToInsert));
-      }
+      // 2. Process submitted targets
+      for (const submittedTarget of submittedTargets) {
+        if (!submittedTarget.id || submittedTarget.id.startsWith('new_')) {
+          // --- Target to INSERT (New) ---
+          console.log('[updateUser HISTORICAL AUDIT V2] Identifying INSERT:', submittedTarget);
+          const { id, ...insertData } = submittedTarget;
+          operations.push(
+            supabase.from('targets').insert({
+              ...insertData,
+              user_id: userId,
+              created_by: adminUserId // Set creator
+              // closed_by remains NULL
+            })
+          );
+        } else {
+          submittedTargetIds.add(submittedTarget.id);
+          const existingActiveTarget = activeTargetsMap.get(submittedTarget.id);
 
-      if (targetsToUpdate.length > 0) {
-          console.log('[updateUser] Pushing update operations');
-          for (const target of targetsToUpdate) {
-              const { id, ...updateData } = target;
-              console.log(`[updateUser] -- Updating target ID: ${id} with data:`, updateData);
-              operations.push(supabase.from('targets').update(updateData).eq('id', id));
+          if (existingActiveTarget) {
+            if (!targetsAreEqual(submittedTarget, existingActiveTarget)) {
+              console.log(`[updateUser HISTORICAL AUDIT V2 - LINKING] Identifying UPDATE for ID ${submittedTarget.id}: Closing old, Inserting new.`);
+              // --- Target to CLOSE (due to update) ---
+              operations.push(
+                supabase.from('targets').update({
+                  end_date: now,
+                  closed_by: adminUserId // Set closer
+                  // created_by is NOT changed
+                }).eq('id', submittedTarget.id)
+              );
+              // --- Target to INSERT (the updated version with link) ---
+              const { id, ...insertData } = submittedTarget;
+              operations.push(
+                supabase.from('targets').insert({
+                  ...insertData,
+                  user_id: userId,
+                  created_by: adminUserId,
+                  previous_target_id: existingActiveTarget.id
+                })
+              );
+            } else {
+              console.log(`[updateUser HISTORICAL AUDIT V2 - LINKING] Target ID ${submittedTarget.id} submitted but identical. No change.`);
+            }
+          } else {
+            console.warn(`[updateUser HISTORICAL AUDIT V2 - LINKING] Submitted target ID ${submittedTarget.id} not active. Ignoring.`);
           }
+        }
       }
 
-      if (targetIdsToDelete.length > 0) {
-        console.log('[updateUser] Pushing delete operation');
-        operations.push(supabase.from('targets').delete().in('id', targetIdsToDelete));
+      // 3. Process active targets not submitted (UI deletions)
+      for (const [id] of activeTargetsMap.entries()) {
+        if (!submittedTargetIds.has(id)) {
+          // --- Target to CLOSE (due to UI deletion) ---
+          console.log(`[updateUser HISTORICAL AUDIT V2] Identifying CLOSE for ID ${id} (deleted in UI).`);
+          operations.push(
+            supabase.from('targets').update({
+              end_date: now,
+              closed_by: adminUserId // Set closer
+              // created_by is NOT changed
+            }).eq('id', id)
+          );
+        }
       }
 
-      // Execute all operations
+      // 4. Execute all DB operations
       if (operations.length > 0) {
-        console.log('[updateUser] Executing DB operations...');
+        console.log('[updateUser HISTORICAL AUDIT V2] Executing DB operations...', operations.length);
         const results = await Promise.all(operations);
-        console.log('[updateUser] DB operations results:', results); // Log results
+        console.log('[updateUser HISTORICAL AUDIT V2] DB operations results:', results);
         results.forEach(result => {
           if (result.error) {
-            console.error('[updateUser] Target DB operation failed:', result.error);
-            // Collect the first error encountered
+            console.error('[updateUser HISTORICAL AUDIT V2] Target DB operation failed:', result.error);
             if (!targetError) targetError = result.error;
           }
         });
       } else {
-          console.log('[updateUser] No target DB operations to execute.');
+        console.log('[updateUser HISTORICAL AUDIT V2] No target DB operations needed.');
       }
 
-      if (targetError) throw targetError; // Throw if any target operation failed
-      console.log('[updateUser] Target operations successful.');
+    if (targetError) throw targetError;
+      console.log('[updateUser HISTORICAL AUDIT V2] Target operations successful.');
 
     } catch (error) {
-      console.error("[updateUser] Error processing targets:", error);
-      // Assign error to handle it after profile update attempt
+      console.error("[updateUser HISTORICAL AUDIT V2] Error processing targets:", error);
       targetError = error instanceof Error ? error : new Error(String(error));
     }
   } else {
-      console.log('[updateUser] No targets included in updates.');
+    console.log('[updateUser HISTORICAL AUDIT V2] No targets included in updates.');
   }
 
-  // Update other user data in 'profiles' table
+  // 5. Update profile data (remains the same)
   let profileError: Error | null = null;
   if (Object.keys(profileUpdates).length > 0) {
-    console.log('[updateUser] Updating profile with:', profileUpdates);
+    console.log('[updateUser HISTORICAL AUDIT V2] Updating profile with:', profileUpdates);
     try {
-        const { data: profileUpdateData, error } = await supabase
-          .from('profiles')
-          .update(profileUpdates)
-          .eq('id', userId)
-          .select(); // Add select() to potentially see what was updated or if RLS blocked it
-
-        console.log('[updateUser] Profile update result:', { profileUpdateData, error }); // Log profile update result
-        if (error) throw error;
+      const { data: profileUpdateData, error } = await supabase
+      .from('profiles')
+        .update(profileUpdates)
+        .eq('id', userId)
+        .select();
+      console.log('[updateUser HISTORICAL AUDIT V2] Profile update result:', { profileUpdateData, error });
+    if (error) throw error;
     } catch(error) {
-        console.error("[updateUser] Error updating profile:", error);
-        profileError = error instanceof Error ? error : new Error(String(error));
+      console.error("[updateUser HISTORICAL AUDIT V2] Error updating profile:", error);
+      profileError = error instanceof Error ? error : new Error(String(error));
     }
   } else {
-      console.log('[updateUser] No profile updates to apply.');
+    console.log('[updateUser HISTORICAL AUDIT V2] No profile updates to apply.');
   }
 
-  // Handle combined errors
+  // 6. Handle combined errors (remains the same)
   if (targetError || profileError) {
-      const errorMessage = [
-          targetError ? `Targets Error: ${targetError.message}` : null,
-          profileError ? `Profile Error: ${profileError.message}` : null
-      ].filter(Boolean).join('; ');
-      console.error(`[updateUser] Failing with combined error: ${errorMessage}`);
-      throw new Error(errorMessage || 'Update failed');
+    const errorMessage = [
+        targetError ? `Targets Error: ${targetError.message}` : null,
+        profileError ? `Profile Error: ${profileError.message}` : null
+    ].filter(Boolean).join('; ');
+    console.error(`[updateUser HISTORICAL AUDIT V2] Failing with combined error: ${errorMessage}`);
+    throw new Error(errorMessage || 'Update failed');
   }
 
-  console.log('[updateUser] Update process completed successfully.');
+  console.log('[updateUser HISTORICAL AUDIT V2] Update process completed successfully.');
 }
 
 async function impersonateUser(userId: string) {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
   // Check if current user is admin
@@ -318,7 +367,7 @@ export function useUsers() {
     { userId: string; updates: Partial<User> } // Variables type
   >({
     mutationFn: ({ userId, updates }) => updateUser(userId, updates),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Invalidate queries to refetch
       queryClient.invalidateQueries({ queryKey: ['users'] });
       // Maybe invalidate specific user query if you have one
