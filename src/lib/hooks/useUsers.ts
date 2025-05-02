@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, supabaseAdmin } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 // Define the Target structure accurately
 export interface Target {
@@ -17,6 +16,7 @@ export interface Target {
   updated_at?: string;
   created_by?: string | null; // Add creator field
   closed_by?: string | null;  // Add closer field
+  previous_target_id?: string | null; // Add previous link field
 }
 
 // Update User interface to use the Target array type
@@ -58,7 +58,8 @@ async function fetchUsers(): Promise<User[]> {
         created_at,
         updated_at,
         created_by,
-        closed_by
+        closed_by,
+        previous_target_id
       )
     `)
     .order('created_at', { ascending: false });
@@ -182,7 +183,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
       }
 
       // 3. Process active targets not submitted (UI deletions)
-      for (const [id, activeTarget] of activeTargetsMap.entries()) {
+      for (const [id] of activeTargetsMap.entries()) {
         if (!submittedTargetIds.has(id)) {
           // --- Target to CLOSE (due to UI deletion) ---
           console.log(`[updateUser HISTORICAL AUDIT V2] Identifying CLOSE for ID ${id} (deleted in UI).`);
@@ -256,7 +257,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
 }
 
 async function impersonateUser(userId: string) {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
   // Check if current user is admin
@@ -366,7 +367,7 @@ export function useUsers() {
     { userId: string; updates: Partial<User> } // Variables type
   >({
     mutationFn: ({ userId, updates }) => updateUser(userId, updates),
-    onSuccess: (_, variables) => {
+    onSuccess: (_) => {
       // Invalidate queries to refetch
       queryClient.invalidateQueries({ queryKey: ['users'] });
       // Maybe invalidate specific user query if you have one

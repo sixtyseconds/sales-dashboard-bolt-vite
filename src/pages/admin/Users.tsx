@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
@@ -6,9 +6,7 @@ import { toast } from 'sonner';
 import {
   Users as UsersIcon,
   Shield,
-  UserCog,
   ChevronDown,
-  ChevronUp,
   Search,
   Filter,
   Download,
@@ -20,7 +18,7 @@ import {
   Trash2,
   PlusCircle,
   History,
-  X
+  ChevronRight
 } from 'lucide-react';
 import { useUsers, User, Target as TargetType } from '@/lib/hooks/useUsers';
 import { cn } from '@/lib/utils';
@@ -37,7 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import { USER_STAGES } from '@/lib/hooks/useUser';
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import UserAvatar from '@/components/ui/UserAvatar';
 import Tooltip from '@/components/ui/Tooltip';
 
@@ -664,6 +662,115 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
   const [isLoadingProfiles, setIsLoadingProfiles] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
 
+  // --- State for Expanded Rows --- //
+  const [expandedChains, setExpandedChains] = useState<Set<string>>(new Set());
+
+  // --- Data Preparation for Expandable Table --- //
+  const { latestTargetsData, fullChainsData } = useMemo(() => {
+    if (!user.targets) return { latestTargetsData: [], fullChainsData: new Map() };
+
+    // 1. Apply Date Filters (Same as before)
+    const filterStart = filterStartDate ? new Date(`${filterStartDate}T00:00:00`) : null;
+    const filterEnd = filterEndDate ? new Date(`${filterEndDate}T23:59:59`) : null;
+    const isValidFilterStart = filterStart && isValid(filterStart);
+    const isValidFilterEnd = filterEnd && isValid(filterEnd);
+
+    const filteredTargets = user.targets.filter(target => {
+      const targetStart = target.start_date ? new Date(target.start_date) : null;
+      const targetEnd = target.end_date ? new Date(target.end_date) : null;
+      const isValidTargetStart = targetStart && isValid(targetStart);
+      if (!isValidTargetStart) return false;
+      const isValidTargetEnd = !targetEnd || isValid(targetEnd);
+      const startsBeforeFilterEnd = !isValidFilterEnd || (isValidTargetStart && targetStart <= filterEnd);
+      const endsAfterFilterStart = !isValidFilterStart || !isValidTargetEnd || targetEnd === null || (targetEnd >= filterStart);
+      return startsBeforeFilterEnd && endsAfterFilterStart;
+    });
+
+    if (filteredTargets.length === 0) return { latestTargetsData: [], fullChainsData: new Map() };
+
+    // 2. Group targets into chains
+    const targetMap = new Map<string, TargetType>(filteredTargets.filter(t => t.id).map(t => [t.id!, t]));
+    const chains = new Map<string, TargetType[]>(); // Map<rootId, chainTargets[]>
+    const processedIds = new Set<string>();
+
+    for (const target of filteredTargets) {
+      if (!target.id || processedIds.has(target.id)) continue;
+
+      // Trace back to find root
+      let current: TargetType | undefined = target;
+      let root: TargetType = target;
+      const visitedInTraceback = new Set<string>();
+      while (current?.previous_target_id && targetMap.has(current.previous_target_id)) {
+        if (visitedInTraceback.has(current.id!)) break; // Cycle detected
+        visitedInTraceback.add(current.id!);
+        current = targetMap.get(current.previous_target_id);
+        if (current) root = current;
+        else break;
+      }
+
+      if (processedIds.has(root.id!)) continue; // Root already part of another chain
+
+      // Collect full chain forward from root
+      const currentChain: TargetType[] = [];
+      let chainMember: TargetType | undefined = root;
+      const visitedInChainBuild = new Set<string>();
+      while (chainMember) {
+        if (!chainMember.id || visitedInChainBuild.has(chainMember.id)) break; // Cycle/missing ID
+        visitedInChainBuild.add(chainMember.id);
+        processedIds.add(chainMember.id);
+        currentChain.push(chainMember);
+        // Find next (target whose previous_target_id is current id)
+        chainMember = filteredTargets.find(t => t.previous_target_id === chainMember?.id);
+      }
+
+      // Sort chain by start date ascending for internal consistency
+      currentChain.sort((a, b) =>
+        (a.start_date ? new Date(a.start_date).getTime() : 0) - (b.start_date ? new Date(b.start_date).getTime() : 0)
+      );
+      chains.set(root.id!, currentChain);
+    }
+
+    // 3. Prepare data for rendering
+    const latestTargetsData: (TargetType & { rootId: string; hasHistory: boolean })[] = [];
+    const fullChainsData = new Map<string, TargetType[]>(chains); // Keep the full chains
+
+    chains.forEach((chain, rootId) => {
+        if (chain.length > 0) {
+            // The last element in the date-sorted chain is the latest
+            const latestTarget = chain[chain.length - 1];
+            latestTargetsData.push({
+                ...latestTarget,
+                rootId: rootId,
+                hasHistory: chain.length > 1,
+            });
+        }
+    });
+
+    // 4. Sort the latest targets array by start_date descending
+    latestTargetsData.sort((a, b) => {
+        const dateA = a.start_date ? new Date(a.start_date).getTime() : 0;
+        const dateB = b.start_date ? new Date(b.start_date).getTime() : 0;
+        return dateB - dateA; // Descending order
+    });
+
+    console.log("[TargetHistoryModal] Processed data for table:", { latestTargetsData, fullChainsData });
+    return { latestTargetsData, fullChainsData };
+
+  }, [user.targets, filterStartDate, filterEndDate]);
+
+  // Toggle expand state for a chain
+  const toggleExpand = (rootId: string) => {
+    setExpandedChains(current => {
+        const newSet = new Set(current);
+        if (newSet.has(rootId)) {
+            newSet.delete(rootId);
+        } else {
+            newSet.add(rootId);
+        }
+        return newSet;
+    });
+  };
+
   // Effect to fetch profiles based on target history user IDs
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -840,7 +947,7 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-gray-900/95 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6 w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+        <div className="flex flex-col justify-between items-start sm:items-center mb-4 xl:mb-8 gap-4 xl:gap-8">
           <h2 className="text-xl font-bold text-white">
             Target History for {user.first_name} {user.last_name}
           </h2>
@@ -882,19 +989,20 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                 <Download className="w-4 h-4" />
                 <span>Export</span>
             </button>
-            <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-700">
+            {/* <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-700">
                  <X className="w-5 h-5" />
-            </button>
+            </button> */}
           </div>
         </div>
 
         <div className="overflow-y-auto flex-grow">
-          {filteredSortedTargets.length === 0 ? (
+          {latestTargetsData.length === 0 ? (
             <p className="text-gray-400 text-center py-10">No target history matches the selected filters.</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-800/50 text-left text-xs font-medium text-gray-400">
+                  <th className="px-1 py-2 w-10"></th>
                   <th className="px-4 py-2">Revenue</th>
                   <th className="px-4 py-2">Outbound</th>
                   <th className="px-4 py-2">Meetings</th>
@@ -906,46 +1014,102 @@ function TargetHistoryModal({ user, onClose }: TargetHistoryModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {filteredSortedTargets.map((target, index) => {
-                  const isActive = isTargetCurrentlyActive(target);
-                  console.log(`[TargetHistoryModal] Rendering row ${index}, target ID: ${target.id}, created_by: ${target.created_by}, closed_by: ${target.closed_by}`);
+                {latestTargetsData.map((latestTarget, index) => {
+                  const isExpanded = expandedChains.has(latestTarget.rootId);
+                  const isActive = isTargetCurrentlyActive(latestTarget);
+
+                  // Determine alternating background color for expanded state
+                  const expandedBgColor = index % 2 === 0 ? 'bg-blue-950/50' : 'bg-teal-950/50';
+                  const expandedBorderColor = index % 2 === 0 ? 'border-blue-900/60' : 'border-teal-900/60';
+
+                  // Get historical targets for this chain if expanded
+                  const chainHistory = fullChainsData.get(latestTarget.rootId) as TargetType[] | undefined;
+                  const historicalTargets = isExpanded && chainHistory
+                    ? chainHistory
+                        .filter((t) => t.id !== latestTarget.id)
+                        .sort((a, b) => (
+                            (b.start_date ? new Date(b.start_date).getTime() : 0) -
+                            (a.start_date ? new Date(a.start_date).getTime() : 0)
+                        ))
+                    : [];
+
                   return (
-                    <tr key={target.id || `history-${index}`} className="border-b border-gray-800/50">
-                      {/* Target Value Cells */}
-                      <td className="px-4 py-2 text-white">{target.revenue_target?.toLocaleString() ?? '-'}</td>
-                      <td className="px-4 py-2 text-white">{target.outbound_target ?? '-'}</td>
-                      <td className="px-4 py-2 text-white">{target.meetings_target ?? '-'}</td>
-                      <td className="px-4 py-2 text-white">{target.proposal_target ?? '-'}</td>
-                      {/* Date Cells */}
-                      <td className="px-4 py-2 text-white">{target.start_date ? format(new Date(target.start_date), 'yyyy-MM-dd') : '-'}</td>
-                      <td className="px-4 py-2">
-                        {/* End Date Badge */}
-                        <span className={cn(
-                          "px-2 py-0.5 rounded text-xs font-medium",
-                          isActive
-                            ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/50"
-                            : target.end_date ? "bg-red-600/20 text-red-200 border border-red-500/50" : "text-gray-500"
-                        )}>
-                          {target.end_date ? format(new Date(target.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : 'No End Date')}
-                        </span>
-                      </td>
-                      {/* Created By Cell - Remove flex */}
-                      <td className="px-4 py-2">
-                         <UserAvatarBadge
-                            userId={target.created_by}
-                            profileMap={profileMap}
-                            isLoading={isLoadingProfiles}
-                         />
-                      </td>
-                      {/* Closed By Cell - Remove flex */}
-                      <td className="px-4 py-2">
-                         <UserAvatarBadge
-                            userId={target.closed_by}
-                            profileMap={profileMap}
-                            isLoading={isLoadingProfiles}
-                         />
-                      </td>
-                    </tr>
+                    <Fragment key={latestTarget.rootId}>
+                      {/* Main Row (Latest Target) - Apply alternating background if expanded */}
+                      <tr className={cn(
+                        "border-b", // Keep base border style?
+                        isExpanded ? `${expandedBgColor} ${expandedBorderColor}` : "border-gray-800/50 hover:bg-gray-800/10"
+                      )}>
+                        {/* Expand/Collapse Cell */}
+                        <td className="px-1 py-2 text-center">
+                          {latestTarget.hasHistory && (
+                            <button
+                              onClick={() => toggleExpand(latestTarget.rootId)}
+                              className="p-1 rounded text-gray-400 hover:bg-gray-700 hover:text-white"
+                            >
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                            </button>
+                          )}
+                        </td>
+                        {/* Data Cells for Latest Target */}
+                        <td className="px-4 py-2 text-white">{latestTarget.revenue_target?.toLocaleString() ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.outbound_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.meetings_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.proposal_target ?? '-'}</td>
+                        <td className="px-4 py-2 text-white">{latestTarget.start_date ? format(new Date(latestTarget.start_date), 'yyyy-MM-dd') : '-'}</td>
+                        <td className="px-4 py-2">
+                          <span className={cn(
+                            "px-2 py-0.5 rounded text-xs font-medium",
+                            isActive
+                              ? "bg-emerald-600/30 text-emerald-200 border border-emerald-500/50"
+                              : latestTarget.end_date ? "bg-red-600/20 text-red-200 border border-red-500/50" : "text-gray-500"
+                          )}>
+                            {latestTarget.end_date ? format(new Date(latestTarget.end_date), 'yyyy-MM-dd') : (isActive ? 'Active' : 'No End Date')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <UserAvatarBadge userId={latestTarget.created_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                        </td>
+                        <td className="px-4 py-2">
+                          <UserAvatarBadge userId={latestTarget.closed_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                        </td>
+                      </tr>
+
+                      {/* Historical Rows (Rendered if expanded) - Apply same alternating background */}
+                      {isExpanded && historicalTargets && historicalTargets.map((historyTarget, histIndex) => {
+                         const isHistoryActive = isTargetCurrentlyActive(historyTarget);
+                         return (
+                            <tr
+                              key={historyTarget.id || `hist-${histIndex}`}
+                              // Apply the determined expanded background and border
+                              className={`${expandedBgColor} border-b ${expandedBorderColor}`}
+                            >
+                                <td className="px-1 py-2 text-center">{/* Empty or indent marker? */}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.revenue_target?.toLocaleString() ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.outbound_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.meetings_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.proposal_target ?? '-'}</td>
+                                <td className="px-4 py-2 text-gray-300">{historyTarget.start_date ? format(new Date(historyTarget.start_date), 'yyyy-MM-dd') : '-'}</td>
+                                <td className="px-4 py-2">
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded text-xs font-medium",
+                                    isHistoryActive
+                                      ? "bg-emerald-700/30 text-emerald-300 border border-emerald-600/50"
+                                      : historyTarget.end_date ? "bg-red-700/20 text-red-300 border border-red-600/50" : "text-gray-500"
+                                  )}>
+                                    {historyTarget.end_date ? format(new Date(historyTarget.end_date), 'yyyy-MM-dd') : (isHistoryActive ? 'Active' : 'No End Date')}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <UserAvatarBadge userId={historyTarget.created_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                                </td>
+                                <td className="px-4 py-2">
+                                  <UserAvatarBadge userId={historyTarget.closed_by} profileMap={profileMap} isLoading={isLoadingProfiles} />
+                                </td>
+                            </tr>
+                         );
+                      })}
+                    </Fragment>
                   );
                 })}
               </tbody>
