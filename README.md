@@ -10,7 +10,6 @@ A modern sales performance tracking and analytics platform built with React, Vit
 - Performance analytics
 - Team management
 - User authentication and authorization
-- Test comment 
 
 ## Tech Stack
 
