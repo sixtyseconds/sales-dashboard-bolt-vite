@@ -153,7 +153,7 @@ async function updateUser(userId: string, updates: Partial<User>) {
 
           if (existingActiveTarget) {
             if (!targetsAreEqual(submittedTarget, existingActiveTarget)) {
-              console.log(`[updateUser HISTORICAL AUDIT V2] Identifying UPDATE for ID ${submittedTarget.id}: Closing old, Inserting new.`);
+              console.log(`[updateUser HISTORICAL AUDIT V2 - LINKING] Identifying UPDATE for ID ${submittedTarget.id}: Closing old, Inserting new.`);
               // --- Target to CLOSE (due to update) ---
               operations.push(
                 supabase.from('targets').update({
@@ -162,21 +162,21 @@ async function updateUser(userId: string, updates: Partial<User>) {
                   // created_by is NOT changed
                 }).eq('id', submittedTarget.id)
               );
-              // --- Target to INSERT (the updated version) ---
+              // --- Target to INSERT (the updated version with link) ---
               const { id, ...insertData } = submittedTarget;
               operations.push(
                 supabase.from('targets').insert({
                   ...insertData,
-        user_id: userId,
-                  created_by: adminUserId // Set creator for the new version
-                  // closed_by remains NULL for the new version
+                  user_id: userId,
+                  created_by: adminUserId,
+                  previous_target_id: existingActiveTarget.id
                 })
               );
             } else {
-              console.log(`[updateUser HISTORICAL AUDIT V2] Target ID ${submittedTarget.id} submitted but identical. No change.`);
+              console.log(`[updateUser HISTORICAL AUDIT V2 - LINKING] Target ID ${submittedTarget.id} submitted but identical. No change.`);
             }
           } else {
-            console.warn(`[updateUser HISTORICAL AUDIT V2] Submitted target ID ${submittedTarget.id} not active. Ignoring.`);
+            console.warn(`[updateUser HISTORICAL AUDIT V2 - LINKING] Submitted target ID ${submittedTarget.id} not active. Ignoring.`);
           }
         }
       }
