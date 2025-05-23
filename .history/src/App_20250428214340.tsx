@@ -16,7 +16,6 @@ import ForgotPassword from '@/pages/auth/forgot-password';
 import ResetPassword from '@/pages/auth/reset-password';
 import { PipelinePage } from '@/pages/PipelinePage';
 import ActivityProcessingPage from '@/pages/ActivityProcessingPage';
-import ClientTrackingPage from '@/pages/ClientTrackingPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,7 +52,6 @@ function App() {
           <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
           <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
           <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
-          <Route path="/clients" element={<AppLayout><ClientTrackingPage /></AppLayout>} />
         </Routes>
         <Toaster />
         <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(74,74,117,0.15),transparent)] pointer-events-none" />

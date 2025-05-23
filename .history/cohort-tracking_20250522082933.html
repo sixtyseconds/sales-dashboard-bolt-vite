@@ -1,0 +1,667 @@
+<html><head>
+    <meta charset="utf-8"/>
+    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+    <link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter%3Awght%40400%3B500%3B700%3B900&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+    <title>Stitch Design</title>
+    <link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+    <body>
+    <div class="relative flex size-full min-h-screen flex-col bg-[#121416] dark group/design-root overflow-x-hidden" style='font-family: Inter, "Noto Sans", sans-serif;'>
+    <div class="layout-container flex h-full grow flex-col">
+    <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#2C3035] px-6 md:px-10 py-3">
+    <div class="flex items-center gap-6 md:gap-8">
+    <div class="flex items-center gap-3 text-white">
+    <div class="size-6 text-[#dce7f3]">
+    <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <path d="M36.7273 44C33.9891 44 31.6043 39.8386 30.3636 33.69C29.123 39.8386 26.7382 44 24 44C21.2618 44 18.877 39.8386 17.6364 33.69C16.3957 39.8386 14.0109 44 11.2727 44C7.25611 44 4 35.0457 4 24C4 12.9543 7.25611 4 11.2727 4C14.0109 4 16.3957 8.16144 17.6364 14.31C18.877 8.16144 21.2618 4 24 4C26.7382 4 29.123 8.16144 30.3636 14.31C31.6043 8.16144 33.9891 4 36.7273 4C40.7439 4 44 12.9543 44 24C44 35.0457 40.7439 44 36.7273 44Z" fill="currentColor"></path>
+    </svg>
+    </div>
+    <h2 class="text-white text-xl font-bold leading-tight tracking-[-0.015em]">SalesTracker</h2>
+    </div>
+    <nav class="hidden md:flex items-center gap-6 lg:gap-8">
+    <a class="text-[#dce7f3] text-sm font-medium leading-normal hover:text-white transition-colors" href="#">Dashboard</a>
+    <a class="text-white text-sm font-bold leading-normal border-b-2 border-[#dce7f3] pb-1" href="#">Clients</a>
+    <a class="text-[#dce7f3] text-sm font-medium leading-normal hover:text-white transition-colors" href="#">Reports</a>
+    <a class="text-[#dce7f3] text-sm font-medium leading-normal hover:text-white transition-colors" href="#">Settings</a>
+    </nav>
+    </div>
+    <div class="flex flex-1 justify-end items-center gap-4 md:gap-6">
+    <label class="flex flex-col min-w-40 !h-10 max-w-64">
+    <div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+    <div class="text-[#A2ABB3] flex border-none bg-[#2C3035] items-center justify-center pl-3 rounded-l-lg border-r-0">
+    <span class="material-icons text-base">search</span>
+    </div>
+    <input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-white focus:outline-0 focus:ring-0 border-none bg-[#2C3035] focus:border-none h-full placeholder:text-[#A2ABB3] px-3 rounded-l-none border-l-0 pl-2 text-sm font-normal leading-normal" placeholder="Search clients..." value=""/>
+    </div>
+    </label>
+    <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-[#dce7f3]" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDiK_sYMiyHM-mdIwM5FZkjlvxtwB-PtSpaeZw1JOrXTNGcAapjDp1Kn485W8yfKPXz47PTomRl9ZGuOfSfcWPdwUFHuGojjJD1CiZrIPuAl-iNWaDc4fdw5thNqOhPrcZLYfxaSgj_45p__KHGznx4_3Y5oghy0Zmcq4--nZGYhNvQdxIj8UVSOHCzeBxq_Efsp9OE7xlX4-21DhhMGFX9ciNwLy0wATLrjD_NSzEWn9mY4fuLOnuAyYeolvbX7ixyMBKvInGvLwj0");'></div>
+    <button class="md:hidden text-white">
+    <span class="material-icons">menu</span>
+    </button>
+    </div>
+    </header>
+    <main class="px-6 md:px-10 lg:px-12 xl:px-20 flex flex-1 justify-center py-8">
+    <div class="layout-content-container flex flex-col w-full max-w-screen-2xl">
+    <div class="flex flex-wrap justify-between items-center gap-4 p-4 mb-6">
+    <div class="flex flex-col gap-1">
+    <h1 class="text-white tracking-tight text-3xl md:text-4xl font-bold leading-tight">Client Tracking &amp; Retention</h1>
+    <p class="text-[#A2ABB3] text-sm md:text-base font-normal leading-normal">Monitor client health, forecast billings, and analyze churn.</p>
+    </div>
+    </div>
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 px-4">
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <p class="text-sm text-[#A2ABB3] mb-1">Total Active Clients</p>
+    <p class="text-3xl font-bold text-white">345</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <p class="text-sm text-[#A2ABB3] mb-1">Monthly Recurring Revenue</p>
+    <p class="text-3xl font-bold text-white">$215,780</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <p class="text-sm text-[#A2ABB3] mb-1">Monthly Churn Rate</p>
+    <p class="text-3xl font-bold text-red-400">2.5%</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <p class="text-sm text-[#A2ABB3] mb-1">Clients Signed This Month</p>
+    <p class="text-3xl font-bold text-green-400">28</p>
+    </div>
+    </section>
+    <section class="mb-8">
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">Client Lifecycle Stages</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 p-4">
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <h3 class="text-blue-400 text-lg font-semibold mb-1">Onboarding</h3>
+    <p class="text-2xl font-bold text-white">32 Clients</p>
+    <p class="text-sm text-[#A2ABB3]">$48,500 MRR</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <h3 class="text-green-400 text-lg font-semibold mb-1">Active</h3>
+    <p class="text-2xl font-bold text-white">285 Clients</p>
+    <p class="text-sm text-[#A2ABB3]">$155,280 MRR</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <h3 class="text-yellow-400 text-lg font-semibold mb-1">Given Notice</h3>
+    <p class="text-2xl font-bold text-white">18 Clients</p>
+    <p class="text-sm text-[#A2ABB3]">$10,500 MRR</p>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-5 shadow-lg">
+    <h3 class="text-red-400 text-lg font-semibold mb-1">Cancelled</h3>
+    <p class="text-2xl font-bold text-white">10 Clients</p>
+    <p class="text-sm text-[#A2ABB3]">$1,500 Lost MRR</p>
+    </div>
+    </div>
+    </section>
+    <section class="mb-8">
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">Revenue Trend (Last 12 Months)</h2>
+    <div class="p-4 bg-[#1E2022] border border-[#2C3035] rounded-xl shadow-lg">
+    <canvas class="max-h-96" id="revenueTrendChart"></canvas>
+    </div>
+    </section>
+    <section class="mb-8">
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">Revenue Breakdown</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-6 shadow-lg">
+    <h3 class="text-white text-lg font-semibold mb-1">One-Off vs. Subscription</h3>
+    <p class="text-sm text-[#A2ABB3] mb-4">Proportion of revenue types.</p>
+    <canvas class="max-h-64" id="revenueTypeBreakdownChart"></canvas>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-6 shadow-lg">
+    <h3 class="text-white text-lg font-semibold mb-1">Subscription Breakdown</h3>
+    <p class="text-sm text-[#A2ABB3] mb-4">Distribution across subscription tiers.</p>
+    <canvas class="max-h-64" id="subscriptionTierBreakdownChart"></canvas>
+    </div>
+    </div>
+    </section>
+    <section class="mb-8">
+    <div class="flex justify-between items-center px-4 pb-3 pt-2">
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em]">Client Views</h2>
+    <div class="flex items-center gap-2">
+    <button class="flex items-center justify-center gap-1 rounded-md h-9 px-3 bg-blue-600 text-white text-sm font-medium transition-colors" id="tableViewBtn">
+    <span class="material-icons text-base">table_rows</span>
+    <span>Table</span>
+    </button>
+    <button class="flex items-center justify-center gap-1 rounded-md h-9 px-3 bg-[#2C3035] hover:bg-[#383c42] text-[#dce7f3] text-sm font-medium transition-colors" id="kanbanViewBtn">
+    <span class="material-icons text-base">view_kanban</span>
+    <span>Kanban</span>
+    </button>
+    </div>
+    </div>
+    <div class="p-4" id="clientTableView">
+    <div class="flex flex-wrap gap-4 mb-6">
+    <div class="flex-1 min-w-[200px]">
+    <label class="block text-sm font-medium text-[#A2ABB3] mb-1" for="filter-status-table">Status</label>
+    <select class="block w-full bg-[#1E2022] border border-[#2C3035] text-white rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 text-sm" id="filter-status-table" name="filter-status-table">
+    <option selected="">All Statuses</option>
+    <option value="onboarding">Onboarding</option>
+    <option value="active">Active</option>
+    <option value="notice">Notice Given</option>
+    <option value="cancelled">Cancelled</option>
+    </select>
+    </div>
+    <div class="flex-1 min-w-[200px]">
+    <label class="block text-sm font-medium text-[#A2ABB3] mb-1" for="filter-revenue-table">Revenue Type</label>
+    <select class="block w-full bg-[#1E2022] border border-[#2C3035] text-white rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 text-sm" id="filter-revenue-table" name="filter-revenue-table">
+    <option selected="">All Types</option>
+    <option value="subscription">Subscription</option>
+    <option value="one-off">One-Off Project</option>
+    </select>
+    </div>
+    <div class="flex-1 min-w-[200px]">
+    <label class="block text-sm font-medium text-[#A2ABB3] mb-1" for="sort-by-table">Sort By</label>
+    <select class="block w-full bg-[#1E2022] border border-[#2C3035] text-white rounded-lg p-2.5 focus:ring-blue-500 focus:border-blue-500 text-sm" id="sort-by-table" name="sort-by-table">
+    <option value="name">Client Name</option>
+    <option selected="" value="value">Contract Value</option>
+    <option value="renewal">Renewal Date</option>
+    </select>
+    </div>
+    </div>
+    <div class="overflow-x-auto bg-[#1E2022] border border-[#2C3035] rounded-xl shadow-lg">
+    <table class="w-full min-w-[800px] text-sm text-left text-[#A2ABB3]">
+    <thead class="text-xs text-[#dce7f3] uppercase bg-[#2C3035]/50">
+    <tr>
+    <th class="px-6 py-3 rounded-tl-lg" scope="col">Client Name</th>
+    <th class="px-6 py-3" scope="col">Status</th>
+    <th class="px-6 py-3" scope="col">Contract Value</th>
+    <th class="px-6 py-3" scope="col">MRR</th>
+    <th class="px-6 py-3" scope="col">Renewal Date</th>
+    <th class="px-6 py-3 rounded-tr-lg" scope="col">Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="border-b border-[#2C3035] hover:bg-[#2C3035]/30">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Tech Solutions Inc.</td>
+    <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-600/30 text-blue-300 border border-blue-500/40">Onboarding</span></td>
+    <td class="px-6 py-4 text-white">$75,000</td>
+    <td class="px-6 py-4 text-white">$6,250</td>
+    <td class="px-6 py-4 text-white">Dec 15, 2024</td>
+    <td class="px-6 py-4">
+    <button class="text-[#A2ABB3] hover:text-white"><span class="material-icons text-base">visibility</span></button>
+    <button class="text-[#A2ABB3] hover:text-white ml-2"><span class="material-icons text-base">edit</span></button>
+    </td>
+    </tr>
+    <tr class="border-b border-[#2C3035] hover:bg-[#2C3035]/30">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Innovate Systems</td>
+    <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-600/30 text-green-300 border border-green-500/40">Active</span></td>
+    <td class="px-6 py-4 text-white">$120,000</td>
+    <td class="px-6 py-4 text-white">$10,000</td>
+    <td class="px-6 py-4 text-white">Mar 22, 2025</td>
+    <td class="px-6 py-4">
+    <button class="text-[#A2ABB3] hover:text-white"><span class="material-icons text-base">visibility</span></button>
+    <button class="text-[#A2ABB3] hover:text-white ml-2"><span class="material-icons text-base">edit</span></button>
+    </td>
+    </tr>
+    <tr class="border-b border-[#2C3035] hover:bg-[#2C3035]/30">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Global Dynamics</td>
+    <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-600/30 text-yellow-300 border border-yellow-500/40">Notice Given</span></td>
+    <td class="px-6 py-4 text-white">$50,000</td>
+    <td class="px-6 py-4 text-white">$4,167</td>
+    <td class="px-6 py-4 text-white">Oct 01, 2024</td>
+    <td class="px-6 py-4">
+    <button class="text-[#A2ABB3] hover:text-white"><span class="material-icons text-base">visibility</span></button>
+    <button class="text-[#A2ABB3] hover:text-white ml-2"><span class="material-icons text-base">edit</span></button>
+    </td>
+    </tr>
+    <tr class="hover:bg-[#2C3035]/30">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap rounded-bl-lg">Quantum Leap Corp</td>
+    <td class="px-6 py-4"><span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-600/30 text-red-300 border border-red-500/40">Cancelled</span></td>
+    <td class="px-6 py-4 text-white">$90,000</td>
+    <td class="px-6 py-4 text-white">-</td>
+    <td class="px-6 py-4 text-white">Aug 10, 2024 (Cancelled)</td>
+    <td class="px-6 py-4 rounded-br-lg">
+    <button class="text-[#A2ABB3] hover:text-white"><span class="material-icons text-base">visibility</span></button>
+    <button class="text-[#A2ABB3] hover:text-white ml-2"><span class="material-icons text-base">edit</span></button>
+    </td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    </div>
+    <div class="hidden p-4" id="clientKanbanView">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-4">
+    <h3 class="text-blue-400 text-lg font-semibold mb-3 flex items-center justify-between">
+                        Onboarding <span class="text-sm text-[#A2ABB3]">3 Clients</span>
+    </h3>
+    <div class="space-y-3">
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Alpha</p>
+    <p class="text-xs text-[#A2ABB3]">$5,000 MRR</p>
+    </div>
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Beta</p>
+    <p class="text-xs text-[#A2ABB3]">$2,500 MRR</p>
+    </div>
+    </div>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-4">
+    <h3 class="text-green-400 text-lg font-semibold mb-3 flex items-center justify-between">
+                        Active <span class="text-sm text-[#A2ABB3]">5 Clients</span>
+    </h3>
+    <div class="space-y-3">
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Gamma</p>
+    <p class="text-xs text-[#A2ABB3]">$10,000 MRR</p>
+    </div>
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Delta</p>
+    <p class="text-xs text-[#A2ABB3]">$7,200 MRR</p>
+    </div>
+    </div>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-4">
+    <h3 class="text-yellow-400 text-lg font-semibold mb-3 flex items-center justify-between">
+                        Notice Given <span class="text-sm text-[#A2ABB3]">2 Clients</span>
+    </h3>
+    <div class="space-y-3">
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Epsilon</p>
+    <p class="text-xs text-[#A2ABB3]">$3,000 MRR</p>
+    </div>
+    </div>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-4">
+    <h3 class="text-red-400 text-lg font-semibold mb-3 flex items-center justify-between">
+                        Cancelled <span class="text-sm text-[#A2ABB3]">1 Client</span>
+    </h3>
+    <div class="space-y-3">
+    <div class="bg-[#2C3035] p-3 rounded-lg shadow">
+    <p class="text-white font-medium">Client Zeta</p>
+    <p class="text-xs text-[#A2ABB3]">Lost $1,500 MRR</p>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </section>
+    <section class="mb-8">
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">Retained Billings Forecast</h2>
+    <div class="p-4 bg-[#1E2022] border border-[#2C3035] rounded-xl shadow-lg">
+    <canvas class="max-h-96" id="retainedBillingsChart"></canvas>
+    </div>
+    </section>
+    <section>
+    <h2 class="text-white text-xl md:text-2xl font-semibold leading-tight tracking-[-0.015em] px-4 pb-3 pt-2">Churn Analysis</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-4">
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-6 shadow-lg">
+    <h3 class="text-white text-lg font-semibold mb-1">Churn Rate Trend</h3>
+    <p class="text-sm text-[#A2ABB3] mb-4">Monthly churn over the last 6 months.</p>
+    <canvas class="max-h-64" id="churnRateTrendChart"></canvas>
+    </div>
+    <div class="bg-[#1E2022] border border-[#2C3035] rounded-xl p-6 shadow-lg">
+    <h3 class="text-white text-lg font-semibold mb-1">Reasons for Cancellation</h3>
+    <p class="text-sm text-[#A2ABB3] mb-4">Breakdown of churn reasons.</p>
+    <canvas class="max-h-64" id="churnReasonsChart"></canvas>
+    </div>
+    </div>
+    <div class="p-4 mt-6">
+    <h3 class="text-white text-lg font-semibold mb-1 px-4">Cohort Analysis</h3>
+    <p class="text-sm text-[#A2ABB3] mb-4 px-4">Customer retention by monthly cohort.</p>
+    <div class="overflow-x-auto bg-[#1E2022] border border-[#2C3035] rounded-xl shadow-lg p-4">
+    <table class="w-full min-w-[600px] text-sm text-left text-[#A2ABB3]">
+    <thead class="text-xs text-[#dce7f3] uppercase bg-[#2C3035]/50">
+    <tr>
+    <th class="px-6 py-3 rounded-tl-lg" scope="col">Cohort (Signup Month)</th>
+    <th class="px-6 py-3" scope="col">M1</th>
+    <th class="px-6 py-3" scope="col">M2</th>
+    <th class="px-6 py-3" scope="col">M3</th>
+    <th class="px-6 py-3" scope="col">M4</th>
+    <th class="px-6 py-3" scope="col">M5</th>
+    <th class="px-6 py-3 rounded-tr-lg" scope="col">M6</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="border-b border-[#2C3035]">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Jan 2024 (100 users)</td>
+    <td class="px-6 py-4 bg-green-700/20 text-green-300">95%</td>
+    <td class="px-6 py-4 bg-green-700/30 text-green-200">90%</td>
+    <td class="px-6 py-4 bg-green-600/30 text-green-300">88%</td>
+    <td class="px-6 py-4 bg-yellow-600/30 text-yellow-300">85%</td>
+    <td class="px-6 py-4 bg-yellow-700/30 text-yellow-200">82%</td>
+    <td class="px-6 py-4 bg-red-700/30 text-red-300">80%</td>
+    </tr>
+    <tr class="border-b border-[#2C3035]">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Feb 2024 (120 users)</td>
+    <td class="px-6 py-4 bg-green-700/20 text-green-300">98%</td>
+    <td class="px-6 py-4 bg-green-700/30 text-green-200">94%</td>
+    <td class="px-6 py-4 bg-green-600/30 text-green-300">91%</td>
+    <td class="px-6 py-4 bg-yellow-600/30 text-yellow-300">89%</td>
+    <td class="px-6 py-4 bg-yellow-700/30 text-yellow-200">87%</td>
+    <td class="px-6 py-4">-</td>
+    </tr>
+    <tr class="border-b border-[#2C3035]">
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">Mar 2024 (90 users)</td>
+    <td class="px-6 py-4 bg-green-700/20 text-green-300">92%</td>
+    <td class="px-6 py-4 bg-green-700/30 text-green-200">88%</td>
+    <td class="px-6 py-4 bg-yellow-600/30 text-yellow-300">85%</td>
+    <td class="px-6 py-4 bg-yellow-700/30 text-yellow-200">83%</td>
+    <td class="px-6 py-4">-</td>
+    <td class="px-6 py-4">-</td>
+    </tr>
+    <tr>
+    <td class="px-6 py-4 font-medium text-white whitespace-nowrap rounded-bl-lg">Apr 2024 (150 users)</td>
+    <td class="px-6 py-4 bg-green-700/20 text-green-300">96%</td>
+    <td class="px-6 py-4 bg-green-700/30 text-green-200">93%</td>
+    <td class="px-6 py-4 bg-green-600/30 text-green-300">90%</td>
+    <td class="px-6 py-4">-</td>
+    <td class="px-6 py-4">-</td>
+    <td class="px-6 py-4 rounded-br-lg">-</td>
+    </tr>
+    </tbody>
+    </table>
+    </div>
+    </div>
+    </section>
+    </div>
+    </main>
+    </div>
+    </div>
+    <script>
+        Chart.defaults.color = '#A2ABB3';
+        Chart.defaults.borderColor = '#2C3035';
+        // View Toggle Logic
+        const tableViewBtn = document.getElementById('tableViewBtn');
+        const kanbanViewBtn = document.getElementById('kanbanViewBtn');
+        const clientTableView = document.getElementById('clientTableView');
+        const clientKanbanView = document.getElementById('clientKanbanView');
+        if (tableViewBtn && kanbanViewBtn && clientTableView && clientKanbanView) {
+          tableViewBtn.addEventListener('click', () => {
+            clientTableView.classList.remove('hidden');
+            clientKanbanView.classList.add('hidden');
+            tableViewBtn.classList.remove('bg-[#2C3035]', 'hover:bg-[#383c42]', 'text-[#dce7f3]');
+            tableViewBtn.classList.add('bg-blue-600', 'text-white');
+            kanbanViewBtn.classList.remove('bg-blue-600', 'text-white');
+            kanbanViewBtn.classList.add('bg-[#2C3035]', 'hover:bg-[#383c42]', 'text-[#dce7f3]');
+          });
+          kanbanViewBtn.addEventListener('click', () => {
+            clientTableView.classList.add('hidden');
+            clientKanbanView.classList.remove('hidden');
+            kanbanViewBtn.classList.remove('bg-[#2C3035]', 'hover:bg-[#383c42]', 'text-[#dce7f3]');
+            kanbanViewBtn.classList.add('bg-blue-600', 'text-white');
+            tableViewBtn.classList.remove('bg-blue-600', 'text-white');
+            tableViewBtn.classList.add('bg-[#2C3035]', 'hover:bg-[#383c42]', 'text-[#dce7f3]');
+          });
+        }
+        const revenueTrendCtx = document.getElementById('revenueTrendChart');
+        if (revenueTrendCtx) {
+          new Chart(revenueTrendCtx, {
+            type: 'line',
+            data: {
+              labels: ['Aug \'23', 'Sep \'23', 'Oct \'23', 'Nov \'23', 'Dec \'23', 'Jan \'24', 'Feb \'24', 'Mar \'24', 'Apr \'24', 'May \'24', 'Jun \'24', 'Jul \'24'],
+              datasets: [{
+                label: 'Total Revenue',
+                data: [180000, 185000, 190000, 195000, 200000, 205000, 210000, 212000, 215000, 218000, 220000, 215780],
+                borderColor: '#10B981', // emerald-500
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#10B981',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#10B981'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: false,
+                  ticks: {
+                    callback: function(value) {
+                      return '$' + value / 1000 + 'k';
+                    }
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: 'top',
+                  labels: {
+                    color: '#dce7f3'
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+        const revenueTypeBreakdownCtx = document.getElementById('revenueTypeBreakdownChart');
+        if (revenueTypeBreakdownCtx) {
+          new Chart(revenueTypeBreakdownCtx, {
+            type: 'pie',
+            data: {
+              labels: ['Subscription Revenue', 'One-Off Revenue'],
+              datasets: [{
+                data: [185000, 30780], // Example data
+                backgroundColor: [
+                  'rgba(59, 130, 246, 0.7)', // blue-500
+                  'rgba(234, 179, 8, 0.7)' // yellow-500
+                ],
+                borderColor: '#1E2022',
+                borderWidth: 2,
+                hoverOffset: 8
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    padding: 15
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      let label = context.label || '';
+                      if (label) {
+                        label += ': ';
+                      }
+                      if (context.parsed !== null) {
+                        label += '$' + context.parsed.toLocaleString();
+                      }
+                      return label;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+        const subscriptionTierBreakdownCtx = document.getElementById('subscriptionTierBreakdownChart');
+        if (subscriptionTierBreakdownCtx) {
+          new Chart(subscriptionTierBreakdownCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Starter', 'Growth', 'Scale', 'Build'],
+              datasets: [{
+                data: [45000, 75000, 50000, 15000], // Example data
+                backgroundColor: [
+                  'rgba(16, 185, 129, 0.7)', // emerald-500
+                  'rgba(59, 130, 246, 0.7)', // blue-500
+                  'rgba(245, 158, 11, 0.7)', // amber-500
+                  'rgba(147, 51, 234, 0.7)' // purple-500
+                ],
+                borderColor: '#1E2022',
+                borderWidth: 2,
+                hoverOffset: 8
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    padding: 15
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      let label = context.label || '';
+                      if (label) {
+                        label += ': ';
+                      }
+                      if (context.parsed !== null) {
+                        label += '$' + context.parsed.toLocaleString();
+                      }
+                      return label;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+        const retainedBillingsCtx = document.getElementById('retainedBillingsChart');
+        if (retainedBillingsCtx) {
+          new Chart(retainedBillingsCtx, {
+            type: 'line',
+            data: {
+              labels: ['July', 'August', 'September', 'October', 'November', 'December', 'January (F)'],
+              datasets: [{
+                label: 'Retained Billings',
+                data: [55000, 58000, 62000, 60000, 65000, 68000, 72000],
+                borderColor: '#3B82F6', // blue-500
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointBackgroundColor: '#3B82F6',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#3B82F6'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: false,
+                  ticks: {
+                    callback: function(value) {
+                      return '$' + value / 1000 + 'k';
+                    }
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: true,
+                  position: 'top',
+                  labels: {
+                    color: '#dce7f3'
+                  }
+                },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return context.dataset.label + ': $' + context.parsed.y.toLocaleString();
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+        const churnRateTrendCtx = document.getElementById('churnRateTrendChart');
+        if (churnRateTrendCtx) {
+          new Chart(churnRateTrendCtx, {
+            type: 'bar',
+            data: {
+              labels: ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+              datasets: [{
+                label: 'Monthly Churn Rate',
+                data: [2.8, 2.5, 3.1, 2.9, 2.6, 2.5],
+                backgroundColor: [
+                  'rgba(239, 68, 68, 0.5)', // red-500
+                  'rgba(239, 68, 68, 0.5)',
+                  'rgba(239, 68, 68, 0.6)',
+                  'rgba(239, 68, 68, 0.5)',
+                  'rgba(239, 68, 68, 0.4)',
+                  'rgba(239, 68, 68, 0.4)',
+                ],
+                borderColor: [
+                  '#EF4444',
+                  '#EF4444',
+                  '#EF4444',
+                  '#EF4444',
+                  '#EF4444',
+                  '#EF4444',
+                ],
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function(value) {
+                      return value + '%';
+                    }
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: false
+                }
+              }
+            }
+          });
+        }
+        const churnReasonsCtx = document.getElementById('churnReasonsChart');
+        if (churnReasonsCtx) {
+          new Chart(churnReasonsCtx, {
+            type: 'doughnut',
+            data: {
+              labels: ['Budget Cuts', 'Product Fit', 'Switched Competitor', 'Poor Service', 'Other'],
+              datasets: [{
+                label: 'Churn Reasons',
+                data: [35, 25, 20, 15, 5],
+                backgroundColor: [
+                  'rgba(239, 68, 68, 0.7)', // red-500
+                  'rgba(245, 158, 11, 0.7)', // amber-500
+                  'rgba(59, 130, 246, 0.7)', // blue-500
+                  'rgba(16, 185, 129, 0.7)', // emerald-500
+                  'rgba(107, 114, 128, 0.7)' // gray-500
+                ],
+                borderColor: '#1E2022',
+                borderWidth: 2,
+                hoverOffset: 8
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
+                    padding: 15
+                  }
+                }
+              }
+            }
+          });
+        }
+      </script>
+    
+    </body></html>
