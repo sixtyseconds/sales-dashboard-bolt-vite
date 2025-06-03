@@ -97,15 +97,15 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
         }
         
         // Apply value filter
-        if (filterOptions.minValue && Number(deal.value || 0) < filterOptions.minValue) {
+        if (filterOptions.minValue && deal.value < filterOptions.minValue) {
           return;
         }
-        if (filterOptions.maxValue && Number(deal.value || 0) > filterOptions.maxValue) {
+        if (filterOptions.maxValue && deal.value > filterOptions.maxValue) {
           return;
         }
         
         // Apply probability filter
-        if (filterOptions.probability && Number(deal.probability || 0) < filterOptions.probability) {
+        if (filterOptions.probability && deal.probability < filterOptions.probability) {
           return;
         }
         
@@ -133,7 +133,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
   // Calculate pipeline value (total of all deals)
   const pipelineValue = useMemo(() => {
     if (!deals) return 0;
-    return deals.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
+    return deals.reduce((sum, deal) => sum + parseFloat(deal.value), 0);
   }, [deals]);
   
   // Calculate weighted pipeline value (based on probability)
@@ -141,7 +141,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     if (!deals) return 0;
     return deals.reduce((sum, deal) => {
       const probability = deal.probability || deal.deal_stages?.default_probability || 0;
-      return sum + (Number(deal.value || 0) * (Number(probability) / 100));
+      return sum + (parseFloat(deal.value) * (probability / 100));
     }, 0);
   }, [deals]);
   
@@ -152,7 +152,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     const metrics = stages.map(stage => {
       const stageDeals = deals.filter(deal => deal.stage_id === stage.id);
       const count = stageDeals.length;
-      const value = stageDeals.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
+      const value = stageDeals.reduce((sum, deal) => sum + parseFloat(deal.value), 0);
       
       return {
         stageId: stage.id,

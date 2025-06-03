@@ -3,40 +3,40 @@ import { toast } from 'sonner';
 import { ContactService } from '@/lib/services/contactService';
 import type { Contact } from '@/lib/database/models';
 
-const API_BASE_URL = 'http://localhost:8000/api';
-
-export interface Contact {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  full_name: string | null;
-  email: string;
-  phone: string | null;
-  title: string | null;
-  linkedin_url: string | null;
-  is_primary: boolean;
-  company_id: string | null;
-  owner_id: string;
-  created_at: string;
-  updated_at: string;
-  // Company relationship
-  companies?: {
-    id: string;
-    name: string;
-    domain: string;
-    size: string;
-    industry: string;
-    website: string;
-  } | null;
-}
-
 interface UseContactsOptions {
-  ownerId?: string;
   search?: string;
   companyId?: string;
+  isPrimary?: boolean;
+  includeCompany?: boolean;
+  autoFetch?: boolean;
 }
 
-export function useContacts(options: UseContactsOptions = {}) {
+interface UseContactsReturn {
+  contacts: Contact[];
+  isLoading: boolean;
+  error: Error | null;
+  totalCount: number;
+  
+  // Actions
+  fetchContacts: () => Promise<void>;
+  createContact: (contactData: Omit<Contact, 'id' | 'created_at' | 'updated_at' | 'full_name'>) => Promise<Contact | null>;
+  updateContact: (id: string, updates: Partial<Contact>) => Promise<Contact | null>;
+  deleteContact: (id: string) => Promise<boolean>;
+  searchContacts: (query: string) => Promise<Contact[]>;
+  
+  // Utility functions
+  findContactByEmail: (email: string) => Promise<Contact | null>;
+  autoCreateFromEmail: (email: string, owner_id: string, firstName?: string, lastName?: string, companyName?: string) => Promise<Contact | null>;
+  setPrimaryContact: (contactId: string) => Promise<Contact | null>;
+  
+  // State management
+  refreshContacts: () => void;
+  clearError: () => void;
+}
+
+const API_BASE_URL = 'http://localhost:8000/api';
+
+export function useContacts(ownerId?: string, search?: string, companyId?: string) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -49,16 +49,16 @@ export function useContacts(options: UseContactsOptions = {}) {
       let url = `${API_BASE_URL}/contacts?includeCompany=true`;
       const params = new URLSearchParams();
       
-      if (options.ownerId) {
-        params.append('ownerId', options.ownerId);
+      if (ownerId) {
+        params.append('ownerId', ownerId);
       }
       
-      if (options.search) {
-        params.append('search', options.search);
+      if (search) {
+        params.append('search', search);
       }
       
-      if (options.companyId) {
-        params.append('companyId', options.companyId);
+      if (companyId) {
+        params.append('companyId', companyId);
       }
       
       if (params.toString()) {
@@ -79,7 +79,7 @@ export function useContacts(options: UseContactsOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [options.ownerId, options.search, options.companyId]);
+  }, [ownerId, search, companyId]);
 
   useEffect(() => {
     fetchContacts();

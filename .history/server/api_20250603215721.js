@@ -31,11 +31,11 @@ async function connectDB() {
 // User endpoint - Andrew Bryce's profile
 app.get('/api/user', (req, res) => {
   res.json({
-    id: 'ac4efca2-1fe1-49b3-9d5e-6ac3d8bf3459', // Andrew's actual UUID from the database
-    email: 'andrew.bryce@sixtyseconds.video',
+    id: 'andrew-bryce-123',
+    email: 'andrew@example.com',
     first_name: 'Andrew',
     last_name: 'Bryce',
-    stage: 'Director',
+    stage: 'Manager',
     is_admin: true,
     avatar_url: null,
     created_at: new Date().toISOString(),

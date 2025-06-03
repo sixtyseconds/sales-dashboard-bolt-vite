@@ -64,7 +64,7 @@ export interface DealWithRelationships {
   }>;
 }
 
-export function useDeals(ownerId?: string) {
+export function useDeals() {
   const [deals, setDeals] = useState<DealWithRelationships[]>([]);
   const [stages, setStages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,18 +73,7 @@ export function useDeals(ownerId?: string) {
   // Fetch deals from Neon API with full CRM relationships
   const fetchDealsFromNeon = useCallback(async (): Promise<DealWithRelationships[]> => {
     try {
-      let url = `${API_BASE_URL}/deals`;
-      const params = new URLSearchParams();
-      
-      if (ownerId) {
-        params.append('ownerId', ownerId);
-      }
-      
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-      
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE_URL}/deals`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -96,7 +85,7 @@ export function useDeals(ownerId?: string) {
       console.error('Error fetching deals from Neon:', error);
       return [];
     }
-  }, [ownerId]);
+  }, []);
 
   // Fetch stages from Neon API (consistent with deals)
   const fetchStages = useCallback(async () => {

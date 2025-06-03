@@ -28,14 +28,14 @@ async function connectDB() {
   }
 }
 
-// User endpoint - Andrew Bryce's profile
+// Mock user endpoint
 app.get('/api/user', (req, res) => {
   res.json({
-    id: 'ac4efca2-1fe1-49b3-9d5e-6ac3d8bf3459', // Andrew's actual UUID from the database
-    email: 'andrew.bryce@sixtyseconds.video',
-    first_name: 'Andrew',
-    last_name: 'Bryce',
-    stage: 'Director',
+    id: 'dev-user-123',
+    email: 'dev@example.com',
+    first_name: 'Development',
+    last_name: 'User',
+    stage: 'Manager',
     is_admin: true,
     avatar_url: null,
     created_at: new Date().toISOString(),
@@ -46,7 +46,7 @@ app.get('/api/user', (req, res) => {
 // Companies with stats endpoint
 app.get('/api/companies', async (req, res) => {
   try {
-    const { search, includeStats, limit, ownerId } = req.query;
+    const { search, includeStats, limit } = req.query;
     
     let query = `
       SELECT 
@@ -74,20 +74,10 @@ app.get('/api/companies', async (req, res) => {
     `;
     
     const params = [];
-    const conditions = [];
     
     if (search) {
-      conditions.push(`(c.name ILIKE $${params.length + 1} OR c.domain ILIKE $${params.length + 1})`);
+      query += ` WHERE (c.name ILIKE $${params.length + 1} OR c.domain ILIKE $${params.length + 1})`;
       params.push(`%${search}%`);
-    }
-    
-    if (ownerId) {
-      conditions.push(`c.owner_id = $${params.length + 1}`);
-      params.push(ownerId);
-    }
-    
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
     }
     
     query += ` ORDER BY c.updated_at DESC`;
@@ -113,7 +103,7 @@ app.get('/api/companies', async (req, res) => {
 // Deals with relationships endpoint
 app.get('/api/deals', async (req, res) => {
   try {
-    const { includeRelationships, limit, ownerId } = req.query;
+    const { includeRelationships, limit } = req.query;
     
     let query = `
       SELECT 
@@ -136,27 +126,14 @@ app.get('/api/deals', async (req, res) => {
         LEFT JOIN contacts ct ON d.primary_contact_id = ct.id
         LEFT JOIN deal_stages ds ON d.stage_id = ds.id
       ` : ''}
+      ORDER BY d.updated_at DESC
     `;
     
-    const params = [];
-    const conditions = [];
-    
-    if (ownerId) {
-      conditions.push(`d.owner_id = $${params.length + 1}`);
-      params.push(ownerId);
-    }
-    
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
-    }
-    
-    query += ` ORDER BY d.updated_at DESC`;
-    
     if (limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(parseInt(limit));
+      query += ` LIMIT $1`;
     }
 
+    const params = limit ? [parseInt(limit)] : [];
     const result = await client.query(query, params);
     
     res.json({
@@ -173,7 +150,7 @@ app.get('/api/deals', async (req, res) => {
 // Contacts with relationships endpoint
 app.get('/api/contacts', async (req, res) => {
   try {
-    const { search, companyId, includeCompany, limit, ownerId } = req.query;
+    const { search, companyId, includeCompany, limit } = req.query;
     
     let query = `
       SELECT 
@@ -201,11 +178,6 @@ app.get('/api/contacts', async (req, res) => {
     if (companyId) {
       conditions.push(`ct.company_id = $${params.length + 1}`);
       params.push(companyId);
-    }
-    
-    if (ownerId) {
-      conditions.push(`ct.owner_id = $${params.length + 1}`);
-      params.push(ownerId);
     }
     
     if (conditions.length > 0) {
@@ -271,11 +243,13 @@ app.get('/api/stages', async (req, res) => {
         id,
         name,
         color,
+        order_index,
         default_probability,
+        is_final,
         created_at,
         updated_at
       FROM deal_stages
-      ORDER BY name ASC
+      ORDER BY order_index ASC
     `;
 
     const result = await client.query(query);
@@ -287,41 +261,6 @@ app.get('/api/stages', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching deal stages:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Owners/Sales Reps endpoint
-app.get('/api/owners', async (req, res) => {
-  try {
-    const query = `
-      SELECT DISTINCT
-        p.id,
-        p.first_name,
-        p.last_name,
-        p.stage,
-        p.email,
-        (p.first_name || ' ' || p.last_name) as full_name
-      FROM profiles p
-      WHERE p.id IN (
-        SELECT DISTINCT owner_id FROM companies WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM deals WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM contacts WHERE owner_id IS NOT NULL
-      )
-      ORDER BY p.first_name, p.last_name
-    `;
-
-    const result = await client.query(query);
-    
-    res.json({
-      data: result.rows,
-      error: null,
-      count: result.rows.length
-    });
-  } catch (error) {
-    console.error('Error fetching owners:', error);
     res.status(500).json({ error: error.message });
   }
 });

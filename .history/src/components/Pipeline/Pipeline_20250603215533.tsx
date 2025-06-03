@@ -498,14 +498,6 @@ function PipelineContent() {
                 <span>{getSortLabel()}</span>
               </button>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <OwnerFilter
-                selectedOwnerId={selectedOwnerId}
-                onOwnerChange={setSelectedOwnerId}
-                className="w-[280px]"
-              />
-            </div>
           </div>
 
           <DndContext

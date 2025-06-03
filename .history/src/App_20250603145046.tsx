@@ -16,6 +16,8 @@ import ForgotPassword from '@/pages/auth/forgot-password';
 import ResetPassword from '@/pages/auth/reset-password';
 import { PipelinePage } from '@/pages/PipelinePage';
 import ActivityProcessingPage from '@/pages/ActivityProcessingPage';
+import ClientTrackingPage from '@/pages/ClientTrackingPage';
+import CompaniesPage from '@/pages/companies';
 import CompaniesTable from '@/pages/companies/CompaniesTable';
 import ContactsTable from '@/pages/contacts/ContactsTable';
 
@@ -50,7 +52,7 @@ function App() {
           <Route path="/heatmap" element={<AppLayout><Heatmap /></AppLayout>} />
           <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
           <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
-          <Route path="/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
+          <Route path="/companies" element={<AppLayout><CompaniesPage /></AppLayout>} />
           <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />
           <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />

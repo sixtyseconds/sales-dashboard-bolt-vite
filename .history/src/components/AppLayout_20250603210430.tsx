@@ -29,15 +29,31 @@ import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userData } = useUser();
+  const { userData, isImpersonating, endImpersonating } = useUser();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, toggleMobileMenu] = useCycle(false, true);
   const [hasMounted, setHasMounted] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
 
+  // Handle stopping impersonation
+  const handleStopImpersonating = async () => {
+    await endImpersonating();
+    // Redirect to dashboard after stopping impersonation
+    if (location.pathname !== '/') {
+      window.location.href = '/';
+    } else {
+      // Force a reload to ensure fresh data
+      window.location.reload();
+    }
+  };
+
   const handleLogout = async () => {
     try {
+      // If we're impersonating, stop impersonation first before logout
+      if (isImpersonating) {
+        await endImpersonating();
+      }
       await supabase.auth.signOut();
       toast.success('Logged out successfully');
     } catch (error: any) {
@@ -82,13 +98,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-gray-100">
       {/* Impersonation Banner */}
-      {/* {isImpersonating && (
+      {isImpersonating && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500/10 backdrop-blur-sm text-center py-1 px-2 text-amber-400 text-xs font-medium border-b border-amber-500/20">
           <span className="flex items-center justify-center gap-1">
             <UserX className="w-3 h-3" /> You are viewing as {userData?.first_name} {userData?.last_name}
           </span>
         </div>
-      )} */}
+      )}
       
       <div className="fixed top-0 left-0 right-0 flex items-center justify-between z-50 p-4 bg-gray-950/50 backdrop-blur-sm border-b border-gray-800/50 lg:hidden">
         <div className="flex items-center gap-3">
@@ -238,6 +254,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <Settings className="w-5 h-5" />
                     Settings
                   </Link>
+                  
+                  {isImpersonating && (
+                    <button 
+                      onClick={() => {
+                        toggleMobileMenu();
+                        handleStopImpersonating();
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                    >
+                      <UserX className="w-5 h-5" />
+                      Stop Impersonating
+                    </button>
+                  )}
                   
                   <button 
                     onClick={handleLogout}
@@ -421,6 +450,30 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </AnimatePresence>
             </button>
           </div>
+
+          {/* Display Stop Impersonation button at the bottom left */}
+          {isImpersonating && (
+            <div className="flex-shrink-0 pt-2 pb-4 px-2 border-t border-gray-800/50 mt-auto">
+              <button
+                onClick={handleStopImpersonating}
+                className="flex w-full items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+              >
+                <UserX className="w-4 h-4" />
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      className="overflow-hidden whitespace-nowrap"
+                    >
+                      Stop Impersonating
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+            </div>
+          )}
         </div>
       </motion.div>
       <main className={cn(

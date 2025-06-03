@@ -31,11 +31,11 @@ async function connectDB() {
 // User endpoint - Andrew Bryce's profile
 app.get('/api/user', (req, res) => {
   res.json({
-    id: 'ac4efca2-1fe1-49b3-9d5e-6ac3d8bf3459', // Andrew's actual UUID from the database
-    email: 'andrew.bryce@sixtyseconds.video',
+    id: 'andrew-bryce-123',
+    email: 'andrew@example.com',
     first_name: 'Andrew',
     last_name: 'Bryce',
-    stage: 'Director',
+    stage: 'Manager',
     is_admin: true,
     avatar_url: null,
     created_at: new Date().toISOString(),
@@ -287,41 +287,6 @@ app.get('/api/stages', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching deal stages:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Owners/Sales Reps endpoint
-app.get('/api/owners', async (req, res) => {
-  try {
-    const query = `
-      SELECT DISTINCT
-        p.id,
-        p.first_name,
-        p.last_name,
-        p.stage,
-        p.email,
-        (p.first_name || ' ' || p.last_name) as full_name
-      FROM profiles p
-      WHERE p.id IN (
-        SELECT DISTINCT owner_id FROM companies WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM deals WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM contacts WHERE owner_id IS NOT NULL
-      )
-      ORDER BY p.first_name, p.last_name
-    `;
-
-    const result = await client.query(query);
-    
-    res.json({
-      data: result.rows,
-      error: null,
-      count: result.rows.length
-    });
-  } catch (error) {
-    console.error('Error fetching owners:', error);
     res.status(500).json({ error: error.message });
   }
 });

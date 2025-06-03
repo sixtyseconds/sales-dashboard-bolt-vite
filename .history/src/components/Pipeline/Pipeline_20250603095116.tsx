@@ -22,7 +22,6 @@ import { PipelineColumn } from './PipelineColumn';
 import { DealCard } from './DealCard';
 import { DealForm } from './DealForm';
 import { PipelineTable } from './PipelineTable';
-import { OwnerFilter } from '@/components/OwnerFilter';
 import { Loader2, ArrowDownUp } from 'lucide-react';
 import EditDealModal from '@/components/EditDealModal';
 import { toast } from 'sonner';
@@ -112,8 +111,6 @@ function PipelineContent() {
     moveDealToStage,
     forceUpdateDealStage,
     refreshDeals,
-    selectedOwnerId,
-    setSelectedOwnerId
   } = usePipeline();
 
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
@@ -497,14 +494,6 @@ function PipelineContent() {
                 <ArrowDownUp className="w-4 h-4" />
                 <span>{getSortLabel()}</span>
               </button>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <OwnerFilter
-                selectedOwnerId={selectedOwnerId}
-                onOwnerChange={setSelectedOwnerId}
-                className="w-[280px]"
-              />
             </div>
           </div>
 

@@ -14,29 +14,17 @@ export interface Target {
 }
 
 export function useTargets(userId: string | undefined) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<Target[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Mock implementation - returns proper target object structure
+    // Mock implementation - returns empty data
     // Eliminates Supabase 400 errors while keeping components functional
     if (userId) {
       setIsLoading(true);
       setTimeout(() => {
-        // Return mock target data that matches what Dashboard expects
-        setData({
-          id: 'mock-target-1',
-          user_id: userId,
-          revenue_target: 20000,
-          outbound_target: 100,
-          meetings_target: 20,
-          proposal_target: 15,
-          start_date: new Date().toISOString(),
-          end_date: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        setData([]); // Return empty array
         setError(null);
         setIsLoading(false);
       }, 100);
