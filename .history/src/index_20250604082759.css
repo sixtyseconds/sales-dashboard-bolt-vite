@@ -84,58 +84,8 @@
   }
 }
 
-/* Dark Theme Button Styles */
+/* Contact Record Page Styles */
 @layer components {
-  /* Primary Buttons */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium px-4 py-2.5 rounded-lg transition-all duration-300 hover:from-blue-500 hover:to-blue-600 hover:shadow-lg hover:shadow-blue-500/25 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 min-h-[40px] whitespace-nowrap;
-  }
-
-  /* Secondary Buttons */
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 bg-gray-800/80 border border-gray-600/60 text-gray-100 font-medium px-4 py-2.5 rounded-lg transition-all duration-300 hover:bg-gray-700/90 hover:border-gray-500 hover:text-white focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 min-h-[40px] whitespace-nowrap;
-  }
-
-  /* Ghost Buttons */
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 bg-transparent text-gray-200 font-medium px-4 py-2.5 rounded-lg transition-all duration-300 hover:bg-gray-800/60 hover:text-white focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 min-h-[40px] whitespace-nowrap;
-  }
-
-  /* Outline Buttons */
-  .btn-outline {
-    @apply inline-flex items-center justify-center gap-2 bg-transparent border border-gray-500/70 text-gray-200 font-medium px-4 py-2.5 rounded-lg transition-all duration-300 hover:bg-gray-800/60 hover:border-gray-400 hover:text-white focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900 min-h-[40px] whitespace-nowrap;
-  }
-
-  /* Small Buttons */
-  .btn-sm {
-    @apply px-3 py-2 text-sm min-h-[36px];
-  }
-
-  /* Large Buttons */
-  .btn-lg {
-    @apply px-6 py-3 text-lg min-h-[48px];
-  }
-
-  /* Icon Buttons */
-  .btn-icon {
-    @apply inline-flex items-center justify-center p-2 w-10 h-10 rounded-lg bg-transparent text-gray-300 hover:bg-gray-800/60 hover:text-white transition-all duration-300 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-900;
-  }
-
-  /* Button groups - prevent layout shifts */
-  .btn-group {
-    @apply flex items-center gap-3 flex-wrap;
-  }
-
-  /* Clickable Deal Cards */
-  .deal-card-clickable {
-    @apply cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-black/20 hover:border-opacity-70;
-  }
-
-  .deal-card-clickable:hover {
-    transform: translateY(-2px);
-  }
-
-  /* Glassmorphism Components */
   .glassmorphism {
     background: rgba(20, 28, 36, 0.6);
     backdrop-filter: blur(16px);
@@ -221,67 +171,20 @@
   }
 }
 
-/* Force dark theme button colors in shadcn components */
+/* Attempt to force color on base button in dark mode */
 @layer utilities {
   .dark button {
-    color: hsl(var(--foreground)) !important;
+      /* This might affect ALL buttons, adjust if needed */
+      /* Trying to ensure default text color is the bright foreground */
+      color: hsl(var(--foreground)) !important;
   }
-  
-  .dark button.bg-primary {
-    color: hsl(var(--primary-foreground)) !important;
-  }
-  
-  .dark button.bg-secondary {
-    color: hsl(var(--secondary-foreground)) !important;
-  }
-
-  /* Override shadcn button variants for dark theme */
-  .dark .btn-primary,
-  .dark button[class*="bg-blue"] {
-    @apply bg-gradient-to-r from-blue-600 to-blue-700 text-white border-0 hover:from-blue-500 hover:to-blue-600;
-  }
-
-  .dark .btn-secondary,
-  .dark button[variant="outline"] {
-    @apply bg-gray-800/80 border-gray-600/60 text-gray-100 hover:bg-gray-700/90 hover:border-gray-500 hover:text-white;
-  }
-
-  .dark .btn-ghost,
-  .dark button[variant="ghost"] {
-    @apply bg-transparent text-gray-200 hover:bg-gray-800/60 hover:text-white border-0;
-  }
-
-  /* Button text color improvements */
-  .btn-primary span,
-  .btn-secondary span,
-  .btn-outline span,
-  .btn-ghost span {
-    @apply text-current;
-  }
-
-  /* Icon button improvements */
-  .btn-icon:hover {
-    @apply bg-gray-800/80 text-white;
-  }
-
-  /* Ensure button content doesn't shift */
-  .btn-primary,
-  .btn-secondary,
-  .btn-outline,
-  .btn-ghost {
-    @apply flex-shrink-0;
-  }
-
-  /* Mobile responsive button adjustments */
-  @media (max-width: 768px) {
-    .btn-group {
-      @apply flex-col w-full;
-    }
-    
-    .btn-group button {
-      @apply w-full;
-    }
-  }
+  /* Explicitly set primary/secondary back if the above overrides too much */
+   .dark button.bg-primary {
+      color: hsl(var(--primary-foreground)) !important; /* Dark text on light bg */
+   }
+   .dark button.bg-secondary {
+      color: hsl(var(--secondary-foreground)) !important; /* Light text on dark bg */
+   }
 }
 
 /* Custom Glassmorphism Components for Contact Record */
@@ -366,21 +269,4 @@
 
 .action-button-secondary {
   @apply bg-gray-800/50 border border-gray-600 text-gray-300 hover:bg-gray-700/50 hover:border-gray-500;
-}
-
-/* Breadcrumb Navigation */
-.breadcrumb-nav {
-  @apply flex items-center gap-2 text-sm text-gray-400 mb-6;
-}
-
-.breadcrumb-item {
-  @apply hover:text-white transition-colors cursor-pointer;
-}
-
-.breadcrumb-separator {
-  @apply text-gray-600;
-}
-
-.breadcrumb-current {
-  @apply text-white font-medium;
 }
