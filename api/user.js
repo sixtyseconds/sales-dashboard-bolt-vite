@@ -1,4 +1,4 @@
-export default function handler(request, response) {
+module.exports = function handler(request, response) {
   try {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
@@ -56,4 +56,4 @@ export default function handler(request, response) {
       count: 0
     });
   }
-} 
+}; 
