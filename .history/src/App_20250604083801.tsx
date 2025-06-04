@@ -56,7 +56,6 @@ function App() {
           <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />
           <Route path="/crm/contacts/:id" element={<AppLayout><ContactRecord /></AppLayout>} />
-          <Route path="/crm/deals/:id" element={<AppLayout><DealRecord /></AppLayout>} />
           <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
           <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
           <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />

@@ -243,44 +243,12 @@
 
   .dark .btn-secondary,
   .dark button[variant="outline"] {
-    @apply bg-gray-800/80 border-gray-600/60 text-gray-100 hover:bg-gray-700/90 hover:border-gray-500 hover:text-white;
+    @apply bg-gray-800/60 border-gray-600/50 text-gray-200 hover:bg-gray-700/70 hover:border-gray-500 hover:text-white;
   }
 
   .dark .btn-ghost,
   .dark button[variant="ghost"] {
-    @apply bg-transparent text-gray-200 hover:bg-gray-800/60 hover:text-white border-0;
-  }
-
-  /* Button text color improvements */
-  .btn-primary span,
-  .btn-secondary span,
-  .btn-outline span,
-  .btn-ghost span {
-    @apply text-current;
-  }
-
-  /* Icon button improvements */
-  .btn-icon:hover {
-    @apply bg-gray-800/80 text-white;
-  }
-
-  /* Ensure button content doesn't shift */
-  .btn-primary,
-  .btn-secondary,
-  .btn-outline,
-  .btn-ghost {
-    @apply flex-shrink-0;
-  }
-
-  /* Mobile responsive button adjustments */
-  @media (max-width: 768px) {
-    .btn-group {
-      @apply flex-col w-full;
-    }
-    
-    .btn-group button {
-      @apply w-full;
-    }
+    @apply bg-transparent text-gray-300 hover:bg-gray-800/40 hover:text-white border-0;
   }
 }
 

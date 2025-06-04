@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { ApiContactService } from '@/lib/services/apiContactService';
+import { ContactService } from '@/lib/services/contactService';
 import type { Contact } from '@/lib/database/models';
 
 interface UseContactsOptions {
@@ -37,7 +37,7 @@ interface UseContactsReturn {
 
 export function useContacts(options: UseContactsOptions = {}): UseContactsReturn {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -49,7 +49,12 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
     setError(null);
     
     try {
-      const data = await ApiContactService.getContacts(options);
+      const data = await ContactService.getContacts({
+        search: options.search,
+        companyId: options.companyId,
+        isPrimary: options.isPrimary,
+        includeCompany: options.includeCompany
+      });
       
       setContacts(data);
       setTotalCount(data.length);
@@ -65,7 +70,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Create a new contact
   const createContact = useCallback(async (contactData: Omit<Contact, 'id' | 'created_at' | 'updated_at' | 'full_name'>) => {
     try {
-      const newContact = await ApiContactService.createContact(contactData);
+      const newContact = await ContactService.createContact(contactData);
       
       // Add to local state
       setContacts(prev => [newContact, ...prev]);
@@ -85,7 +90,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Update an existing contact
   const updateContact = useCallback(async (id: string, updates: Partial<Contact>) => {
     try {
-      const updatedContact = await ApiContactService.updateContact(id, updates);
+      const updatedContact = await ContactService.updateContact(id, updates);
       
       // Update local state
       setContacts(prev => 
@@ -108,7 +113,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Delete a contact
   const deleteContact = useCallback(async (id: string) => {
     try {
-      await ApiContactService.deleteContact(id);
+      await ContactService.deleteContact(id);
       
       // Remove from local state
       setContacts(prev => prev.filter(contact => contact.id !== id));
@@ -128,7 +133,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Search contacts
   const searchContacts = useCallback(async (query: string) => {
     try {
-      const results = await ApiContactService.searchContacts(query, options.includeCompany);
+      const results = await ContactService.searchContacts(query, options.includeCompany);
       return results;
     } catch (err) {
       const error = err as Error;
@@ -141,7 +146,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Find contact by email
   const findContactByEmail = useCallback(async (email: string) => {
     try {
-      return await ApiContactService.findContactByEmail(email);
+      return await ContactService.findContactByEmail(email);
     } catch (err) {
       const error = err as Error;
       setError(error);
@@ -159,7 +164,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
     companyName?: string
   ) => {
     try {
-      const contact = await ApiContactService.autoCreateContactFromEmail(
+      const contact = await ContactService.autoCreateContactFromEmail(
         email, 
         owner_id, 
         firstName, 
@@ -188,7 +193,7 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
   // Set primary contact
   const setPrimaryContact = useCallback(async (contactId: string) => {
     try {
-      const updatedContact = await ApiContactService.setPrimaryContact(contactId);
+      const updatedContact = await ContactService.setPrimaryContact(contactId);
       
       // Update local state - set this as primary and others as non-primary
       setContacts(prev => 
@@ -255,56 +260,37 @@ export function useContacts(options: UseContactsOptions = {}): UseContactsReturn
 // Convenience hook for getting a single contact
 export function useContact(id: string, includeRelationships = true) {
   const [contact, setContact] = useState<Contact | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    const fetchContact = async () => {
-      if (!id) {
-        setContact(null);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const data = await ApiContactService.getContactById(id, includeRelationships);
-        setContact(data);
-      } catch (err) {
-        console.error('Error fetching contact:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch contact'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchContact();
-  }, [id, includeRelationships]);
-
-  const refetch = async () => {
+  const fetchContact = useCallback(async () => {
     if (!id) return;
-
+    
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const data = await ApiContactService.getContactById(id, includeRelationships);
+      const data = await ContactService.getContactById(id, includeRelationships);
       setContact(data);
     } catch (err) {
-      console.error('Error refetching contact:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch contact'));
+      const error = err as Error;
+      setError(error);
+      console.error('Error fetching contact:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id, includeRelationships]);
+
+  useEffect(() => {
+    fetchContact();
+  }, [fetchContact]);
 
   return {
     contact,
     isLoading,
     error,
-    refetch
+    refetch: fetchContact,
+    clearError: () => setError(null)
   };
 }
 
@@ -321,7 +307,7 @@ export function useContactsByCompany(companyId: string) {
     setError(null);
     
     try {
-      const data = await ApiContactService.getContactsByCompany(companyId);
+      const data = await ContactService.getContactsByCompany(companyId);
       setContacts(data);
     } catch (err) {
       const error = err as Error;

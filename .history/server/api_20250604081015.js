@@ -341,8 +341,10 @@ app.get('/api/contacts/:id/activities', async (req, res) => {
     const query = `
       SELECT 
         a.*,
+        d.title as deal_title,
         c.name as company_name
       FROM activities a
+      LEFT JOIN deals d ON a.deal_id = d.id
       LEFT JOIN companies c ON a.company_id = c.id
       WHERE a.contact_id = $1
       ORDER BY a.created_at DESC
@@ -555,111 +557,6 @@ app.get('/api/owners', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching owners:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Contact tasks endpoint (simplified - can be enhanced later with real tasks table)
-app.get('/api/contacts/:id/tasks', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // For now, we'll create simple tasks based on activities and deals
-    const tasksQuery = `
-      SELECT 
-        'activity' as source,
-        a.id::text as id,
-        a.type || ' follow-up' as title,
-        'Follow up on ' || a.type || ' activity' as description,
-        'medium' as priority,
-        a.created_at + INTERVAL '3 days' as due_date,
-        false as completed
-      FROM activities a 
-      WHERE a.contact_id = $1
-      AND a.created_at > NOW() - INTERVAL '30 days'
-      
-      UNION ALL
-      
-      SELECT 
-        'deal' as source,
-        d.id::text as id,
-        'Follow up on deal' as title,
-        'Check progress on deal worth £' || COALESCE(d.value::text, 'unknown') as description,
-        CASE 
-          WHEN d.value > 10000 THEN 'high'
-          WHEN d.value > 5000 THEN 'medium'
-          ELSE 'low'
-        END as priority,
-        d.updated_at + INTERVAL '7 days' as due_date,
-        CASE WHEN d.status = 'won' THEN true ELSE false END as completed
-      FROM deals d 
-      WHERE (d.primary_contact_id = $1 OR d.id IN (
-        SELECT deal_id FROM deal_contacts WHERE contact_id = $1
-      ))
-      AND d.status != 'lost'
-      
-      ORDER BY due_date DESC
-      LIMIT 10
-    `;
-
-    const result = await client.query(tasksQuery, [id]);
-    
-    res.json({
-      data: result.rows,
-      error: null,
-      count: result.rows.length
-    });
-  } catch (error) {
-    console.error('Error fetching contact tasks:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Single deal by ID endpoint
-app.get('/api/deals/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { includeRelationships } = req.query;
-    
-    let query = `
-      SELECT 
-        d.*,
-        ${includeRelationships === 'true' ? `
-          c.name as company_name,
-          c.domain as company_domain,
-          c.size as company_size,
-          c.industry as company_industry,
-          ct.full_name as contact_name,
-          ct.email as contact_email,
-          ct.title as contact_title,
-          ds.name as stage_name,
-          ds.color as stage_color,
-          ds.default_probability as default_probability
-        ` : 'null as company_name, null as company_domain, null as contact_name, null as contact_email, null as stage_name, null as stage_color, null as default_probability'}
-      FROM deals d
-      ${includeRelationships === 'true' ? `
-        LEFT JOIN companies c ON d.company_id = c.id
-        LEFT JOIN contacts ct ON d.primary_contact_id = ct.id
-        LEFT JOIN deal_stages ds ON d.stage_id = ds.id
-      ` : ''}
-      WHERE d.id = $1
-    `;
-
-    const result = await client.query(query, [id]);
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'Deal not found',
-        data: null 
-      });
-    }
-    
-    res.json({
-      data: result.rows[0],
-      error: null
-    });
-  } catch (error) {
-    console.error('Error fetching deal:', error);
     res.status(500).json({ error: error.message });
   }
 });
