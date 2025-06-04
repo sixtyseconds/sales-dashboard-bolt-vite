@@ -9,20 +9,19 @@ export default function handler(request, response) {
     }
 
     if (request.method === 'GET') {
-      // Return Andrew Bryce's profile - this is a simple hardcoded response that shouldn't timeout
-      const userData = {
-        id: 'ac4efca2-1fe1-49b3-9d5e-6ac3d8bf3459', // Andrew's actual UUID from the database
-        email: 'andrew.bryce@sixtyseconds.video',
-        first_name: 'Andrew',
-        last_name: 'Bryce',
-        stage: 'Director',
-        is_admin: true,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      const testData = {
+        status: 'success',
+        message: 'API is working correctly',
+        timestamp: new Date().toISOString(),
+        environment: {
+          nodejs: process.version,
+          platform: process.platform,
+          hasDbUrl: !!process.env.DATABASE_URL,
+          vercel: !!process.env.VERCEL,
+        }
       };
 
-      console.log('Returning user data for Andrew Bryce');
+      console.log('Test endpoint accessed successfully');
       
       response.setHeader('Content-Type', 'application/json');
       response.setHeader('Access-Control-Allow-Origin', '*');
@@ -30,7 +29,7 @@ export default function handler(request, response) {
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       
       return response.status(200).json({
-        data: userData,
+        data: testData,
         error: null,
         count: 1
       });
@@ -45,7 +44,7 @@ export default function handler(request, response) {
       count: 0
     });
   } catch (error) {
-    console.error('Error in user API:', error);
+    console.error('Error in test API:', error);
     
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Access-Control-Allow-Origin', '*');

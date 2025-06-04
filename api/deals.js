@@ -1,4 +1,4 @@
-import { getDbClient, handleCORS, apiResponse } from './_db.js';
+import { executeQuery, handleCORS, apiResponse } from './_db.js';
 
 export default async function handler(request) {
   // Handle CORS preflight
@@ -6,52 +6,62 @@ export default async function handler(request) {
   if (corsResponse) return corsResponse;
 
   const url = new URL(request.url);
-  const pathParts = url.pathname.split('/api/deals').filter(p => p);
+  const pathSegments = url.pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'deals');
+  const dealId = pathSegments[0];
   
-  try {
-    const client = await getDbClient();
-    
-    if (request.method === 'GET') {
-      if (pathParts.length === 0) {
+  if (request.method === 'GET') {
+    try {
+      if (!dealId) {
         // GET /api/deals - List all deals
-        return await handleDealsList(client, url);
-      } else if (pathParts.length === 1) {
+        return await handleDealsList(url);
+      } else if (pathSegments.length === 1) {
         // GET /api/deals/:id - Single deal
-        const dealId = pathParts[0].replace('/', '');
-        return await handleSingleDeal(client, url, dealId);
+        return await handleSingleDeal(dealId);
+      } else if (pathSegments.length === 2) {
+        // GET /api/deals/:id/activities, etc.
+        const subResource = pathSegments[1];
+        
+        switch (subResource) {
+          case 'activities':
+            return await handleDealActivities(url, dealId);
+          case 'contacts':
+            return await handleDealContacts(dealId);
+          case 'files':
+            return await handleDealFiles(dealId);
+          default:
+            return apiResponse(null, 'Resource not found', 404);
+        }
       }
       
       return apiResponse(null, 'Endpoint not found', 404);
-    } else if (request.method === 'POST') {
-      // POST /api/deals - Create deal
-      return await handleCreateDeal(client, request);
-    } else if (request.method === 'PUT' || request.method === 'PATCH') {
-      if (pathParts.length === 1) {
-        // PUT /api/deals/:id - Update deal
-        const dealId = pathParts[0].replace('/', '');
-        return await handleUpdateDeal(client, request, dealId);
-      }
-      
-      return apiResponse(null, 'Endpoint not found', 404);
-    } else if (request.method === 'DELETE') {
-      if (pathParts.length === 1) {
-        // DELETE /api/deals/:id - Delete deal
-        const dealId = pathParts[0].replace('/', '');
-        return await handleDeleteDeal(client, dealId);
-      }
-      
-      return apiResponse(null, 'Endpoint not found', 404);
+    } catch (error) {
+      console.error('Error in deals API:', error);
+      return apiResponse(null, error.message, 500);
+    }
+  } else if (request.method === 'POST') {
+    // POST /api/deals - Create deal
+    return await handleCreateDeal(url);
+  } else if (request.method === 'PUT' || request.method === 'PATCH') {
+    if (pathSegments.length === 1) {
+      // PUT /api/deals/:id - Update deal
+      return await handleUpdateDeal(url, dealId);
     }
     
-    return apiResponse(null, 'Method not allowed', 405);
-  } catch (error) {
-    console.error('Error in deals API:', error);
-    return apiResponse(null, error.message, 500);
+    return apiResponse(null, 'Endpoint not found', 404);
+  } else if (request.method === 'DELETE') {
+    if (pathSegments.length === 1) {
+      // DELETE /api/deals/:id - Delete deal
+      return await handleDeleteDeal(dealId);
+    }
+    
+    return apiResponse(null, 'Endpoint not found', 404);
   }
+  
+  return apiResponse(null, 'Method not allowed', 405);
 }
 
 // List all deals
-async function handleDealsList(client, url) {
+async function handleDealsList(url) {
   const { ownerId, stageId, status, includeRelationships, limit, search } = Object.fromEntries(url.searchParams);
   
   let query = `
@@ -113,7 +123,7 @@ async function handleDealsList(client, url) {
     params.push(parseInt(limit));
   }
 
-  const result = await client.query(query, params);
+  const result = await executeQuery(query, params);
   
   const data = result.rows.map(row => ({
     ...row,
@@ -153,7 +163,7 @@ async function handleDealsList(client, url) {
 }
 
 // Single deal by ID
-async function handleSingleDeal(client, url, dealId) {
+async function handleSingleDeal(dealId) {
   const { includeRelationships } = Object.fromEntries(url.searchParams);
   
   let query = `
@@ -182,7 +192,7 @@ async function handleSingleDeal(client, url, dealId) {
     WHERE d.id = $1
   `;
 
-  const result = await client.query(query, [dealId]);
+  const result = await executeQuery(query, [dealId]);
   
   if (result.rows.length === 0) {
     return apiResponse(null, 'Deal not found', 404);
@@ -227,7 +237,7 @@ async function handleSingleDeal(client, url, dealId) {
 }
 
 // Create deal
-async function handleCreateDeal(client, request) {
+async function handleCreateDeal(url) {
   const body = await request.json();
   const {
     name,
@@ -261,12 +271,12 @@ async function handleCreateDeal(client, request) {
     value, description, stage_id, owner_id, expected_close_date, probability, status
   ];
   
-  const result = await client.query(query, params);
+  const result = await executeQuery(query, params);
   return apiResponse(result.rows[0], 'Deal created successfully', 201);
 }
 
 // Update deal
-async function handleUpdateDeal(client, request, dealId) {
+async function handleUpdateDeal(url, dealId) {
   const body = await request.json();
   const updates = [];
   const params = [];
@@ -302,7 +312,7 @@ async function handleUpdateDeal(client, request, dealId) {
     RETURNING *
   `;
   
-  const result = await client.query(query, params);
+  const result = await executeQuery(query, params);
   
   if (result.rows.length === 0) {
     return apiResponse(null, 'Deal not found', 404);
@@ -312,9 +322,9 @@ async function handleUpdateDeal(client, request, dealId) {
 }
 
 // Delete deal
-async function handleDeleteDeal(client, dealId) {
+async function handleDeleteDeal(dealId) {
   const query = `DELETE FROM deals WHERE id = $1 RETURNING id`;
-  const result = await client.query(query, [dealId]);
+  const result = await executeQuery(query, [dealId]);
   
   if (result.rows.length === 0) {
     return apiResponse(null, 'Deal not found', 404);

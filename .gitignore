@@ -24,6 +24,17 @@ dist-ssr
 *.sln
 *.sw?
 
+# VS Code Local History Extension
+.history/
+
+# Mac OS
+._*
+
+# Editor backups
+*~
+*.tmp
+*.bak
+
 # Environment variables
 .env
 .env.*
