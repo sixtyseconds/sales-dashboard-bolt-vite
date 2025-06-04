@@ -1,5 +1,7 @@
-module.exports = function handler(request, response) {
+export default function handler(request, response) {
   try {
+    console.log('User API called, method:', request.method);
+    
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       response.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,11 +26,13 @@ module.exports = function handler(request, response) {
 
       console.log('Returning user data for Andrew Bryce');
       
+      // Set headers
       response.setHeader('Content-Type', 'application/json');
       response.setHeader('Access-Control-Allow-Origin', '*');
       response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
       response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       
+      // Return JSON response
       return response.status(200).json({
         data: userData,
         error: null,
@@ -36,6 +40,7 @@ module.exports = function handler(request, response) {
       });
     }
 
+    // Method not allowed
     response.setHeader('Content-Type', 'application/json');
     response.setHeader('Access-Control-Allow-Origin', '*');
     
@@ -56,4 +61,4 @@ module.exports = function handler(request, response) {
       count: 0
     });
   }
-}; 
+} 
