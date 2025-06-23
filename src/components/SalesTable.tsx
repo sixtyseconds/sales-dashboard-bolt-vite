@@ -158,7 +158,15 @@ export function SalesTable() {
         if (filters.type === 'sale' && filters.saleType) {
           matchesSubType = activity.details?.toLowerCase().includes(filters.saleType.toLowerCase()) || false;
         } else if (filters.type === 'meeting' && filters.meetingType) {
-          matchesSubType = activity.details?.toLowerCase().includes(filters.meetingType.toLowerCase()) || false;
+          const searchTerm = filters.meetingType.toLowerCase();
+          const details = activity.details?.toLowerCase() || '';
+          
+          // Smart matching for discovery variants
+          if (searchTerm.includes('discovery')) {
+            matchesSubType = details.includes('discovery');
+          } else {
+            matchesSubType = details.includes(searchTerm);
+          }
         } else if (filters.type === 'outbound' && filters.outboundType) {
           matchesSubType = activity.details?.toLowerCase().includes(filters.outboundType.toLowerCase()) || false;
         }
@@ -792,6 +800,7 @@ export function SalesTable() {
                           {filters.type === 'meeting' && (
                             <>
                               <option value="Discovery Call">Discovery Call</option>
+                              <option value="Discovery Meeting">Discovery Meeting</option>
                               <option value="Product Demo">Product Demo</option>
                               <option value="Follow-up">Follow-up</option>
                               <option value="Demo">Demo</option>
