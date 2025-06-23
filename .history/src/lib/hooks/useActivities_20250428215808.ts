@@ -81,7 +81,7 @@ async function createActivity(activity: {
       user_id: user.id,
       type: activity.type,
       client_name: activity.client_name,
-      details: activity.details || null,
+      details: activity.details || '',
       amount: activity.amount,
       priority: activity.priority || 'medium',
       sales_rep: `${profile.first_name} ${profile.last_name}`,

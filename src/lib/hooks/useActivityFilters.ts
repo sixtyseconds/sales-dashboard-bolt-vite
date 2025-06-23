@@ -5,7 +5,7 @@ export type ActivityType = 'sale' | 'outbound' | 'meeting' | 'proposal';
 export type ActivityStatus = 'completed' | 'pending' | 'cancelled' | 'no_show';
 export type ActivityPriority = 'high' | 'medium' | 'low';
 export type SaleType = 'one-off' | 'subscription' | 'lifetime';
-export type MeetingType = 'Discovery Call' | 'Product Demo' | 'Follow-up' | 'Demo' | 'Other';
+export type MeetingType = 'Discovery Call' | 'Discovery Meeting' | 'Product Demo' | 'Follow-up' | 'Demo' | 'Other';
 export type OutboundType = 'Call' | 'Email' | 'LinkedIn' | 'Other';
 
 interface ActivityFilters {
