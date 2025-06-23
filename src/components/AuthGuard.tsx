@@ -13,7 +13,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // First try to get existing session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        // If no session but we have tokens in localStorage, try to recover
+        if (!session && !sessionError) {
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          if (userError && userError.message.includes('session')) {
+            // Session is invalid, clear it and redirect to login
+            await supabase.auth.signOut();
+          }
+        }
+        
         const isPublicRoute = publicRoutes.includes(location.pathname);
 
         if (!session && !isPublicRoute) {
@@ -23,6 +34,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
             navigate('/');
           }
         }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        // If there's an error, sign out and redirect to login
+        await supabase.auth.signOut();
+        const isPublicRoute = publicRoutes.includes(location.pathname);
+        if (!isPublicRoute) {
+          navigate('/auth/login');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -30,10 +49,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       const isPublicRoute = publicRoutes.includes(location.pathname);
 
-      if (!session && !isPublicRoute) {
+      if (event === 'SIGNED_OUT' || (!session && !isPublicRoute)) {
         navigate('/auth/login');
       } else if (session && isPublicRoute) {
         if (location.pathname !== '/auth/reset-password') {
@@ -46,6 +65,21 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
     };
   }, [navigate, location.pathname]);
+
+  // Add session refresh strategy
+  useEffect(() => {
+    const refreshSession = async () => {
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('Session refresh failed:', error);
+        // Don't automatically sign out here as it might be a temporary network issue
+      }
+    };
+
+    // Refresh session every 30 minutes
+    const interval = setInterval(refreshSession, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (isLoading) {
     return (
