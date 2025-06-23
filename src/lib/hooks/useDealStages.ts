@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { API_BASE_URL } from '@/lib/config';
 
 interface DealStage {
   id: string;
@@ -23,14 +23,17 @@ export function useDealStages() {
         setIsLoading(true);
         setError(null);
         
-        const { data, error } = await supabase
-          .from('deal_stages')
-          .select('*')
-          .order('order_position', { ascending: true });
-          
-        if (error) throw error;
+        const response = await fetch(`${API_BASE_URL}/stages`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch stages: ${response.statusText}`);
+        }
         
-        setStages(data);
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        
+        setStages(result.data || []);
       } catch (err) {
         console.error('Error fetching deal stages:', err);
         setError(err);
@@ -40,40 +43,31 @@ export function useDealStages() {
     }
 
     fetchStages();
-    
-    // Setup realtime subscription
-    const subscription = supabase
-      .channel('stage_changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'deal_stages' 
-      }, () => {
-        fetchStages();
-      })
-      .subscribe();
-      
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const createStage = async (stageData: Omit<DealStage, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       setError(null);
       
-      const { data, error } = await supabase
-        .from('deal_stages')
-        .insert(stageData)
-        .select()
-        .single();
-        
-      if (error) throw error;
+      const response = await fetch(`${API_BASE_URL}/stages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stageData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create stage: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
       
       // Optimistic update
-      setStages(prevStages => [...prevStages, data].sort((a, b) => a.order_position - b.order_position));
+      setStages(prevStages => [...prevStages, result.data].sort((a, b) => a.order_position - b.order_position));
       
-      return data;
+      return result.data;
     } catch (err) {
       console.error('Error creating stage:', err);
       setError(err);
@@ -85,18 +79,24 @@ export function useDealStages() {
     try {
       setError(null);
       
-      const { data, error } = await supabase
-        .from('deal_stages')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-        
-      if (error) throw error;
+      const response = await fetch(`${API_BASE_URL}/stages/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update stage: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
       
       // Optimistic update
       setStages(prevStages => 
-        prevStages.map(s => s.id === id ? data : s)
+        prevStages.map(s => s.id === id ? result.data : s)
           .sort((a, b) => a.order_position - b.order_position)
       );
       
@@ -112,12 +112,18 @@ export function useDealStages() {
     try {
       setError(null);
       
-      const { error } = await supabase
-        .from('deal_stages')
-        .delete()
-        .eq('id', id);
-        
-      if (error) throw error;
+      const response = await fetch(`${API_BASE_URL}/stages/${id}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete stage: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
       
       // Optimistic update
       setStages(prevStages => prevStages.filter(s => s.id !== id));
