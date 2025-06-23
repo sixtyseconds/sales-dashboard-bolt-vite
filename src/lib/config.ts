@@ -19,7 +19,7 @@ export const config = {
 // Helper to test API connectivity
 export async function testApiConnectivity() {
   try {
-    const response = await fetch(`${API_BASE_URL}/test`);
+    const response = await fetch(`${API_BASE_URL}/health`);
     const data = await response.json();
     console.log('✅ API connectivity test passed:', data);
     return true;

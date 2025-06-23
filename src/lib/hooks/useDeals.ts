@@ -96,8 +96,8 @@ export function useDeals(ownerId?: string) {
       }
       
       const dealsResult = await dealsResponse.json();
-      if (!dealsResult.success) {
-        throw new Error(dealsResult.message || 'Failed to fetch deals');
+      if (dealsResult.error) {
+        throw new Error(dealsResult.error || 'Failed to fetch deals');
       }
       
       setDeals(dealsResult.data || []);
@@ -119,8 +119,8 @@ export function useDeals(ownerId?: string) {
       }
       
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to fetch stages');
+      if (result.error) {
+        throw new Error(result.error || 'Failed to fetch stages');
       }
       
       setStages(result.data || []);
@@ -163,8 +163,8 @@ export function useDeals(ownerId?: string) {
       }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to create deal');
+      if (result.error) {
+        throw new Error(result.error || 'Failed to create deal');
       }
 
       toast.success('Deal created successfully');
@@ -192,8 +192,8 @@ export function useDeals(ownerId?: string) {
       }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to update deal');
+      if (result.error) {
+        throw new Error(result.error || 'Failed to update deal');
       }
 
       toast.success('Deal updated successfully');
@@ -217,8 +217,8 @@ export function useDeals(ownerId?: string) {
       }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to delete deal');
+      if (result.error) {
+        throw new Error(result.error || 'Failed to delete deal');
       }
 
       toast.success('Deal deleted successfully');
@@ -249,8 +249,8 @@ export function useDeals(ownerId?: string) {
       }
 
       const result = await response.json();
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to move deal');
+      if (result.error) {
+        throw new Error(result.error || 'Failed to move deal');
       }
 
       await fetchDeals(); // Refresh data
