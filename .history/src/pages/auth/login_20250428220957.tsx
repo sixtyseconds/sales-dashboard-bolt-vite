@@ -27,14 +27,10 @@ export default function Login() {
 
       if (error) throw error;
 
-      // No need for a toast here, useAuth hook will handle it
+      toast.success('Welcome back!');
       navigate('/');
     } catch (error: any) {
-      if (error.message === 'Invalid login credentials') {
-        toast.error('Invalid email or password. Please try again.');
-      } else {
-        toast.error(error.message || 'An unknown error occurred.');
-      }
+      toast.error(error.message);
     } finally {
       setIsLoading(false);
     }
