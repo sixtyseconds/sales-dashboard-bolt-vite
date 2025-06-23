@@ -96,10 +96,11 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
         };
         await addSale(saleData);
       } else if (selectedAction) {
+        console.log('Submitting activity with details:', formData.details);
         await addActivity({
           type: selectedAction as 'meeting' | 'proposal',
           client_name: formData.client_name || 'Unknown',
-          details: formData.details,
+          details: formData.details || 'No details provided',
           amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
           date: selectedDate.toISOString(),
           contactIdentifier: formData.contactIdentifier,

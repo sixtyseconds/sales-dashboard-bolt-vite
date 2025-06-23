@@ -158,19 +158,14 @@ export function SalesTable() {
         if (filters.type === 'sale' && filters.saleType) {
           matchesSubType = activity.details?.toLowerCase().includes(filters.saleType.toLowerCase()) || false;
         } else if (filters.type === 'meeting' && filters.meetingType) {
-          const filterType = filters.meetingType.toLowerCase();
+          const searchTerm = filters.meetingType.toLowerCase();
           const details = activity.details?.toLowerCase() || '';
           
-          // Exact matching for new meeting types (they should match exactly now)
-          if (filterType === 'discovery call' || filterType === 'discovery meeting') {
-            // Match either "Discovery Call" or "Discovery Meeting" when user selects either discovery option
-            matchesSubType = details.includes('discovery call') || details.includes('discovery meeting');
-          } else if (filterType === 'product demo' || filterType === 'demo') {
-            // Match either "Product Demo" or "Demo" 
-            matchesSubType = details.includes('product demo') || details.includes('demo');
+          // Smart matching for discovery variants
+          if (searchTerm.includes('discovery')) {
+            matchesSubType = details.includes('discovery');
           } else {
-            // For other types (Follow-up, Other), match exactly
-            matchesSubType = details.includes(filterType);
+            matchesSubType = details.includes(searchTerm);
           }
         } else if (filters.type === 'outbound' && filters.outboundType) {
           matchesSubType = activity.details?.toLowerCase().includes(filters.outboundType.toLowerCase()) || false;

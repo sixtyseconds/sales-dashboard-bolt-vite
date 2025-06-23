@@ -49,13 +49,6 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate meeting type for meetings
-    if (selectedAction === 'meeting' && !formData.details) {
-      toast.error('Please select a meeting type');
-      return;
-    }
-    
     // For non-outbound, require identifier
     if (selectedAction !== 'outbound') {
       if (!formData.contactIdentifier) {
