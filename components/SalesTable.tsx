@@ -75,6 +75,8 @@ export default function SalesTable() {
     return activities.filter(activity => {
       const matchesType = !filters.type || activity.type === filters.type;
       const matchesSalesRep = !filters.salesRep || activity.salesRep === filters.salesRep;
+      const matchesMeetingType = !filters.meetingType || 
+        (activity.type === 'meeting' && activity.details === filters.meetingType);
       const matchesSearch = !filters.searchQuery || 
         activity.clientName.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
         activity.type.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
@@ -83,7 +85,7 @@ export default function SalesTable() {
       const matchesDate = activityDate >= filters.dateRange.start && 
                          activityDate <= filters.dateRange.end;
 
-      return matchesType && matchesSalesRep && matchesSearch && matchesDate;
+      return matchesType && matchesSalesRep && matchesMeetingType && matchesSearch && matchesDate;
     });
   }, [activities, filters]);
 
@@ -637,7 +639,7 @@ export default function SalesTable() {
                   className="overflow-hidden"
                   suppressHydrationWarning
                 >
-                  <div suppressHydrationWarning className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div suppressHydrationWarning className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <select
                       suppressHydrationWarning
                       className="bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm"
@@ -661,6 +663,19 @@ export default function SalesTable() {
                         <option key={rep} value={rep}>{rep}</option>
                       ))}
                     </select>
+                    {(!filters.type || filters.type === 'meeting') && (
+                      <select
+                        suppressHydrationWarning
+                        className="bg-gray-800/50 border border-gray-700/50 rounded-xl px-4 py-2.5 text-white text-sm"
+                        value={filters.meetingType || 'all'}
+                        onChange={(e) => setFilters({ meetingType: e.target.value === 'all' ? undefined : e.target.value })}
+                      >
+                        <option value="all">All Meeting Types</option>
+                        <option value="discovery">Discovery</option>
+                        <option value="demo">Demo</option>
+                        <option value="follow-up">Follow-up</option>
+                      </select>
+                    )}
                     <DateRangePicker
                       dateRange={{ from: filters.dateRange.start, to: filters.dateRange.end }}
                       onDateRangeChange={(range) => 

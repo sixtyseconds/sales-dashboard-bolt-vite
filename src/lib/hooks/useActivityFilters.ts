@@ -4,6 +4,7 @@ import { startOfMonth, endOfMonth } from 'date-fns';
 interface ActivityFilters {
   type?: string;
   salesRep?: string;
+  meetingType?: string;
   dateRange: {
     start: Date;
     end: Date;
@@ -25,7 +26,8 @@ export const useActivityFilters = create<ActivityFiltersStore>((set) => ({
       end: new Date(),
     },
     searchQuery: '',
-    salesRep: undefined
+    salesRep: undefined,
+    meetingType: undefined
   },
   setFilters: (newFilters) => 
     set((state) => ({
@@ -45,7 +47,8 @@ export const useActivityFilters = create<ActivityFiltersStore>((set) => ({
           end: new Date(),
         },
         searchQuery: '',
-        salesRep: undefined
+        salesRep: undefined,
+        meetingType: undefined
       }
     }),
 }));

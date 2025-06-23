@@ -17,6 +17,8 @@ import {
   ArrowDown,
   TrendingUp,
   TrendingDown,
+  Search,
+  ArrowUpRight,
 } from 'lucide-react';
 import SalesActivityChart from '@/components/SalesActivityChart';
 import ReactDOM from 'react-dom';
@@ -579,6 +581,84 @@ export default function Dashboard() {
           dateRange={selectedMonthRange}
           previousMonthTotal={previousMonthTotals.proposals}
         />
+      </div>
+
+      {/* Meeting Type Breakdown */}
+      <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Meeting Breakdown</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            { 
+              type: 'discovery', 
+              label: 'Discovery Calls', 
+              color: 'blue',
+              icon: Search 
+            },
+            { 
+              type: 'demo', 
+              label: 'Product Demos', 
+              color: 'violet',
+              icon: Users 
+            },
+            { 
+              type: 'follow-up', 
+              label: 'Follow-up Meetings', 
+              color: 'emerald',
+              icon: ArrowUpRight 
+            }
+          ].map(({ type, label, color, icon: Icon }) => {
+            const count = selectedMonthActivities
+              .filter(a => a.type === 'meeting' && a.details === type)
+              .reduce((sum, a) => sum + (a.quantity || 1), 0);
+            
+            const previousCount = previousMonthToDateActivities
+              .filter(a => a.type === 'meeting' && a.details === type)
+              .reduce((sum, a) => sum + (a.quantity || 1), 0);
+            
+            const trend = previousCount > 0 ? Math.round(((count - previousCount) / previousCount) * 100) : 0;
+            
+            return (
+              <motion.div
+                key={type}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => {
+                  setFilters({ 
+                    type: 'meeting',
+                    meetingType: type,
+                    dateRange: selectedMonthRange 
+                  });
+                  navigate('/activity', { state: { preserveFilters: true } });
+                }}
+                className={`bg-gray-800/30 rounded-xl p-4 border border-gray-700/50 hover:bg-gray-800/50 transition-all duration-300 cursor-pointer hover:border-${color}-500/30`}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`p-2 rounded-lg bg-${color}-500/10 border border-${color}-500/20`}>
+                    <Icon className={`w-5 h-5 text-${color}-500`} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-white text-sm">{label}</h3>
+                    <p className="text-xs text-gray-400">This month</p>
+                  </div>
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-2xl font-bold text-white">{count}</span>
+                  <div className={`flex items-center gap-1 text-xs font-medium ${
+                    trend >= 0 ? `text-${color}-500` : 'text-red-500'
+                  }`}>
+                    {trend >= 0 ? (
+                      <ArrowUp className="w-3 h-3" />
+                    ) : (
+                      <ArrowDown className="w-3 h-3" />
+                    )}
+                    {trend >= 0 ? '+' : ''}{trend}%
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Sales Activity Chart */}
