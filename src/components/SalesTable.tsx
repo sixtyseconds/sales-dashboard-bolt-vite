@@ -20,9 +20,12 @@ import {
   BarChart as BarChartIcon,
   Phone,
   FileText,
-  UploadCloud // Added for potential use in import component
+  UploadCloud, // Added for potential use in import component
+  Filter,
+  X,
+  Search
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities, Activity } from '@/lib/hooks/useActivities';
 import { useUser } from '@/lib/hooks/useUser'; // Import useUser hook
 import { Button } from '@/components/ui/button';
@@ -40,6 +43,7 @@ import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { ActivityUploadModal } from './admin/ActivityUploadModal'; // Import the new modal
+// ActivityFilters component created inline to avoid import issues
 
 // Define type for date range presets
 type DateRangePreset = 'today' | 'thisWeek' | 'thisMonth' | 'last30Days' | 'custom';
@@ -67,6 +71,7 @@ export function SalesTable() {
   // State for custom date range (implement date pickers later if needed)
   // const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false); // State for upload modal
+  const [showFilters, setShowFilters] = useState(false); // State for filters panel
 
   // Calculate the current and previous date ranges based on the selected type
   const { currentDateRange, previousDateRange } = useMemo(() => {
@@ -119,21 +124,61 @@ export function SalesTable() {
     });
   }, [currentDateRange, setFilters]);
 
-  // Filter activities combining both date range and type filter
+  // Filter activities with comprehensive filtering
   const filteredActivities = useMemo(() => {
     return activities.filter(activity => {
       try {
         const activityDate = new Date(activity.date);
+        
+        // Date range filtering
+        const matchesDate = activityDate >= currentDateRange.start && 
+                           activityDate <= currentDateRange.end;
+        
+        // Basic type filtering
         const matchesType = !filters.type || activity.type === filters.type;
-        return activityDate >= currentDateRange.start && 
-               activityDate <= currentDateRange.end &&
-               matchesType;
+        
+        // Sales rep filtering
+        const matchesSalesRep = !filters.salesRep || activity.sales_rep === filters.salesRep;
+        
+        // Client name filtering
+        const matchesClient = !filters.clientName || activity.client_name === filters.clientName;
+        
+        // Status filtering
+        const matchesStatus = !filters.status || activity.status === filters.status;
+        
+        // Priority filtering
+        const matchesPriority = !filters.priority || activity.priority === filters.priority;
+        
+        // Amount range filtering
+        const matchesAmountRange = (!filters.minAmount || (activity.amount && activity.amount >= filters.minAmount)) &&
+                                  (!filters.maxAmount || (activity.amount && activity.amount <= filters.maxAmount));
+        
+        // Sub-type filtering based on details field (since we don't have dedicated fields yet)
+        let matchesSubType = true;
+        if (filters.type === 'sale' && filters.saleType) {
+          matchesSubType = activity.details?.toLowerCase().includes(filters.saleType.toLowerCase()) || false;
+        } else if (filters.type === 'meeting' && filters.meetingType) {
+          matchesSubType = activity.details?.toLowerCase().includes(filters.meetingType.toLowerCase()) || false;
+        } else if (filters.type === 'outbound' && filters.outboundType) {
+          matchesSubType = activity.details?.toLowerCase().includes(filters.outboundType.toLowerCase()) || false;
+        }
+        
+        // Search query filtering
+        const matchesSearch = !filters.searchQuery || 
+          activity.client_name?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+          activity.type?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+          activity.sales_rep?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+          activity.details?.toLowerCase().includes(filters.searchQuery.toLowerCase());
+
+        return matchesDate && matchesType && matchesSalesRep && matchesClient && 
+               matchesStatus && matchesPriority && matchesAmountRange && 
+               matchesSubType && matchesSearch;
       } catch (e) {
         console.error("Error parsing activity date:", activity.date, e);
         return false; // Exclude activities with invalid dates
       }
     });
-  }, [activities, currentDateRange, filters.type]);
+  }, [activities, currentDateRange, filters]);
 
   // Filter activities for the PREVIOUS equivalent period
   const previousPeriodActivities = useMemo(() => {
@@ -584,6 +629,226 @@ export function SalesTable() {
                 <option value="last30Days">Last 30 Days</option>
               </select>
             </div>
+          </div>
+
+          {/* Activity Filters */}
+          <div className="space-y-4">
+            {/* Filter Toggle and Summary */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="bg-gray-800/50 border-gray-700/50 text-white hover:bg-gray-700/50"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Advanced Filters
+                {(filters.type || filters.salesRep || filters.status || filters.priority || filters.searchQuery) && (
+                  <span className="ml-2 bg-emerald-500 text-white text-xs rounded-full px-2 py-0.5">
+                    Active
+                  </span>
+                )}
+              </Button>
+
+              {(filters.type || filters.salesRep || filters.status || filters.priority || filters.searchQuery) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            {/* Filter Panel */}
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50 space-y-6">
+                    
+                    {/* Search */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-300">Search</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search activities, clients, details..."
+                          value={filters.searchQuery}
+                          onChange={(e) => setFilters({ searchQuery: e.target.value })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Filter Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      
+                      {/* Activity Type */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Activity Type</label>
+                        <select
+                          value={filters.type || 'all'}
+                          onChange={(e) => setFilters({ type: e.target.value === 'all' ? undefined : e.target.value as any })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="sale">Sales</option>
+                          <option value="outbound">Outbound</option>
+                          <option value="meeting">Meetings</option>
+                          <option value="proposal">Proposals</option>
+                        </select>
+                      </div>
+
+                      {/* Sales Rep */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Sales Rep</label>
+                        <select
+                          value={filters.salesRep || 'all'}
+                          onChange={(e) => setFilters({ salesRep: e.target.value === 'all' ? undefined : e.target.value })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value="all">All Sales Reps</option>
+                          {Array.from(new Set(activities.map(a => a.sales_rep).filter(Boolean))).sort().map((rep: string) => (
+                            <option key={rep} value={rep}>{rep}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Status */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Status</label>
+                        <select
+                          value={filters.status || 'all'}
+                          onChange={(e) => setFilters({ status: e.target.value === 'all' ? undefined : e.target.value as any })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="completed">Completed</option>
+                          <option value="pending">Pending</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="no_show">No Show</option>
+                        </select>
+                      </div>
+
+                      {/* Priority */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">Priority</label>
+                        <select
+                          value={filters.priority || 'all'}
+                          onChange={(e) => setFilters({ priority: e.target.value === 'all' ? undefined : e.target.value as any })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value="all">All Priorities</option>
+                          <option value="high">High</option>
+                          <option value="medium">Medium</option>
+                          <option value="low">Low</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Sub-type Filters (when applicable) */}
+                    {filters.type && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-300">
+                          {filters.type === 'sale' ? 'Sale Type' : 
+                           filters.type === 'meeting' ? 'Meeting Type' : 
+                           filters.type === 'outbound' ? 'Outbound Type' : 
+                           'Sub Type'}
+                        </label>
+                        <select
+                          value={
+                            filters.type === 'sale' ? (filters.saleType || 'all') :
+                            filters.type === 'meeting' ? (filters.meetingType || 'all') :
+                            filters.type === 'outbound' ? (filters.outboundType || 'all') : 'all'
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value === 'all' ? undefined : e.target.value;
+                            if (filters.type === 'sale') {
+                              setFilters({ saleType: value as any });
+                            } else if (filters.type === 'meeting') {
+                              setFilters({ meetingType: value as any });
+                            } else if (filters.type === 'outbound') {
+                              setFilters({ outboundType: value as any });
+                            }
+                          }}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        >
+                          <option value="all">All Types</option>
+                          {filters.type === 'sale' && (
+                            <>
+                              <option value="one-off">One-off</option>
+                              <option value="subscription">Subscription</option>
+                              <option value="lifetime">Lifetime</option>
+                            </>
+                          )}
+                          {filters.type === 'meeting' && (
+                            <>
+                              <option value="Discovery Call">Discovery Call</option>
+                              <option value="Product Demo">Product Demo</option>
+                              <option value="Follow-up">Follow-up</option>
+                              <option value="Demo">Demo</option>
+                              <option value="Other">Other</option>
+                            </>
+                          )}
+                          {filters.type === 'outbound' && (
+                            <>
+                              <option value="Call">Phone Call</option>
+                              <option value="Email">Email</option>
+                              <option value="LinkedIn">LinkedIn</option>
+                              <option value="Other">Other</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Amount Range */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-300">Amount Range</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          type="number"
+                          placeholder="Min amount"
+                          value={filters.minAmount || ''}
+                          onChange={(e) => setFilters({ minAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Max amount"
+                          value={filters.maxAmount || ''}
+                          onChange={(e) => setFilters({ maxAmount: e.target.value ? parseFloat(e.target.value) : undefined })}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Client Filter */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-300">Client</label>
+                      <select
+                        value={filters.clientName || 'all'}
+                        onChange={(e) => setFilters({ clientName: e.target.value === 'all' ? undefined : e.target.value })}
+                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      >
+                        <option value="all">All Clients</option>
+                        {Array.from(new Set(activities.map(a => a.client_name).filter(Boolean))).sort().map((client: string) => (
+                          <option key={client} value={client}>{client}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 px-4 sm:px-0">
