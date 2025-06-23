@@ -8,8 +8,24 @@ if (!supabaseUrl) throw new Error('Missing env.VITE_SUPABASE_URL');
 if (!supabaseAnonKey) throw new Error('Missing env.VITE_SUPABASE_ANON_KEY');
 if (!supabaseServiceKey) throw new Error('Missing env.VITE_SUPABASE_SERVICE_ROLE_KEY');
 
-// Regular client for normal operations
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Debug logging for environment variables (remove in production)
+if (import.meta.env.MODE === 'development') {
+  console.log('Supabase Config:', {
+    url: supabaseUrl?.substring(0, 20) + '...',
+    anonKey: supabaseAnonKey?.substring(0, 10) + '...',
+    hasServiceKey: !!supabaseServiceKey
+  });
+}
+
+// Regular client for normal operations with explicit session config
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  }
+});
 
 // Admin client with service role for admin operations, configured to avoid auth conflicts
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
