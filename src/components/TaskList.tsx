@@ -12,7 +12,6 @@ import {
   Plus,
   Filter,
   Search,
-  MoreHorizontal,
   Edit,
   Trash2,
   AlertTriangle,
@@ -32,13 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
+// Temporarily removing dropdown menu to fix import issues
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -535,33 +528,26 @@ const TaskList: React.FC<TaskListProps> = ({
                                         </Avatar>
                                       )}
 
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
+                                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {onEditTask && (
                                           <Button 
                                             variant="ghost" 
                                             size="sm"
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                                            className="h-8 w-8 p-0 hover:bg-gray-700"
+                                            onClick={() => onEditTask(task)}
                                           >
-                                            <MoreHorizontal className="w-4 h-4" />
+                                            <Edit className="w-4 h-4" />
                                           </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                          {onEditTask && (
-                                            <DropdownMenuItem onClick={() => onEditTask(task)}>
-                                              <Edit className="w-4 h-4 mr-2" />
-                                              Edit Task
-                                            </DropdownMenuItem>
-                                          )}
-                                          <DropdownMenuSeparator />
-                                          <DropdownMenuItem 
-                                            onClick={() => handleDeleteTask(task.id)}
-                                            className="text-red-400 focus:text-red-400"
-                                          >
-                                            <Trash2 className="w-4 h-4 mr-2" />
-                                            Delete Task
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                        )}
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400"
+                                          onClick={() => handleDeleteTask(task.id)}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
