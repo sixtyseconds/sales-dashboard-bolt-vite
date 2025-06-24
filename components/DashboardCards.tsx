@@ -11,7 +11,7 @@ import {
   Target,
   Phone,
   FileText,
-  DollarSign,
+  PoundSterling,
 } from 'lucide-react';
 
 export function DashboardCards() {
@@ -34,7 +34,7 @@ export function DashboardCards() {
   const metrics = [
     {
       title: 'Revenue',
-      icon: DollarSign,
+      icon: PoundSterling,
       value: salesData.performance.reduce((sum, sale) => sum + sale.amount, 0),
       target: targets.revenue_target,
      color: 'emerald', // Green for deals/sales

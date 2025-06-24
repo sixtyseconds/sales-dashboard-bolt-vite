@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { DealCard } from './DealCard';
-import { PlusCircle, DollarSign } from 'lucide-react';
+import { PlusCircle, PoundSterling } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface PipelineColumnProps {
@@ -127,7 +127,7 @@ export function PipelineColumn({
             </div>
             <div className="flex items-center justify-between font-medium">
               <div className="flex items-center gap-1 text-sm">
-                <DollarSign className="w-3.5 h-3.5 text-[#37bd7e]" />
+                <PoundSterling className="w-3.5 h-3.5 text-[#37bd7e]" />
                 <span className="text-white">Weighted ({stage.default_probability}%):</span>
               </div>
               <span className="text-sm text-[#37bd7e]">{formatCurrency(weightedValue)}</span>
