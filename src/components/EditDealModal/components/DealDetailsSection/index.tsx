@@ -1,5 +1,5 @@
 import React, { RefObject } from 'react';
-import { FileText, Building, User, Calendar, DollarSign, Star, Package2, AlignLeft } from 'lucide-react';
+import { FileText, Building, User, Calendar, PoundSterling, Star, Package2, AlignLeft } from 'lucide-react';
 import { useFormContext, Controller } from 'react-hook-form';
 
 interface DealDetailsSectionProps {
@@ -117,7 +117,7 @@ const DealDetailsSection: React.FC<DealDetailsSectionProps> = ({ initialFocusRef
         >
           <div className="relative">
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
-              <DollarSign className="w-4 h-4" />
+              <PoundSterling className="w-4 h-4" />
             </div>
             <div className="absolute left-9 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none">
               £

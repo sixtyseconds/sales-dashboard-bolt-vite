@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useUser } from '@/lib/hooks/useUser';
 import { useSalesData } from '@/lib/hooks/useSalesData';
 import { useTargets } from '@/lib/hooks/useTargets';
-import { Users, Phone, FileText, DollarSign, Loader2 } from 'lucide-react';
+import { Users, Phone, FileText, PoundSterling, Loader2 } from 'lucide-react';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { useNavigate } from 'react-router-dom';
 import { useActivities } from '@/lib/hooks/useActivities';
@@ -170,7 +170,7 @@ export default function SalesFunnel() {
       id: 'closed',
       label: 'Signed',
       value: funnelMetrics.closed,
-      icon: DollarSign,
+      icon: PoundSterling,
       color: 'emerald',
       description: 'Deals signed'
     },

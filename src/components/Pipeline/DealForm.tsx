@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, DollarSign, Users, Building, FileText } from 'lucide-react';
+import { X, Calendar, PoundSterling, Users, Building, FileText } from 'lucide-react';
 import { useDealStages } from '@/lib/hooks/useDealStages';
 import { IdentifierField, IdentifierType } from '@/components/IdentifierField';
 import { toast } from 'sonner';
@@ -62,8 +62,8 @@ export function DealForm({
         expected_close_date: deal.expected_close_date || '',
         description: deal.description || '',
         probability: deal.probability || '',
-        contactIdentifier: deal.contactIdentifier || '',
-        contactIdentifierType: deal.contactIdentifierType || 'unknown'
+        contactIdentifier: deal.contact_identifier || deal.contactIdentifier || '',
+        contactIdentifierType: deal.contact_identifier_type || deal.contactIdentifierType || 'unknown'
       });
     } else if (initialStageId) {
       setFormData(prev => ({
@@ -109,10 +109,15 @@ export function DealForm({
       return;
     }
     
-    // Prepare data for saving, ensuring empty date is null
+    // Prepare data for saving, mapping camelCase to snake_case and ensuring empty date is null
+    const { contactIdentifier, contactIdentifierType, ...otherFormData } = formData;
+    
     const dataToSave = {
-      ...formData,
-      expected_close_date: formData.expected_close_date === '' ? null : formData.expected_close_date
+      ...otherFormData,
+      expected_close_date: formData.expected_close_date === '' ? null : formData.expected_close_date,
+      // Map camelCase frontend fields to snake_case database fields
+      contact_identifier: contactIdentifier,
+      contact_identifier_type: contactIdentifierType
     };
     
     onSave(dataToSave); // Pass the cleaned data
@@ -235,7 +240,7 @@ export function DealForm({
               bg-gray-900/80 focus-within:border-violet-500/50 transition-colors"
             >
               <span className="pl-3 text-gray-500">
-                <DollarSign className="w-5 h-5" />
+                <PoundSterling className="w-5 h-5" />
               </span>
               <input
                 type="number"

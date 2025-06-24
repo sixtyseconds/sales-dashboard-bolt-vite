@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, PlusCircle, LayoutGrid, Table, X, DollarSign, Percent } from 'lucide-react';
+import { Search, Filter, PlusCircle, LayoutGrid, Table, X, PoundSterling, Percent } from 'lucide-react';
 import { usePipeline } from '@/lib/contexts/PipelineContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -195,7 +195,7 @@ export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineH
                 <div className="space-y-4">
                   <div>
                     <label className="flex items-center text-sm font-medium text-gray-300 mb-2">
-                      <DollarSign className="w-4 h-4 mr-2 text-gray-400" />
+                      <PoundSterling className="w-4 h-4 mr-2 text-gray-400" />
                       Deal Value Range
                     </label>
                     <div className="flex items-center gap-3">

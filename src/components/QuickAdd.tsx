@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, X, Phone, FileText, Users, DollarSign } from 'lucide-react';
+import { Plus, X, Phone, FileText, Users, PoundSterling } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities } from '@/lib/hooks/useActivities';
 import { Calendar } from '@/components/ui/calendar';
@@ -127,7 +127,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   };
 
   const quickActions = [
-    { id: 'sale', icon: DollarSign, label: 'Add Sale', color: 'emerald' },
+    { id: 'sale', icon: PoundSterling, label: 'Add Sale', color: 'emerald' },
     { id: 'outbound', icon: Phone, label: 'Add Outbound', color: 'blue' },
     { id: 'meeting', icon: Users, label: 'Add Meeting', color: 'violet' },
     { id: 'proposal', icon: FileText, label: 'Add Proposal', color: 'orange' },
