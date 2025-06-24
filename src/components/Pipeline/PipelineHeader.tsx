@@ -63,45 +63,42 @@ export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineH
       {stageMetrics && stageMetrics.length > 0 && (
         <div className="bg-gray-900/50 rounded-xl border border-gray-800/50 p-4">
           <h3 className="text-lg font-semibold text-white mb-3">Weighted Pipeline by Stage</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="flex flex-wrap gap-3">
             {stageMetrics.map((metric) => {
               const formattedWeighted = new Intl.NumberFormat('en-GB', {
                 style: 'currency',
                 currency: 'GBP',
-                maximumFractionDigits: 0
+                maximumFractionDigits: 0,
+                notation: metric.weightedValue >= 1000000 ? 'compact' : 'standard'
               }).format(metric.weightedValue);
               
               const formattedTotal = new Intl.NumberFormat('en-GB', {
                 style: 'currency',
                 currency: 'GBP',
-                maximumFractionDigits: 0
+                maximumFractionDigits: 0,
+                notation: metric.value >= 1000000 ? 'compact' : 'standard'
               }).format(metric.value);
 
               return (
                 <div
                   key={metric.stageId}
-                  className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50 hover:border-gray-600/50 transition-colors"
+                  className="flex items-center gap-3 bg-gray-800/50 rounded-lg px-4 py-2.5 border border-gray-700/50 hover:border-gray-600/50 transition-colors min-w-0"
                 >
-                  <div className="flex flex-col">
-                    <div className="text-sm font-medium text-gray-300 mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-medium text-gray-300 whitespace-nowrap">
                       {metric.stageName}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <div className="text-lg font-bold text-emerald-400">
-                          {formattedWeighted}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Total: {formattedTotal}
-                        </div>
+                    <div className="text-xs bg-gray-700/50 text-gray-400 px-2 py-0.5 rounded-full">
+                      {metric.count}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-emerald-400 leading-none">
+                        {formattedWeighted}
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-white">
-                          {metric.count}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          deals
-                        </div>
+                      <div className="text-xs text-gray-500 leading-none">
+                        of {formattedTotal}
                       </div>
                     </div>
                   </div>
