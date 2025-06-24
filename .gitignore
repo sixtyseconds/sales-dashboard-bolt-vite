@@ -26,14 +26,25 @@ dist-ssr
 
 # VS Code Local History Extension
 .history/
+**/.history/
 
 # Mac OS
 ._*
+**/.DS_Store
+**._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
 
 # Editor backups
 *~
 *.tmp
 *.bak
+*.swp
+*.swo
 
 # Environment variables
 .env
@@ -44,3 +55,18 @@ dist-ssr
 **/supabase/.branches
 **/supabase/.temp
 .vercel
+
+# Additional unnecessary files
+*.orig
+*.rej
+.cache/
+coverage/
+junit.xml
+test-results/
+playwright-report/
+playwright/.cache/
+
+# IDE and editor specific
+.vscode-test/
+.nyc_output/
+node_modules.nosync/
