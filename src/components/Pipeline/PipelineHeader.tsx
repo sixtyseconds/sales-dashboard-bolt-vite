@@ -16,7 +16,8 @@ export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineH
     filterOptions, 
     setFilterOptions,
     pipelineValue,
-    weightedPipelineValue
+    weightedPipelineValue,
+    stageMetrics
   } = usePipeline();
   
   const [showFilters, setShowFilters] = useState(false);
@@ -47,7 +48,7 @@ export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineH
         
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-col items-end">
-            <div className="text-sm text-gray-400">Pipeline Value</div>
+            <div className="text-sm text-gray-400">Total Pipeline</div>
             <div className="text-xl font-bold text-emerald-400">
               {formattedPipelineValue}
             </div>
@@ -57,6 +58,59 @@ export function PipelineHeader({ onAddDealClick, view, onViewChange }: PipelineH
           </div>
         </div>
       </div>
+
+      {/* Weighted Amount Per Pipeline Stage */}
+      {stageMetrics && stageMetrics.length > 0 && (
+        <div className="bg-gray-900/50 rounded-xl border border-gray-800/50 p-4">
+          <h3 className="text-lg font-semibold text-white mb-3">Weighted Pipeline by Stage</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {stageMetrics.map((metric) => {
+              const formattedWeighted = new Intl.NumberFormat('en-GB', {
+                style: 'currency',
+                currency: 'GBP',
+                maximumFractionDigits: 0
+              }).format(metric.weightedValue);
+              
+              const formattedTotal = new Intl.NumberFormat('en-GB', {
+                style: 'currency',
+                currency: 'GBP',
+                maximumFractionDigits: 0
+              }).format(metric.value);
+
+              return (
+                <div
+                  key={metric.stageId}
+                  className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50 hover:border-gray-600/50 transition-colors"
+                >
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium text-gray-300 mb-1">
+                      {metric.stageName}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <div className="text-lg font-bold text-emerald-400">
+                          {formattedWeighted}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Total: {formattedTotal}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-white">
+                          {metric.count}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          deals
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">

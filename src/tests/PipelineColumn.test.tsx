@@ -6,7 +6,7 @@ import { DndContext } from '@dnd-kit/core';
 // Mock formatCurrency utility
 vi.mock('../lib/utils', () => ({
   cn: vi.fn((...args) => args.join(' ')),
-  formatCurrency: vi.fn((value) => `$${value}`)
+  formatCurrency: vi.fn((value) => `£${value.toLocaleString()}`)
 }));
 
 describe('PipelineColumn Component', () => {
@@ -66,11 +66,11 @@ describe('PipelineColumn Component', () => {
       />
     );
     
-    // Total value should be $3000
-    expect(screen.getByText('$3000')).toBeInTheDocument();
+    // Total value should be £3,000
+    expect(screen.getByText('£3,000')).toBeInTheDocument();
     
-    // Weighted value should be $750 (25% of $3000)
-    expect(screen.getByText('$750')).toBeInTheDocument();
+    // Weighted value should be £750 (25% of £3,000)
+    expect(screen.getByText('£750')).toBeInTheDocument();
     
     // Should show the probability percentage
     expect(screen.getByText('Weighted (25%):')).toBeInTheDocument();
