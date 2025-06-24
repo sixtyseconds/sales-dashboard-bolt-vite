@@ -1,6 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
+import { createApiMonitor } from '@/lib/utils/apiUtils';
+import { API_BASE_URL } from '@/lib/config';
 import { AppLayout } from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
 import Dashboard from '@/pages/Dashboard';
@@ -40,6 +43,17 @@ declare global {
 window.queryClient = queryClient;
 
 function App() {
+  // Initialize API connection monitoring
+  useEffect(() => {
+    const monitor = createApiMonitor(API_BASE_URL, 30000); // Check every 30 seconds
+    monitor.start();
+    
+    // Cleanup on unmount
+    return () => {
+      monitor.stop();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGuard>

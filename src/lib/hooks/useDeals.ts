@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { API_BASE_URL } from '@/lib/config';
+import { fetchWithRetry, apiCall } from '@/lib/utils/apiUtils';
 
 export interface DealWithRelationships {
   id: string;
@@ -90,17 +91,13 @@ export function useDeals(ownerId?: string) {
         includeRelationships: 'true'
       });
       
-      const dealsResponse = await fetch(`${API_BASE_URL}/deals?${dealsParams}`);
-      if (!dealsResponse.ok) {
-        throw new Error(`Failed to fetch deals: ${dealsResponse.statusText}`);
-      }
+      const dealsResult = await apiCall<DealWithRelationships[]>(
+        `${API_BASE_URL}/deals?${dealsParams}`,
+        {},
+        { maxRetries: 2, retryDelay: 1500 }
+      );
       
-      const dealsResult = await dealsResponse.json();
-      if (dealsResult.error) {
-        throw new Error(dealsResult.error || 'Failed to fetch deals');
-      }
-      
-      setDeals(dealsResult.data || []);
+      setDeals(dealsResult || []);
     } catch (err: any) {
       console.error('Error fetching deals:', err);
       setError(err.message);
@@ -113,17 +110,13 @@ export function useDeals(ownerId?: string) {
   // Fetch stages from API
   const fetchStages = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/stages`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch stages: ${response.statusText}`);
-      }
+      const result = await apiCall<DealStage[]>(
+        `${API_BASE_URL}/stages`,
+        {},
+        { maxRetries: 2, retryDelay: 1500 }
+      );
       
-      const result = await response.json();
-      if (result.error) {
-        throw new Error(result.error || 'Failed to fetch stages');
-      }
-      
-      setStages(result.data || []);
+      setStages(result || []);
     } catch (err: any) {
       console.error('Error fetching stages:', err);
       setError(err.message);

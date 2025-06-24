@@ -2,6 +2,9 @@
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const isProduction = window.location.hostname.includes('vercel.app') || !isLocalhost;
 
+// API configuration
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+
 // Database configuration (using Supabase only)
 export const config = {
   isLocalhost,
@@ -17,6 +20,7 @@ if (config.debug) {
     isLocalhost: config.isLocalhost,
     isProduction: config.isProduction,
     debug: config.debug,
+    apiBaseUrl: API_BASE_URL,
     note: 'Using Supabase for all data operations'
   });
 } 

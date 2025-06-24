@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase/client';
-import { useUser } from '@/lib/hooks/useUser';
+import { useUser } from './useUser';
 import { Task } from '@/lib/database/models';
 
 interface TaskFilters {
@@ -59,136 +59,177 @@ interface UpdateTaskData {
 export function useTasks(filters?: TaskFilters) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<Error | null>(null);
   const { userData } = useUser();
 
+  // Memoize filters to prevent infinite loops in useEffect.
+  const filtersString = JSON.stringify(filters);
+
   const fetchTasks = useCallback(async () => {
-    if (!userData?.id) return;
+    // Ensure we have user data before proceeding
+    if (!userData?.id) {
+      console.log('fetchTasks: No userData.id available, skipping fetch');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);
       setError(null);
+      
+      const parsedFilters = filtersString ? JSON.parse(filtersString) : {};
 
-      // Build the query with enhanced CRM relations
+      // Get the user ID with fallback for mock scenarios
+      const currentUserId = userData.id || 'mock-user-id';
+
+      // Build the query without contact relations for now
       let query = supabase
         .from('tasks')
-        .select(`
+        .select(
+          `
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email),
-          deal:deal_id(
-            id, name, company, contact_name, contact_email, value, stage_id,
-            deal_stages(id, name, color, order_position)
-          ),
-          companies:company_id(id, name, domain, industry, size, website),
-          contacts:contact_id(id, first_name, last_name, full_name, email, phone, title, company_id)
-        `)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
+        `
+        )
         .order('due_date', { ascending: true, nullsFirst: false });
 
       // Apply filters
-      if (filters?.assigned_to) {
-        query = query.eq('assigned_to', filters.assigned_to);
+      if (parsedFilters?.assigned_to) {
+        query = query.eq('assigned_to', parsedFilters.assigned_to);
+      } else if (parsedFilters?.contact_id) {
+        // If filtering by contact, don't default to current user
       } else {
         // Default to current user's tasks if no specific assignee filter
-        query = query.eq('assigned_to', userData.id);
+        query = query.eq('assigned_to', currentUserId);
       }
 
-      if (filters?.created_by) {
-        query = query.eq('created_by', filters.created_by);
+      if (parsedFilters?.created_by) {
+        query = query.eq('created_by', parsedFilters.created_by);
       }
 
-      if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status);
+      if (parsedFilters?.status && parsedFilters.status.length > 0) {
+        query = query.in('status', parsedFilters.status);
       }
 
-      if (filters?.priority && filters.priority.length > 0) {
-        query = query.in('priority', filters.priority);
+      if (parsedFilters?.priority && parsedFilters.priority.length > 0) {
+        query = query.in('priority', parsedFilters.priority);
       }
 
-      if (filters?.task_type && filters.task_type.length > 0) {
-        query = query.in('task_type', filters.task_type);
+      if (parsedFilters?.task_type && parsedFilters.task_type.length > 0) {
+        query = query.in('task_type', parsedFilters.task_type);
       }
 
-      if (filters?.deal_id) {
-        query = query.eq('deal_id', filters.deal_id);
+      if (parsedFilters?.deal_id) {
+        query = query.eq('deal_id', parsedFilters.deal_id);
       }
 
-      if (filters?.company_id) {
-        query = query.eq('company_id', filters.company_id);
+      if (parsedFilters?.company_id) {
+        query = query.eq('company_id', parsedFilters.company_id);
       }
 
-      if (filters?.contact_id) {
-        query = query.eq('contact_id', filters.contact_id);
+      if (parsedFilters?.contact_id) {
+        query = query.eq('contact_id', parsedFilters.contact_id);
       }
 
-      if (filters?.completed !== undefined) {
-        query = query.eq('completed', filters.completed);
+      if (parsedFilters?.completed !== undefined) {
+        query = query.eq('completed', parsedFilters.completed);
       }
 
-      if (filters?.due_date_range?.start) {
-        query = query.gte('due_date', filters.due_date_range.start.toISOString());
+      if (parsedFilters?.due_date_range?.start) {
+        query = query.gte('due_date', new Date(parsedFilters.due_date_range.start).toISOString());
       }
 
-      if (filters?.due_date_range?.end) {
-        query = query.lte('due_date', filters.due_date_range.end.toISOString());
+      if (parsedFilters?.due_date_range?.end) {
+        query = query.lte('due_date', new Date(parsedFilters.due_date_range.end).toISOString());
       }
 
-      if (filters?.overdue_only) {
+      if (parsedFilters?.overdue_only) {
         query = query
           .lt('due_date', new Date().toISOString())
           .not('status', 'in', '(completed,cancelled)')
           .eq('completed', false);
       }
 
-      if (filters?.search) {
-        query = query.or(`
-          title.ilike.%${filters.search}%,
-          description.ilike.%${filters.search}%,
-          contact_name.ilike.%${filters.search}%,
-          company.ilike.%${filters.search}%,
-          notes.ilike.%${filters.search}%
-        `);
+      if (parsedFilters?.search) {
+        query = query.or(
+          `
+          title.ilike.%${parsedFilters.search}%,
+          description.ilike.%${parsedFilters.search}%,
+          contact_name.ilike.%${parsedFilters.search}%,
+          company.ilike.%${parsedFilters.search}%,
+          notes.ilike.%${parsedFilters.search}%
+        `
+        );
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        // Handle specific errors
+        if (error.message?.includes('relation "tasks" does not exist')) {
+          console.warn('Tasks table does not exist. Please run the migration.');
+          setTasks([]);
+          return;
+        }
+        throw error;
+      }
 
       setTasks(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching tasks:', err);
       setError(err);
+      // Set empty array if table doesn't exist
+      if (err.message?.includes('relation "tasks" does not exist')) {
+        setTasks([]);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [userData?.id, filters]);
+  }, [userData?.id, filtersString]);
 
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
 
   const createTask = useCallback(async (taskData: CreateTaskData) => {
-    if (!userData?.id) {
-      throw new Error('User not authenticated');
+    // Debug logging
+    console.log('createTask called with:', { taskData, userData });
+    
+    // Wait for userData to be loaded or use fallback
+    let userId = userData?.id;
+    
+    if (!userId) {
+      console.log('No userId found, userData:', userData);
+      // If userData is still loading, wait a bit or use fallback
+      if (!userData) {
+        console.error('userData is null/undefined');
+        throw new Error('🔄 User authentication data is still loading. Please try again in a moment.');
+      }
+      // Use fallback ID for development/mock scenarios
+      console.log('Using fallback mock-user-id');
+      userId = 'mock-user-id';
     }
+    
+    // Double-check we have a valid userId
+    if (!userId || userId === '') {
+      console.error('Invalid userId after processing:', userId);
+      throw new Error('❌ Invalid user ID. Please refresh the page and try again.');
+    }
+
+    console.log('Using userId:', userId);
 
     try {
       const { data, error } = await supabase
         .from('tasks')
         .insert({
           ...taskData,
-          created_by: userData.id,
+          created_by: userId,
         })
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email),
-          deal:deal_id(
-            id, name, company, contact_name, contact_email, value, stage_id,
-            deal_stages(id, name, color, order_position)
-          ),
-          companies:company_id(id, name, domain, industry, size, website),
-          contacts:contact_id(id, first_name, last_name, full_name, email, phone, title, company_id)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `)
         .single();
 
@@ -200,7 +241,7 @@ export function useTasks(filters?: TaskFilters) {
       console.error('Error creating task:', err);
       throw err;
     }
-  }, [userData?.id]);
+  }, [userData]);
 
   const updateTask = useCallback(async (taskId: string, updates: UpdateTaskData) => {
     try {
@@ -221,14 +262,8 @@ export function useTasks(filters?: TaskFilters) {
         .eq('id', taskId)
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email),
-          deal:deal_id(
-            id, name, company, contact_name, contact_email, value, stage_id,
-            deal_stages(id, name, color, order_position)
-          ),
-          companies:company_id(id, name, domain, industry, size, website),
-          contacts:contact_id(id, first_name, last_name, full_name, email, phone, title, company_id)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `)
         .single();
 
@@ -284,14 +319,8 @@ export function useTasks(filters?: TaskFilters) {
         .in('id', taskIds)
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email),
-          deal:deal_id(
-            id, name, company, contact_name, contact_email, value, stage_id,
-            deal_stages(id, name, color, order_position)
-          ),
-          companies:company_id(id, name, domain, industry, size, website),
-          contacts:contact_id(id, first_name, last_name, full_name, email, phone, title, company_id)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `);
 
       if (error) throw error;
@@ -315,8 +344,8 @@ export function useTasks(filters?: TaskFilters) {
         .from('tasks')
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `)
         .eq('deal_id', dealId)
         .order('due_date', { ascending: true, nullsFirst: false });
@@ -335,8 +364,8 @@ export function useTasks(filters?: TaskFilters) {
         .from('tasks')
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `)
         .eq('contact_id', contactId)
         .order('due_date', { ascending: true, nullsFirst: false });
@@ -355,8 +384,8 @@ export function useTasks(filters?: TaskFilters) {
         .from('tasks')
         .select(`
           *,
-          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
-          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
         `)
         .eq('company_id', companyId)
         .order('due_date', { ascending: true, nullsFirst: false });
@@ -369,36 +398,58 @@ export function useTasks(filters?: TaskFilters) {
     }
   }, []);
 
-  // Real-time subscription for tasks
-  useEffect(() => {
-    if (!userData?.id) return;
+  // Enhanced contact-focused functions
+  const createContactTask = useCallback(async (contactId: string, taskData: Omit<CreateTaskData, 'contact_id'>) => {
+    return createTask({
+      ...taskData,
+      contact_id: contactId
+    });
+  }, [createTask]);
 
-    const channel = supabase
-      .channel('tasks-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tasks',
-          filter: `assigned_to=eq.${userData.id}`,
-        },
-        () => {
-          // Refetch tasks when changes occur
-          fetchTasks();
+  const getTasksGroupedByContact = useCallback(async (contactIds?: string[]) => {
+    try {
+      let query = supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
+        `)
+        .not('contact_id', 'is', null)
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (contactIds && contactIds.length > 0) {
+        query = query.in('contact_id', contactIds);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Group tasks by contact
+      const groupedTasks = (data || []).reduce((acc: Record<string, Task[]>, task: Task) => {
+        const contactId = task.contact_id;
+        if (contactId) {
+          if (!acc[contactId]) {
+            acc[contactId] = [];
+          }
+          acc[contactId].push(task);
         }
-      )
-      .subscribe();
+        return acc;
+      }, {});
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [userData?.id, fetchTasks]);
+      return groupedTasks;
+    } catch (err) {
+      console.error('Error fetching tasks grouped by contact:', err);
+      throw err;
+    }
+  }, []);
 
   return {
     tasks,
     isLoading,
     error,
+    fetchTasks,
     createTask,
     updateTask,
     deleteTask,
@@ -408,6 +459,7 @@ export function useTasks(filters?: TaskFilters) {
     getTasksByDeal,
     getTasksByContact,
     getTasksByCompany,
-    refetch: fetchTasks,
+    createContactTask,
+    getTasksGroupedByContact,
   };
 }
