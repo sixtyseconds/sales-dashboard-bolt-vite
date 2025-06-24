@@ -14,6 +14,7 @@ interface StageMetric {
   stageName: string;
   count: number;
   value: number;
+  weightedValue: number;
 }
 
 interface PipelineContextType {
@@ -152,13 +153,22 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     const metrics = stages.map(stage => {
       const stageDeals = deals.filter(deal => deal.stage_id === stage.id);
       const count = stageDeals.length;
+<<<<<<< HEAD
       const value = stageDeals.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
+=======
+      const value = stageDeals.reduce((sum, deal) => sum + parseFloat(deal.value), 0);
+      const weightedValue = stageDeals.reduce((sum, deal) => {
+        const probability = deal.probability || deal.deal_stages?.default_probability || stage.default_probability || 0;
+        return sum + (parseFloat(deal.value) * (probability / 100));
+      }, 0);
+>>>>>>> 35ad7d57db901d22563e8e963ab9cd9326307a8f
       
       return {
         stageId: stage.id,
         stageName: stage.name,
         count,
-        value
+        value,
+        weightedValue
       };
     });
     

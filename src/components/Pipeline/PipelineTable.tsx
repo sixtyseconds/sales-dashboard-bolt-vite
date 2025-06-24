@@ -12,7 +12,7 @@ import {
   Edit,
   Trash,
   Calendar,
-  DollarSign,
+  PoundSterling,
   Users,
   Circle,
   Phone,
@@ -104,7 +104,7 @@ export function PipelineTable({ onDealClick, onDeleteDeal }: PipelineTableProps)
   const getActivityIcon = (type) => {
     switch (type) {
       case 'sale':
-        return DollarSign;
+        return PoundSterling;
       case 'outbound':
         return Phone;
       case 'meeting':

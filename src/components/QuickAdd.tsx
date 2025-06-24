@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, X, Phone, FileText, Users, DollarSign } from 'lucide-react';
+import { Plus, X, Phone, FileText, Users, PoundSterling } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities } from '@/lib/hooks/useActivities';
 import { Calendar } from '@/components/ui/calendar';
@@ -49,6 +49,13 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate meeting type for meetings
+    if (selectedAction === 'meeting' && !formData.details) {
+      toast.error('Please select a meeting type');
+      return;
+    }
+    
     // For non-outbound, require identifier
     if (selectedAction !== 'outbound') {
       if (!formData.contactIdentifier) {
@@ -91,13 +98,13 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
       } else if (selectedAction) {
         await addActivity({
           type: selectedAction as 'meeting' | 'proposal',
-          client_name: formData.client_name,
+          client_name: formData.client_name || 'Unknown',
           details: formData.details,
           amount: selectedAction === 'proposal' ? parseFloat(formData.amount) : undefined,
           date: selectedDate.toISOString(),
           contactIdentifier: formData.contactIdentifier,
           contactIdentifierType: formData.contactIdentifierType,
-          status: selectedAction === 'meeting' ? formData.status : 'completed'
+          status: selectedAction === 'meeting' ? (formData.status as 'completed' | 'pending' | 'cancelled' | 'no_show') : 'completed'
         });
       }
       // Reset form
@@ -120,7 +127,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
   };
 
   const quickActions = [
-    { id: 'sale', icon: DollarSign, label: 'Add Sale', color: 'emerald' },
+    { id: 'sale', icon: PoundSterling, label: 'Add Sale', color: 'emerald' },
     { id: 'outbound', icon: Phone, label: 'Add Outbound', color: 'blue' },
     { id: 'meeting', icon: Users, label: 'Add Meeting', color: 'violet' },
     { id: 'proposal', icon: FileText, label: 'Add Proposal', color: 'orange' },
@@ -305,13 +312,12 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                     onChange={(value, type) => 
                       setFormData({
                         ...formData, 
-                        contactIdentifier: value, 
+                        contactIdentifier: value || '', 
                         contactIdentifierType: type
                       })
                     }
                     required={selectedAction !== 'outbound'}
                     placeholder={selectedAction !== 'outbound' ? 'Required: Enter email address' : 'Optional: Enter email address'}
-                    label={null}
                   />
                 </div>
                 
@@ -357,9 +363,13 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                       value={formData.details}
                       onChange={(e) => setFormData({...formData, details: e.target.value})}
                     >
-                      <option value="discovery">Discovery</option>
-                      <option value="demo">Demo</option>
-                      <option value="follow-up">Follow-up</option>
+                      <option value="">Select meeting type</option>
+                      <option value="Discovery Call">Discovery Call</option>
+                      <option value="Discovery Meeting">Discovery Meeting</option>
+                      <option value="Product Demo">Product Demo</option>
+                      <option value="Follow-up">Follow-up</option>
+                      <option value="Demo">Demo</option>
+                      <option value="Other">Other</option>
                     </select>
                     
                     <div className="mt-4">

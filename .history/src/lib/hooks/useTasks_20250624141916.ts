@@ -1,0 +1,395 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import { useUser } from '@/lib/hooks/useUser';
+import { Task } from '@/lib/database/models';
+
+interface TaskFilters {
+  assigned_to?: string;
+  created_by?: string;
+  status?: Task['status'][];
+  priority?: Task['priority'][];
+  task_type?: Task['task_type'][];
+  due_date_range?: {
+    start?: Date;
+    end?: Date;
+  };
+  search?: string;
+  overdue_only?: boolean;
+  deal_id?: string;
+  company_id?: string;
+  contact_id?: string;
+  completed?: boolean;
+}
+
+interface CreateTaskData {
+  title: string;
+  description?: string;
+  notes?: string;
+  due_date?: string;
+  priority?: Task['priority'];
+  task_type?: Task['task_type'];
+  assigned_to: string;
+  deal_id?: string;
+  company_id?: string;
+  contact_id?: string;
+  contact_email?: string;
+  contact_name?: string;
+  company?: string;
+}
+
+interface UpdateTaskData {
+  title?: string;
+  description?: string;
+  notes?: string;
+  due_date?: string;
+  priority?: Task['priority'];
+  status?: Task['status'];
+  task_type?: Task['task_type'];
+  assigned_to?: string;
+  completed?: boolean;
+  completed_at?: string;
+  deal_id?: string;
+  company_id?: string;
+  contact_id?: string;
+  contact_email?: string;
+  contact_name?: string;
+  company?: string;
+}
+
+export function useTasks(filters?: TaskFilters) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+  const { userData } = useUser();
+
+  const fetchTasks = useCallback(async () => {
+    if (!userData?.id) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Build the query with enhanced CRM relations
+      let query = supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
+        `)
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      // Apply filters
+      if (filters?.assigned_to) {
+        query = query.eq('assigned_to', filters.assigned_to);
+      } else {
+        // Default to current user's tasks if no specific assignee filter
+        query = query.eq('assigned_to', userData.id);
+      }
+
+      if (filters?.created_by) {
+        query = query.eq('created_by', filters.created_by);
+      }
+
+      if (filters?.status && filters.status.length > 0) {
+        query = query.in('status', filters.status);
+      }
+
+      if (filters?.priority && filters.priority.length > 0) {
+        query = query.in('priority', filters.priority);
+      }
+
+      if (filters?.task_type && filters.task_type.length > 0) {
+        query = query.in('task_type', filters.task_type);
+      }
+
+      if (filters?.deal_id) {
+        query = query.eq('deal_id', filters.deal_id);
+      }
+
+      if (filters?.company_id) {
+        query = query.eq('company_id', filters.company_id);
+      }
+
+      if (filters?.contact_id) {
+        query = query.eq('contact_id', filters.contact_id);
+      }
+
+      if (filters?.completed !== undefined) {
+        query = query.eq('completed', filters.completed);
+      }
+
+      if (filters?.due_date_range?.start) {
+        query = query.gte('due_date', filters.due_date_range.start.toISOString());
+      }
+
+      if (filters?.due_date_range?.end) {
+        query = query.lte('due_date', filters.due_date_range.end.toISOString());
+      }
+
+      if (filters?.overdue_only) {
+        query = query
+          .lt('due_date', new Date().toISOString())
+          .not('status', 'in', '(completed,cancelled)')
+          .eq('completed', false);
+      }
+
+      if (filters?.search) {
+        query = query.or(`
+          title.ilike.%${filters.search}%,
+          description.ilike.%${filters.search}%,
+          contact_name.ilike.%${filters.search}%,
+          company.ilike.%${filters.search}%,
+          notes.ilike.%${filters.search}%
+        `);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setTasks(data || []);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userData?.id, filters]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const createTask = useCallback(async (taskData: CreateTaskData) => {
+    if (!userData?.id) {
+      throw new Error('User not authenticated');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          ...taskData,
+          created_by: userData.id,
+        })
+        .select(`
+          *,
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setTasks((prev: Task[]) => [data, ...prev]);
+      return data;
+    } catch (err) {
+      console.error('Error creating task:', err);
+      throw err;
+    }
+  }, [userData?.id]);
+
+  const updateTask = useCallback(async (taskId: string, updates: UpdateTaskData) => {
+    try {
+      // Handle completion logic
+      if (updates.completed === true && !updates.completed_at) {
+        updates.completed_at = new Date().toISOString();
+        updates.status = 'completed';
+      } else if (updates.completed === false) {
+        updates.completed_at = undefined;
+        if (updates.status === 'completed') {
+          updates.status = 'pending';
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', taskId)
+        .select(`
+          *,
+          assignee:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
+          creator:profiles!created_by(id, first_name, last_name, email, avatar_url)
+        `)
+        .single();
+
+      if (error) throw error;
+
+      setTasks((prev: Task[]) => prev.map((task: Task) => 
+        task.id === taskId ? data : task
+      ));
+      return data;
+    } catch (err) {
+      console.error('Error updating task:', err);
+      throw err;
+    }
+  }, []);
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks((prev: Task[]) => prev.filter((task: Task) => task.id !== taskId));
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      throw err;
+    }
+  }, []);
+
+  const completeTask = useCallback(async (taskId: string) => {
+    return updateTask(taskId, { 
+      completed: true, 
+      status: 'completed',
+      completed_at: new Date().toISOString() 
+    });
+  }, [updateTask]);
+
+  const uncompleteTask = useCallback(async (taskId: string) => {
+    return updateTask(taskId, { 
+      completed: false, 
+      status: 'pending',
+      completed_at: undefined 
+    });
+  }, [updateTask]);
+
+  const bulkUpdateTasks = useCallback(async (taskIds: string[], updates: UpdateTaskData) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(updates)
+        .in('id', taskIds)
+        .select(`
+          *,
+          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
+          creator:created_by(id, first_name, last_name, full_name, avatar_url, email),
+          deal:deal_id(
+            id, name, company, contact_name, contact_email, value, stage_id,
+            deal_stages(id, name, color, order_position)
+          ),
+          companies:company_id(id, name, domain, industry, size, website),
+          contacts:contact_id(id, first_name, last_name, full_name, email, phone, title, company_id)
+        `);
+
+      if (error) throw error;
+
+      setTasks((prev: Task[]) => 
+        prev.map((task: Task) => {
+          const updatedTask = data.find((updated: Task) => updated.id === task.id);
+          return updatedTask || task;
+        })
+      );
+      return data;
+    } catch (err) {
+      console.error('Error bulk updating tasks:', err);
+      throw err;
+    }
+  }, []);
+
+  const getTasksByDeal = useCallback(async (dealId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
+          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+        `)
+        .eq('deal_id', dealId)
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching tasks by deal:', err);
+      throw err;
+    }
+  }, []);
+
+  const getTasksByContact = useCallback(async (contactId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
+          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+        `)
+        .eq('contact_id', contactId)
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching tasks by contact:', err);
+      throw err;
+    }
+  }, []);
+
+  const getTasksByCompany = useCallback(async (companyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:assigned_to(id, first_name, last_name, full_name, avatar_url, email),
+          creator:created_by(id, first_name, last_name, full_name, avatar_url, email)
+        `)
+        .eq('company_id', companyId)
+        .order('due_date', { ascending: true, nullsFirst: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (err) {
+      console.error('Error fetching tasks by company:', err);
+      throw err;
+    }
+  }, []);
+
+  // Real-time subscription for tasks
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const channel = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'tasks',
+          filter: `assigned_to=eq.${userData.id}`,
+        },
+        () => {
+          // Refetch tasks when changes occur
+          fetchTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userData?.id, fetchTasks]);
+
+  return {
+    tasks,
+    isLoading,
+    error,
+    createTask,
+    updateTask,
+    deleteTask,
+    completeTask,
+    uncompleteTask,
+    bulkUpdateTasks,
+    getTasksByDeal,
+    getTasksByContact,
+    getTasksByCompany,
+    refetch: fetchTasks,
+  };
+}
