@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react';
 import { useDeals } from '@/lib/hooks/useDeals';
 import { useDealStages } from '@/lib/hooks/useDealStages';
+import { useUser } from '@/lib/hooks/useUser';
 
 interface FilterOptions {
   minValue: number | null;
@@ -47,7 +48,18 @@ interface PipelineProviderProps {
 }
 
 export function PipelineProvider({ children }: PipelineProviderProps) {
-  const [selectedOwnerId, setSelectedOwnerId] = useState<string | undefined>();
+  // Get current user to use as default owner
+  const { userData } = useUser();
+  
+  // Use current user's ID as default owner if available
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | undefined>(userData?.id);
+  
+  // Update selectedOwnerId when user data loads
+  React.useEffect(() => {
+    if (userData?.id && !selectedOwnerId) {
+      setSelectedOwnerId(userData.id);
+    }
+  }, [userData?.id, selectedOwnerId]);
   
   // Get the stages first
   const {

@@ -1,24 +1,26 @@
 // Environment detection and configuration
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isProduction = window.location.hostname.includes('vercel.app') || !isLocalhost;
 
-// API Base URL - automatically switches between development and production
-export const API_BASE_URL = isLocalhost 
-  ? 'http://localhost:8000/api'  // Local Express server for development
-  : '/api';                      // Vercel serverless functions for production
+// API configuration
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-// Database configuration
+// Database configuration (using Supabase only)
 export const config = {
-  apiBaseUrl: API_BASE_URL,
   isLocalhost,
-  isProduction: !isLocalhost,
+  isProduction,
+  // Add debug mode
+  debug: !isProduction,
 };
 
 // Helper to log configuration in development
-if (isLocalhost) {
+if (config.debug) {
   console.log('🔧 Configuration:', {
     hostname: window.location.hostname,
-    apiBaseUrl: config.apiBaseUrl,
     isLocalhost: config.isLocalhost,
     isProduction: config.isProduction,
+    debug: config.debug,
+    apiBaseUrl: API_BASE_URL,
+    note: 'Using Supabase for all data operations'
   });
 } 

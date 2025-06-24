@@ -1,6 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
+import { createApiMonitor } from '@/lib/utils/apiUtils';
+import { API_BASE_URL } from '@/lib/config';
 import { AppLayout } from '@/components/AppLayout';
 import { AuthGuard } from '@/components/AuthGuard';
 import Dashboard from '@/pages/Dashboard';
@@ -20,6 +23,7 @@ import CompaniesTable from '@/pages/companies/CompaniesTable';
 import ContactsTable from '@/pages/contacts/ContactsTable';
 import ContactRecord from '@/pages/contacts/ContactRecord';
 import DealRecord from '@/pages/deals/DealRecord';
+import TasksPage from '@/pages/TasksPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +43,17 @@ declare global {
 window.queryClient = queryClient;
 
 function App() {
+  // Initialize API connection monitoring
+  useEffect(() => {
+    const monitor = createApiMonitor(API_BASE_URL, 30000); // Check every 30 seconds
+    monitor.start();
+    
+    // Cleanup on unmount
+    return () => {
+      monitor.stop();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthGuard>
@@ -52,6 +67,7 @@ function App() {
           <Route path="/heatmap" element={<AppLayout><Heatmap /></AppLayout>} />
           <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
           <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
+          <Route path="/tasks" element={<AppLayout><TasksPage /></AppLayout>} />
           <Route path="/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />

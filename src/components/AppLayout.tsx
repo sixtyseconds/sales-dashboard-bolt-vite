@@ -53,6 +53,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/' },
     { icon: Kanban, label: 'Pipeline', href: '/pipeline' },
+    { icon: CheckSquare, label: 'Tasks', href: '/tasks' },
     { 
       icon: Building2, 
       label: 'CRM', 

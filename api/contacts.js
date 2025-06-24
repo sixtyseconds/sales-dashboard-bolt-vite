@@ -1,4 +1,4 @@
-import { getDbClient, handleCORS, apiResponse } from './_db.js';
+import { executeQuery, handleCORS, apiResponse } from './_db.js';
 
 export default async function handler(request) {
   // Handle CORS preflight
@@ -7,32 +7,30 @@ export default async function handler(request) {
 
   if (request.method === 'GET') {
     try {
-      const client = await getDbClient();
       const url = new URL(request.url);
-      const pathParts = url.pathname.split('/api/contacts').filter(p => p);
+      const pathSegments = url.pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'contacts');
       
       // Handle different contact endpoints
-      if (pathParts.length === 0) {
+      if (pathSegments.length === 0) {
         // GET /api/contacts - List all contacts
-        return await handleContactsList(client, url);
-      } else if (pathParts.length === 1) {
+        return await handleContactsList(url);
+      } else if (pathSegments.length === 1) {
         // GET /api/contacts/:id - Single contact
-        const contactId = pathParts[0].replace('/', '');
-        return await handleSingleContact(client, url, contactId);
-      } else if (pathParts.length === 2) {
+        const contactId = pathSegments[0];
+        return await handleSingleContact(url, contactId);
+      } else if (pathSegments.length === 2) {
         // GET /api/contacts/:id/deals, /api/contacts/:id/activities, etc.
-        const [contactId, resource] = pathParts[0].replace('/', '').split('/');
-        const subResource = pathParts[1] || resource;
+        const [contactId, subResource] = pathSegments;
         
         switch (subResource) {
           case 'deals':
-            return await handleContactDeals(client, contactId);
+            return await handleContactDeals(contactId);
           case 'activities':
-            return await handleContactActivities(client, url, contactId);
+            return await handleContactActivities(url, contactId);
           case 'stats':
-            return await handleContactStats(client, contactId);
+            return await handleContactStats(contactId);
           case 'tasks':
-            return await handleContactTasks(client, contactId);
+            return await handleContactTasks(contactId);
           default:
             return apiResponse(null, 'Resource not found', 404);
         }
@@ -49,7 +47,7 @@ export default async function handler(request) {
 }
 
 // List all contacts
-async function handleContactsList(client, url) {
+async function handleContactsList(url) {
   const { search, companyId, includeCompany, limit, ownerId } = Object.fromEntries(url.searchParams);
   
   let query = `
@@ -96,7 +94,7 @@ async function handleContactsList(client, url) {
     params.push(parseInt(limit));
   }
 
-  const result = await client.query(query, params);
+  const result = await executeQuery(query, params);
   
   const data = result.rows.map(row => ({
     ...row,
@@ -115,7 +113,7 @@ async function handleContactsList(client, url) {
 }
 
 // Single contact by ID
-async function handleSingleContact(client, url, contactId) {
+async function handleSingleContact(url, contactId) {
   const { includeCompany } = Object.fromEntries(url.searchParams);
   
   let query = `
@@ -134,7 +132,7 @@ async function handleSingleContact(client, url, contactId) {
     WHERE ct.id = $1
   `;
 
-  const result = await client.query(query, [contactId]);
+  const result = await executeQuery(query, [contactId]);
   
   if (result.rows.length === 0) {
     return apiResponse(null, 'Contact not found', 404);
@@ -158,7 +156,7 @@ async function handleSingleContact(client, url, contactId) {
 }
 
 // Contact deals
-async function handleContactDeals(client, contactId) {
+async function handleContactDeals(contactId) {
   const query = `
     SELECT 
       d.*,
@@ -173,12 +171,12 @@ async function handleContactDeals(client, contactId) {
     ORDER BY d.updated_at DESC
   `;
 
-  const result = await client.query(query, [contactId]);
+  const result = await executeQuery(query, [contactId]);
   return apiResponse(result.rows);
 }
 
 // Contact activities
-async function handleContactActivities(client, url, contactId) {
+async function handleContactActivities(url, contactId) {
   const { limit = '10' } = Object.fromEntries(url.searchParams);
   
   const query = `
@@ -192,105 +190,42 @@ async function handleContactActivities(client, url, contactId) {
     LIMIT $2
   `;
 
-  const result = await client.query(query, [contactId, parseInt(limit)]);
+  const result = await executeQuery(query, [contactId, parseInt(limit)]);
   return apiResponse(result.rows);
 }
 
 // Contact statistics
-async function handleContactStats(client, contactId) {
-  // Get activity counts
-  const activityQuery = `
+async function handleContactStats(contactId) {
+  const query = `
     SELECT 
-      type,
-      COUNT(*) as count
-    FROM activities 
-    WHERE contact_id = $1
-    GROUP BY type
-  `;
-  
-  // Get deals data
-  const dealsQuery = `
-    SELECT 
-      COUNT(*) as total_deals,
-      COUNT(CASE WHEN status = 'active' THEN 1 END) as active_deals,
-      COALESCE(SUM(value), 0) as total_value
-    FROM deals 
-    WHERE primary_contact_id = $1 OR id IN (
+      COUNT(DISTINCT d.id) as total_deals,
+      COALESCE(SUM(d.value), 0) as total_deal_value,
+      COUNT(DISTINCT a.id) as total_activities,
+      COUNT(DISTINCT CASE WHEN d.is_won THEN d.id END) as won_deals,
+      COALESCE(SUM(CASE WHEN d.is_won THEN d.value ELSE 0 END), 0) as won_value
+    FROM deals d
+    LEFT JOIN activities a ON d.primary_contact_id = $1
+    WHERE d.primary_contact_id = $1 OR d.id IN (
       SELECT deal_id FROM deal_contacts WHERE contact_id = $1
     )
   `;
-  
-  const [activityResult, dealsResult] = await Promise.all([
-    client.query(activityQuery, [contactId]),
-    client.query(dealsQuery, [contactId])
-  ]);
-  
-  // Process activity counts
-  const activityCounts = {};
-  activityResult.rows.forEach(row => {
-    activityCounts[row.type] = parseInt(row.count);
-  });
-  
-  const dealsData = dealsResult.rows[0] || {};
-  
-  const stats = {
-    meetings: activityCounts.meeting || 0,
-    emails: activityCounts.email || 0,
-    calls: activityCounts.call || 0,
-    totalDeals: parseInt(dealsData.total_deals) || 0,
-    activeDeals: parseInt(dealsData.active_deals) || 0,
-    totalDealsValue: parseFloat(dealsData.total_value) || 0,
-    // Calculate engagement score based on activity
-    engagementScore: Math.min(100, Math.max(0, 
-      (activityCounts.meeting || 0) * 15 + 
-      (activityCounts.email || 0) * 5 + 
-      (activityCounts.call || 0) * 10
-    )),
-    recentActivities: activityResult.rows
-  };
-  
-  return apiResponse(stats);
+
+  const result = await executeQuery(query, [contactId]);
+  return apiResponse(result.rows[0] || {});
 }
 
 // Contact tasks
-async function handleContactTasks(client, contactId) {
-  const tasksQuery = `
+async function handleContactTasks(contactId) {
+  const query = `
     SELECT 
-      'activity' as source,
-      a.id::text as id,
-      a.type || ' follow-up' as title,
-      'Follow up on ' || a.type || ' activity' as description,
-      'medium' as priority,
-      a.created_at + INTERVAL '3 days' as due_date,
-      false as completed
-    FROM activities a 
-    WHERE a.contact_id = $1
-    AND a.created_at > NOW() - INTERVAL '30 days'
-    
-    UNION ALL
-    
-    SELECT 
-      'deal' as source,
-      d.id::text as id,
-      'Follow up on deal' as title,
-      'Check progress on deal worth £' || COALESCE(d.value::text, 'unknown') as description,
-      CASE 
-        WHEN d.value > 10000 THEN 'high'
-        WHEN d.value > 5000 THEN 'medium'
-        ELSE 'low'
-      END as priority,
-      d.updated_at + INTERVAL '7 days' as due_date,
-      CASE WHEN d.status = 'won' THEN true ELSE false END as completed
-    FROM deals d 
-    WHERE (d.primary_contact_id = $1 OR d.id IN (
-      SELECT deal_id FROM deal_contacts WHERE contact_id = $1
-    ))
-    AND d.status != 'lost'
-    
-    ORDER BY due_date DESC
-    LIMIT 10
+      t.*,
+      ct.first_name || ' ' || ct.last_name as contact_name
+    FROM tasks t
+    LEFT JOIN contacts ct ON t.contact_id = ct.id
+    WHERE t.contact_id = $1
+    ORDER BY t.due_date ASC, t.created_at DESC
   `;
 
-  const result = await client.query(tasksQuery, [contactId]);
+  const result = await executeQuery(query, [contactId]);
   return apiResponse(result.rows);
 } 

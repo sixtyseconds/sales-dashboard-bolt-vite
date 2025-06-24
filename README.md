@@ -49,6 +49,37 @@ To build for production:
 npm run build
 ```
 
+## Deployment & Troubleshooting
+
+### Recent Fixes (Latest Update)
+
+**API Timeout Issues Fixed:**
+- Updated database connection handling for Vercel serverless environment
+- Implemented proper connection cleanup to prevent memory leaks
+- Increased API timeout from 10s to 30s in `vercel.json`
+- Fixed URL parsing in contacts and deals APIs
+
+**Supabase Client Issues Fixed:**
+- Implemented singleton pattern to prevent multiple client instances
+- Added unique storage keys for regular and admin clients
+- Fixed environment variable type declarations
+
+**Key Changes:**
+- `api/_db.js`: New `executeQuery()` function with automatic connection cleanup
+- `src/lib/supabase/client.ts`: Singleton pattern for client instances
+- `vercel.json`: Increased `maxDuration` to 30 seconds
+- All API endpoints updated to use new connection management
+
+### Health Check
+
+Monitor API health at: `/api/health`
+
+### Common Issues
+
+1. **504 Gateway Timeout**: Fixed with new connection management
+2. **Multiple Supabase clients warning**: Fixed with singleton pattern
+3. **404 for contact endpoints**: Fixed URL parsing logic
+
 ## License
 
 MIT

@@ -1,4 +1,4 @@
-import { getDbClient, handleCORS, apiResponse } from './_db.js';
+import { executeQuery, handleCORS, apiResponse } from './_db.js';
 
 export default async function handler(request) {
   // Handle CORS preflight
@@ -7,32 +7,24 @@ export default async function handler(request) {
 
   if (request.method === 'GET') {
     try {
-      const client = await getDbClient();
-      
       const query = `
-        SELECT DISTINCT
-          p.id,
-          p.first_name,
-          p.last_name,
-          p.stage,
-          p.email,
-          (p.first_name || ' ' || p.last_name) as full_name
-        FROM profiles p
-        WHERE p.id IN (
-          SELECT DISTINCT owner_id FROM companies WHERE owner_id IS NOT NULL
-          UNION
-          SELECT DISTINCT owner_id FROM deals WHERE owner_id IS NOT NULL
-          UNION
-          SELECT DISTINCT owner_id FROM contacts WHERE owner_id IS NOT NULL
-        )
-        ORDER BY p.first_name, p.last_name
+        SELECT 
+          id,
+          first_name,
+          last_name,
+          email,
+          stage,
+          created_at,
+          updated_at
+        FROM users
+        ORDER BY first_name ASC, last_name ASC
       `;
 
-      const result = await client.query(query);
+      const result = await executeQuery(query);
       
       return apiResponse(result.rows);
     } catch (error) {
-      console.error('Error fetching owners:', error);
+      console.error('Error fetching users:', error);
       return apiResponse(null, error.message, 500);
     }
   }

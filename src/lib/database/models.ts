@@ -251,4 +251,41 @@ export interface UserProfile {
   avatar_url?: string;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Task model - NEW CRM ENTITY
+ */
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  notes?: string;
+  due_date?: string;
+  completed: boolean;
+  completed_at?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
+  task_type: 'call' | 'email' | 'meeting' | 'follow_up' | 'proposal' | 'demo' | 'general';
+  
+  // Relationships
+  assigned_to: string;
+  created_by: string;
+  deal_id?: string;
+  company_id?: string;
+  contact_id?: string;
+  contact_email?: string;
+  contact_name?: string;
+  company?: string; // Legacy field for backward compatibility
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  
+  // Joined relations
+  assignee?: UserProfile;
+  creator?: UserProfile;
+  deal?: Deal;
+  companies?: Company;
+  contacts?: Contact;
 } 
