@@ -24,6 +24,7 @@ import ContactsTable from '@/pages/contacts/ContactsTable';
 import ContactRecord from '@/pages/contacts/ContactRecord';
 import DealRecord from '@/pages/deals/DealRecord';
 import TasksPage from '@/pages/TasksPage';
+import ImprovementRequestsPage from '@/pages/ImprovementRequestsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ function App() {
           <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
           <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
           <Route path="/tasks" element={<AppLayout><TasksPage /></AppLayout>} />
+          <Route path="/improvements" element={<AppLayout><ImprovementRequestsPage /></AppLayout>} />
           <Route path="/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
           <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />

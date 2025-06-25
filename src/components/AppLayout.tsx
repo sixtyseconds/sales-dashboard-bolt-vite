@@ -67,6 +67,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: FileText, label: 'Activity Log', href: '/activity' },
     { icon: MailWarning, label: 'Activity Processing', href: '/activity-processing' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
+    { icon: MailCheck, label: 'Improvements', href: '/improvements' },
     ...(userData?.is_admin ? [
       { 
         icon: UserCog, 
