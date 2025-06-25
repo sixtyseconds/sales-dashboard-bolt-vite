@@ -7,8 +7,11 @@ export default async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const url = new URL(request.url);
-      const { search, includeStats, limit, ownerId } = Object.fromEntries(url.searchParams);
+      // Parse query parameters from request.url for Vercel compatibility
+      const urlParts = request.url.split('?');
+      const queryString = urlParts[1] || '';
+      const searchParams = new URLSearchParams(queryString);
+      const { search, includeStats, limit, ownerId } = Object.fromEntries(searchParams);
       
       let query = `
         SELECT 

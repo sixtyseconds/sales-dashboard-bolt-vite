@@ -6,17 +6,22 @@ export default async function handler(request, response) {
   if (corsResponse) return corsResponse;
 
   try {
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'deals');
+    // Parse URL for Vercel compatibility
+    const urlParts = request.url.split('?');
+    const pathname = urlParts[0];
+    const queryString = urlParts[1] || '';
+    const searchParams = new URLSearchParams(queryString);
+    
+    const pathSegments = pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'deals');
     const dealId = pathSegments[0];
     
     if (request.method === 'GET') {
       if (!dealId) {
         // GET /api/deals - List all deals
-        return await handleDealsList(response, url);
+        return await handleDealsList(response, searchParams);
       } else {
         // GET /api/deals/:id - Single deal
-        return await handleSingleDeal(response, dealId, url);
+        return await handleSingleDeal(response, dealId, searchParams);
       }
     } else if (request.method === 'POST') {
       // POST /api/deals - Create deal
@@ -43,9 +48,9 @@ export default async function handler(request, response) {
 }
 
 // List all deals
-async function handleDealsList(response, url) {
+async function handleDealsList(response, searchParams) {
   try {
-    const { ownerId, stageId, status, includeRelationships, limit, search } = Object.fromEntries(url.searchParams);
+    const { ownerId, stageId, status, includeRelationships, limit, search } = Object.fromEntries(searchParams);
     
     let query = `
       SELECT 
@@ -136,9 +141,9 @@ async function handleDealsList(response, url) {
 }
 
 // Single deal by ID
-async function handleSingleDeal(response, dealId, url) {
+async function handleSingleDeal(response, dealId, searchParams) {
   try {
-    const { includeRelationships } = Object.fromEntries(url.searchParams);
+    const { includeRelationships } = Object.fromEntries(searchParams);
     
     let query = `
       SELECT 

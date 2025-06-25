@@ -7,16 +7,22 @@ export default async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const url = new URL(request.url);
-      const pathSegments = url.pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'contacts');
+      // Parse URL for Vercel compatibility - extract path and query separately
+      const urlParts = request.url.split('?');
+      const pathname = urlParts[0];
+      const queryString = urlParts[1] || '';
+      const searchParams = new URLSearchParams(queryString);
+      
+      // Extract path segments for routing
+      const pathSegments = pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'contacts');
       
       if (pathSegments.length === 0) {
         // GET /api/contacts - List all contacts
-        return await handleContactsList(response, url);
+        return await handleContactsList(response, searchParams);
       } else if (pathSegments.length === 1) {
         // GET /api/contacts/:id - Single contact
         const contactId = pathSegments[0];
-        return await handleSingleContact(response, url, contactId);
+        return await handleSingleContact(response, searchParams, contactId);
       } else if (pathSegments.length === 2) {
         // GET /api/contacts/:id/deals, etc.
         const [contactId, subResource] = pathSegments;
@@ -25,7 +31,7 @@ export default async function handler(request, response) {
           case 'deals':
             return await handleContactDeals(response, contactId);
           case 'activities':
-            return await handleContactActivities(response, url, contactId);
+            return await handleContactActivities(response, searchParams, contactId);
           case 'stats':
             return await handleContactStats(response, contactId);
           case 'owner':
@@ -48,9 +54,9 @@ export default async function handler(request, response) {
 }
 
 // List all contacts
-async function handleContactsList(response, url) {
+async function handleContactsList(response, searchParams) {
   try {
-    const { search, companyId, includeCompany, limit, ownerId } = Object.fromEntries(url.searchParams);
+    const { search, companyId, includeCompany, limit, ownerId } = Object.fromEntries(searchParams);
     
     let query = `
       SELECT 
@@ -117,9 +123,9 @@ async function handleContactsList(response, url) {
 }
 
 // Single contact by ID
-async function handleSingleContact(response, url, contactId) {
+async function handleSingleContact(response, searchParams, contactId) {
   try {
-    const { includeCompany } = Object.fromEntries(url.searchParams);
+    const { includeCompany } = Object.fromEntries(searchParams);
     
     let query = `
       SELECT 
@@ -186,9 +192,9 @@ async function handleContactDeals(response, contactId) {
 }
 
 // Contact activities
-async function handleContactActivities(response, url, contactId) {
+async function handleContactActivities(response, searchParams, contactId) {
   try {
-    const { limit = '10' } = Object.fromEntries(url.searchParams);
+    const { limit = '10' } = Object.fromEntries(searchParams);
     
     const query = `
       SELECT 
