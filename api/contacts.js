@@ -16,15 +16,34 @@ export default async function handler(request, response) {
       // Extract path segments for routing
       const pathSegments = pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'contacts');
       
-      if (pathSegments.length === 0) {
+      // Check if this is a query-based request for individual contact data
+      const contactId = searchParams.get('id');
+      
+      if (contactId) {
+        // Individual contact requests with query parameters
+        if (searchParams.get('stats') === 'true') {
+          return await handleContactStats(response, contactId);
+        } else if (searchParams.get('deals') === 'true') {
+          return await handleContactDeals(response, contactId);
+        } else if (searchParams.get('activities') === 'true') {
+          return await handleContactActivities(response, searchParams, contactId);
+        } else if (searchParams.get('owner') === 'true') {
+          return await handleContactOwner(response, contactId);
+        } else if (searchParams.get('tasks') === 'true') {
+          return await handleContactTasks(response, contactId);
+        } else {
+          // GET /api/contacts?id=xxx - Single contact
+          return await handleSingleContact(response, searchParams, contactId);
+        }
+      } else if (pathSegments.length === 0) {
         // GET /api/contacts - List all contacts
         return await handleContactsList(response, searchParams);
       } else if (pathSegments.length === 1) {
-        // GET /api/contacts/:id - Single contact
+        // Legacy path-based routing (keep for backward compatibility)
         const contactId = pathSegments[0];
         return await handleSingleContact(response, searchParams, contactId);
       } else if (pathSegments.length === 2) {
-        // GET /api/contacts/:id/deals, etc.
+        // Legacy path-based sub-resource routing
         const [contactId, subResource] = pathSegments;
         
         switch (subResource) {
@@ -44,6 +63,20 @@ export default async function handler(request, response) {
       }
       
       return apiResponse(response, null, 'Endpoint not found', 404);
+    } else if (request.method === 'PATCH') {
+      // Handle PATCH requests for updating contacts
+      const contactId = new URLSearchParams(request.url.split('?')[1] || '').get('id');
+      if (!contactId) {
+        return apiResponse(response, null, 'Contact ID is required', 400);
+      }
+      return await handleUpdateContact(response, request, contactId);
+    } else if (request.method === 'DELETE') {
+      // Handle DELETE requests for deleting contacts
+      const contactId = new URLSearchParams(request.url.split('?')[1] || '').get('id');
+      if (!contactId) {
+        return apiResponse(response, null, 'Contact ID is required', 400);
+      }
+      return await handleDeleteContact(response, contactId);
     }
 
     return apiResponse(response, null, 'Method not allowed', 405);
@@ -363,6 +396,130 @@ async function handleContactTasks(response, contactId) {
     return apiResponse(response, result.rows);
   } catch (error) {
     console.error('Error fetching contact tasks:', error);
+    return apiResponse(response, null, error.message, 500);
+  }
+}
+
+// Update contact
+async function handleUpdateContact(response, request, contactId) {
+  try {
+    const body = await request.json();
+    const { 
+      first_name,
+      last_name,
+      email,
+      phone,
+      title,
+      company_id,
+      owner_id,
+      is_primary,
+      linkedin_url,
+      twitter_url,
+      notes
+    } = body;
+    
+    // Build dynamic update query
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+    
+    if (first_name !== undefined) {
+      updates.push(`first_name = $${paramCount++}`);
+      values.push(first_name);
+    }
+    if (last_name !== undefined) {
+      updates.push(`last_name = $${paramCount++}`);
+      values.push(last_name);
+    }
+    if (email !== undefined) {
+      updates.push(`email = $${paramCount++}`);
+      values.push(email);
+    }
+    if (phone !== undefined) {
+      updates.push(`phone = $${paramCount++}`);
+      values.push(phone);
+    }
+    if (title !== undefined) {
+      updates.push(`title = $${paramCount++}`);
+      values.push(title);
+    }
+    if (company_id !== undefined) {
+      updates.push(`company_id = $${paramCount++}`);
+      values.push(company_id);
+    }
+    if (owner_id !== undefined) {
+      updates.push(`owner_id = $${paramCount++}`);
+      values.push(owner_id);
+    }
+    if (is_primary !== undefined) {
+      updates.push(`is_primary = $${paramCount++}`);
+      values.push(is_primary);
+    }
+    if (linkedin_url !== undefined) {
+      updates.push(`linkedin_url = $${paramCount++}`);
+      values.push(linkedin_url);
+    }
+    if (twitter_url !== undefined) {
+      updates.push(`twitter_url = $${paramCount++}`);
+      values.push(twitter_url);
+    }
+    if (notes !== undefined) {
+      updates.push(`notes = $${paramCount++}`);
+      values.push(notes);
+    }
+    
+    if (updates.length === 0) {
+      return apiResponse(response, null, 'No updates provided', 400);
+    }
+    
+    // Update full_name if first_name or last_name changed
+    if (first_name !== undefined || last_name !== undefined) {
+      updates.push(`full_name = CONCAT(COALESCE($${paramCount}, first_name, ''), ' ', COALESCE($${paramCount + 1}, last_name, ''))`);
+      values.push(first_name, last_name);
+      paramCount += 2;
+    }
+    
+    updates.push(`updated_at = NOW()`);
+    values.push(contactId);
+    
+    const query = `
+      UPDATE contacts 
+      SET ${updates.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `;
+
+    const result = await executeQuery(query, values);
+    
+    if (result.rows.length === 0) {
+      return apiResponse(response, null, 'Contact not found', 404);
+    }
+
+    return apiResponse(response, result.rows[0]);
+  } catch (error) {
+    console.error('Error updating contact:', error);
+    return apiResponse(response, null, error.message, 500);
+  }
+}
+
+// Delete contact
+async function handleDeleteContact(response, contactId) {
+  try {
+    const query = `
+      DELETE FROM contacts 
+      WHERE id = $1
+      RETURNING id
+    `;
+
+    const result = await executeQuery(query, [contactId]);
+    
+    if (result.rows.length === 0) {
+      return apiResponse(response, null, 'Contact not found', 404);
+    }
+
+    return apiResponse(response, { id: contactId, deleted: true });
+  } catch (error) {
+    console.error('Error deleting contact:', error);
     return apiResponse(response, null, error.message, 500);
   }
 } 

@@ -48,9 +48,10 @@ export class ApiContactService {
   static async getContactById(id: string, includeRelationships = true) {
     try {
       const params = new URLSearchParams();
+      params.append('id', id);
       params.append('includeCompany', includeRelationships.toString());
       
-      const response = await fetch(`${API_BASE_URL}/contacts/${id}?${params}`);
+      const response = await fetch(`${API_BASE_URL}/contacts?${params}`);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -127,7 +128,7 @@ export class ApiContactService {
    */
   static async updateContact(id: string, updates: Partial<Contact>) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +158,7 @@ export class ApiContactService {
    */
   static async deleteContact(id: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${id}`, {
         method: 'DELETE',
       });
 
@@ -208,7 +209,7 @@ export class ApiContactService {
    */
   static async getContactStats(contactId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/stats`);
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${contactId}&stats=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -297,7 +298,7 @@ export class ApiContactService {
    */
   static async getContactDeals(contactId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/deals`);
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${contactId}&deals=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -321,7 +322,7 @@ export class ApiContactService {
    */
   static async getContactActivities(contactId: string, limit = 10) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/activities?limit=${limit}`);
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${contactId}&activities=true&limit=${limit}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -345,7 +346,7 @@ export class ApiContactService {
    */
   static async getContactOwner(contactId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/owner`);
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${contactId}&owner=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -369,7 +370,7 @@ export class ApiContactService {
    */
   static async getContactTasks(contactId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/contacts/${contactId}/tasks`);
+      const response = await fetch(`${API_BASE_URL}/contacts?id=${contactId}&tasks=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
