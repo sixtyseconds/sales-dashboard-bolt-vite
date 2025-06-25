@@ -19,8 +19,10 @@ export default async function handler(request, response) {
       // Check if this is a query-based request for individual contact data
       const contactId = searchParams.get('id');
       
-      if (contactId) {
+      if (contactId && contactId.trim() !== '') {
         // Individual contact requests with query parameters
+        console.log('Contact ID detected:', contactId);
+        
         if (searchParams.get('stats') === 'true') {
           return await handleContactStats(response, contactId);
         } else if (searchParams.get('deals') === 'true') {
@@ -33,6 +35,7 @@ export default async function handler(request, response) {
           return await handleContactTasks(response, contactId);
         } else {
           // GET /api/contacts?id=xxx - Single contact
+          console.log('Routing to handleSingleContact with ID:', contactId);
           return await handleSingleContact(response, searchParams, contactId);
         }
       } else if (pathSegments.length === 0) {

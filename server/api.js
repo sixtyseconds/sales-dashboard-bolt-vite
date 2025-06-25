@@ -173,8 +173,31 @@ app.get('/api/deals', async (req, res) => {
 // Contacts with relationships endpoint
 app.get('/api/contacts', async (req, res) => {
   try {
-    const { search, companyId, includeCompany, limit, ownerId } = req.query;
+    const { id, search, companyId, includeCompany, limit, ownerId, stats, deals, activities, owner, tasks } = req.query;
     
+    // If ID is provided, handle individual contact requests
+    if (id && id.trim() !== '') {
+      console.log('Express: Contact ID detected:', id);
+      
+      // Handle sub-resource requests
+      if (stats === 'true') {
+        return handleContactStatsExpress(res, id);
+      } else if (deals === 'true') {
+        return handleContactDealsExpress(res, id);
+      } else if (activities === 'true') {
+        return handleContactActivitiesExpress(res, id, req.query);
+      } else if (owner === 'true') {
+        return handleContactOwnerExpress(res, id);
+      } else if (tasks === 'true') {
+        return handleContactTasksExpress(res, id);
+      } else {
+        // Single contact
+        console.log('Express: Routing to single contact with ID:', id);
+        return handleSingleContactExpress(res, id, req.query);
+      }
+    }
+    
+    // List all contacts (existing logic)
     let query = `
       SELECT 
         ct.*,
@@ -666,6 +689,196 @@ app.get('/api/deals/:id', async (req, res) => {
 });
 
 // Start server
+// Express helper functions for contact sub-resources
+async function handleSingleContactExpress(res, contactId, query) {
+  try {
+    const { includeCompany } = query;
+    
+    let querySQL = `
+      SELECT 
+        ct.*,
+        ${includeCompany === 'true' ? `
+          c.id as company_id,
+          c.name as company_name,
+          c.domain as company_domain,
+          c.size as company_size,
+          c.industry as company_industry,
+          c.website as company_website
+        ` : 'null as company_id, null as company_name, null as company_domain, null as company_size, null as company_industry, null as company_website'}
+      FROM contacts ct
+      ${includeCompany === 'true' ? 'LEFT JOIN companies c ON ct.company_id = c.id' : ''}
+      WHERE ct.id = $1
+    `;
+
+    const result = await client.query(querySQL, [contactId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Contact not found',
+        data: null 
+      });
+    }
+    
+    const row = result.rows[0];
+    const data = {
+      ...row,
+      companies: (includeCompany === 'true' && row.company_id) ? {
+        id: row.company_id,
+        name: row.company_name,
+        domain: row.company_domain,
+        size: row.company_size,
+        industry: row.company_industry,
+        website: row.company_website
+      } : null
+    };
+
+    res.json({ data, error: null });
+  } catch (error) {
+    console.error('Error fetching single contact:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function handleContactDealsExpress(res, contactId) {
+  try {
+    const query = `
+      SELECT d.*, ds.name as stage_name, ds.color as stage_color, ds.default_probability
+      FROM deals d
+      LEFT JOIN deal_stages ds ON d.stage_id = ds.id
+      WHERE d.primary_contact_id = $1 OR d.id IN (
+        SELECT deal_id FROM deal_contacts WHERE contact_id = $1
+      )
+      ORDER BY d.updated_at DESC
+    `;
+
+    const result = await client.query(query, [contactId]);
+    res.json({ data: result.rows, error: null, count: result.rows.length });
+  } catch (error) {
+    console.error('Error fetching contact deals:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function handleContactActivitiesExpress(res, contactId, query) {
+  try {
+    const { limit = 10 } = query;
+    
+    const querySQL = `
+      SELECT a.*, c.name as company_name
+      FROM activities a
+      LEFT JOIN companies c ON a.company_id = c.id
+      WHERE a.contact_id = $1
+      ORDER BY a.created_at DESC
+      LIMIT $2
+    `;
+
+    const result = await client.query(querySQL, [contactId, parseInt(limit)]);
+    res.json({ data: result.rows, error: null, count: result.rows.length });
+  } catch (error) {
+    console.error('Error fetching contact activities:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function handleContactStatsExpress(res, contactId) {
+  try {
+    const activityQuery = `SELECT type, COUNT(*) as count FROM activities WHERE contact_id = $1 GROUP BY type`;
+    const dealsQuery = `
+      SELECT COUNT(*) as total_deals, COUNT(CASE WHEN status = 'active' THEN 1 END) as active_deals, COALESCE(SUM(value), 0) as total_value
+      FROM deals WHERE primary_contact_id = $1 OR id IN (SELECT deal_id FROM deal_contacts WHERE contact_id = $1)
+    `;
+    
+    const [activityResult, dealsResult] = await Promise.all([
+      client.query(activityQuery, [contactId]),
+      client.query(dealsQuery, [contactId])
+    ]);
+    
+    const activityCounts = {};
+    activityResult.rows.forEach(row => {
+      activityCounts[row.type] = parseInt(row.count);
+    });
+    
+    const dealsData = dealsResult.rows[0] || {};
+    const stats = {
+      meetings: activityCounts.meeting || 0,
+      emails: activityCounts.email || 0,
+      calls: activityCounts.call || 0,
+      totalDeals: parseInt(dealsData.total_deals) || 0,
+      activeDeals: parseInt(dealsData.active_deals) || 0,
+      totalDealsValue: parseFloat(dealsData.total_value) || 0,
+      engagementScore: Math.min(100, Math.max(0, 
+        (activityCounts.meeting || 0) * 15 + 
+        (activityCounts.email || 0) * 5 + 
+        (activityCounts.call || 0) * 10
+      )),
+      recentActivities: activityResult.rows
+    };
+    
+    res.json({ data: stats, error: null });
+  } catch (error) {
+    console.error('Error fetching contact stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function handleContactOwnerExpress(res, contactId) {
+  try {
+    const query = `
+      SELECT p.id, p.first_name, p.last_name, p.stage, p.email, p.avatar_url, c.created_at as assigned_date
+      FROM contacts c LEFT JOIN profiles p ON c.owner_id = p.id WHERE c.id = $1
+    `;
+
+    const result = await client.query(query, [contactId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Contact or owner not found', data: null });
+    }
+    
+    const row = result.rows[0];
+    const ownerData = {
+      id: row.id,
+      name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+      first_name: row.first_name,
+      last_name: row.last_name,
+      title: row.stage,
+      email: row.email,
+      avatar_url: row.avatar_url,
+      assigned_date: row.assigned_date
+    };
+
+    res.json({ data: ownerData, error: null });
+  } catch (error) {
+    console.error('Error fetching contact owner:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function handleContactTasksExpress(res, contactId) {
+  try {
+    const tasksQuery = `
+      SELECT 'activity' as source, a.id::text as id, a.type || ' follow-up' as title,
+             'Follow up on ' || a.type || ' activity' as description, 'medium' as priority,
+             a.created_at + INTERVAL '3 days' as due_date, false as completed
+      FROM activities a WHERE a.contact_id = $1 AND a.created_at > NOW() - INTERVAL '30 days'
+      UNION ALL
+      SELECT 'deal' as source, d.id::text as id, 'Follow up on deal' as title,
+             'Check progress on deal worth £' || COALESCE(d.value::text, 'unknown') as description,
+             CASE WHEN d.value > 10000 THEN 'high' WHEN d.value > 5000 THEN 'medium' ELSE 'low' END as priority,
+             d.updated_at + INTERVAL '7 days' as due_date,
+             CASE WHEN d.status = 'won' THEN true ELSE false END as completed
+      FROM deals d WHERE (d.primary_contact_id = $1 OR d.id IN (SELECT deal_id FROM deal_contacts WHERE contact_id = $1))
+      AND d.status != 'lost'
+      ORDER BY due_date DESC LIMIT 10
+    `;
+
+    const result = await client.query(tasksQuery, [contactId]);
+    res.json({ data: result.rows, error: null, count: result.rows.length });
+  } catch (error) {
+    console.error('Error fetching contact tasks:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
 async function startServer() {
   await connectDB();
   
