@@ -6,14 +6,19 @@ export default async function handler(request, response) {
   if (corsResponse) return corsResponse;
 
   try {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    const pathSegments = url.pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'stages');
+    // Parse URL for Vercel compatibility
+    const urlParts = request.url.split('?');
+    const pathname = urlParts[0];
+    const queryString = urlParts[1] || '';
+    const searchParams = new URLSearchParams(queryString);
+    
+    const pathSegments = pathname.split('/').filter(segment => segment && segment !== 'api' && segment !== 'stages');
     const stageId = pathSegments[0];
     
     if (request.method === 'GET') {
       if (!stageId) {
         // GET /api/stages - List all stages
-        return await handleStagesList(response, url);
+        return await handleStagesList(response, searchParams);
       } else {
         // GET /api/stages/:id - Single stage
         return await handleSingleStage(response, stageId);
@@ -43,9 +48,9 @@ export default async function handler(request, response) {
 }
 
 // List all stages
-async function handleStagesList(response, url) {
+async function handleStagesList(response, searchParams) {
   try {
-    const { ownerId } = Object.fromEntries(url.searchParams);
+    const { ownerId } = Object.fromEntries(searchParams);
     
     let query = `
       SELECT 
@@ -112,7 +117,7 @@ async function handleSingleStage(response, stageId) {
 // Create stage
 async function handleCreateStage(response, request) {
   try {
-    const body = JSON.parse(request.body || '{}');
+    const body = await request.json();
     const { 
       name,
       color = '#3b82f6',
@@ -153,7 +158,7 @@ async function handleCreateStage(response, request) {
 // Update stage
 async function handleUpdateStage(response, request, stageId) {
   try {
-    const body = JSON.parse(request.body || '{}');
+    const body = await request.json();
     const { 
       name,
       color,
