@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Building2, User, Calendar, DollarSign, Target, TrendingUp, Edit, Phone, Mail, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { API_BASE_URL } from '@/lib/config';
 
 interface Deal {
   id: string;
@@ -42,7 +43,7 @@ const DealRecord: React.FC = () => {
         setError(null);
         
         // Fetch deal data from API
-        const response = await fetch(`http://localhost:8000/api/deals/${id}?includeRelationships=true`);
+        const response = await fetch(`${API_BASE_URL}/deals/${id}?includeRelationships=true`);
         
         if (!response.ok) {
           if (response.status === 404) {

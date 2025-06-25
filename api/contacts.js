@@ -26,6 +26,12 @@ export default async function handler(request, response) {
             return await handleContactDeals(response, contactId);
           case 'activities':
             return await handleContactActivities(response, url, contactId);
+          case 'stats':
+            return await handleContactStats(response, contactId);
+          case 'owner':
+            return await handleContactOwner(response, contactId);
+          case 'tasks':
+            return await handleContactTasks(response, contactId);
           default:
             return apiResponse(response, null, 'Resource not found', 404);
         }
@@ -199,6 +205,158 @@ async function handleContactActivities(response, url, contactId) {
     return apiResponse(response, result.rows);
   } catch (error) {
     console.error('Error fetching contact activities:', error);
+    return apiResponse(response, null, error.message, 500);
+  }
+}
+
+// Contact stats
+async function handleContactStats(response, contactId) {
+  try {
+    // Get activity counts
+    const activityQuery = `
+      SELECT 
+        type,
+        COUNT(*) as count
+      FROM activities 
+      WHERE contact_id = $1
+      GROUP BY type
+    `;
+    
+    // Get deals data
+    const dealsQuery = `
+      SELECT 
+        COUNT(*) as total_deals,
+        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_deals,
+        COALESCE(SUM(value), 0) as total_value
+      FROM deals 
+      WHERE primary_contact_id = $1 OR id IN (
+        SELECT deal_id FROM deal_contacts WHERE contact_id = $1
+      )
+    `;
+    
+    const [activityResult, dealsResult] = await Promise.all([
+      executeQuery(activityQuery, [contactId]),
+      executeQuery(dealsQuery, [contactId])
+    ]);
+    
+    // Process activity counts
+    const activityCounts = {};
+    activityResult.rows.forEach(row => {
+      activityCounts[row.type] = parseInt(row.count);
+    });
+    
+    const dealsData = dealsResult.rows[0] || {};
+    
+    const stats = {
+      meetings: activityCounts.meeting || 0,
+      emails: activityCounts.email || 0,
+      calls: activityCounts.call || 0,
+      totalDeals: parseInt(dealsData.total_deals) || 0,
+      activeDeals: parseInt(dealsData.active_deals) || 0,
+      totalDealsValue: parseFloat(dealsData.total_value) || 0,
+      // Calculate engagement score based on activity
+      engagementScore: Math.min(100, Math.max(0, 
+        (activityCounts.meeting || 0) * 15 + 
+        (activityCounts.email || 0) * 5 + 
+        (activityCounts.call || 0) * 10
+      )),
+      recentActivities: activityResult.rows
+    };
+    
+    return apiResponse(response, stats);
+  } catch (error) {
+    console.error('Error fetching contact stats:', error);
+    return apiResponse(response, null, error.message, 500);
+  }
+}
+
+// Contact owner
+async function handleContactOwner(response, contactId) {
+  try {
+    const query = `
+      SELECT 
+        p.id,
+        p.first_name,
+        p.last_name,
+        p.stage,
+        p.email,
+        p.avatar_url,
+        c.created_at as assigned_date
+      FROM contacts c
+      LEFT JOIN profiles p ON c.owner_id = p.id
+      WHERE c.id = $1
+    `;
+
+    const result = await executeQuery(query, [contactId]);
+    
+    if (result.rows.length === 0) {
+      return apiResponse(response, null, 'Contact or owner not found', 404);
+    }
+    
+    const row = result.rows[0];
+    const ownerData = {
+      id: row.id,
+      name: `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+      first_name: row.first_name,
+      last_name: row.last_name,
+      title: row.stage,
+      email: row.email,
+      avatar_url: row.avatar_url,
+      assigned_date: row.assigned_date
+    };
+
+    return apiResponse(response, ownerData);
+  } catch (error) {
+    console.error('Error fetching contact owner:', error);
+    return apiResponse(response, null, error.message, 500);
+  }
+}
+
+// Contact tasks  
+async function handleContactTasks(response, contactId) {
+  try {
+    // For now, we'll create simple tasks based on activities and deals
+    const tasksQuery = `
+      SELECT 
+        'activity' as source,
+        a.id::text as id,
+        a.type || ' follow-up' as title,
+        'Follow up on ' || a.type || ' activity' as description,
+        'medium' as priority,
+        a.created_at + INTERVAL '3 days' as due_date,
+        false as completed
+      FROM activities a 
+      WHERE a.contact_id = $1
+      AND a.created_at > NOW() - INTERVAL '30 days'
+      
+      UNION ALL
+      
+      SELECT 
+        'deal' as source,
+        d.id::text as id,
+        'Follow up on deal' as title,
+        'Check progress on deal worth £' || COALESCE(d.value::text, 'unknown') as description,
+        CASE 
+          WHEN d.value > 10000 THEN 'high'
+          WHEN d.value > 5000 THEN 'medium'
+          ELSE 'low'
+        END as priority,
+        d.updated_at + INTERVAL '7 days' as due_date,
+        CASE WHEN d.status = 'won' THEN true ELSE false END as completed
+      FROM deals d 
+      WHERE (d.primary_contact_id = $1 OR d.id IN (
+        SELECT deal_id FROM deal_contacts WHERE contact_id = $1
+      ))
+      AND d.status != 'lost'
+      
+      ORDER BY due_date DESC
+      LIMIT 10
+    `;
+
+    const result = await executeQuery(tasksQuery, [contactId]);
+    return apiResponse(response, result.rows);
+  } catch (error) {
+    console.error('Error fetching contact tasks:', error);
     return apiResponse(response, null, error.message, 500);
   }
 } 

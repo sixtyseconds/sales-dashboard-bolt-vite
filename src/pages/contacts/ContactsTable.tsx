@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
@@ -28,30 +28,40 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { toast } from 'sonner';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useUser } from '@/lib/hooks/useUser';
+import { API_BASE_URL } from '@/lib/config';
 
 interface Contact {
   id: string;
-  first_name: string;
-  last_name: string;
-  full_name: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
   email: string;
-  phone: string;
-  title: string;
-  linkedin_url: string;
-  is_primary: boolean;
-  company_id: string;
+  phone?: string;
+  title?: string;
+  company_id?: string;
+  owner_id?: string;
+  linkedin_url?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
+  // Company relationship
   companies?: {
     id: string;
     name: string;
-    domain: string;
-    size: string;
-    industry: string;
-    website: string;
+    domain?: string;
+    size?: string;
+    industry?: string;
+    website?: string;
   };
+}
+
+interface ContactsResponse {
+  data: Contact[];
+  error: string | null;
+  count: number;
 }
 
 type SortField = 'full_name' | 'email' | 'title' | 'company_name' | 'is_primary' | 'created_at' | 'updated_at';
@@ -69,7 +79,7 @@ export default function ContactsTable() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Fetch contacts from API
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchContacts = async () => {
       try {
         setIsLoading(true);

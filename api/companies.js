@@ -8,27 +8,57 @@ export default async function handler(request, response) {
   try {
     if (request.method === 'GET') {
       const url = new URL(request.url);
-      const { search, limit } = Object.fromEntries(url.searchParams);
+      const { search, includeStats, limit, ownerId } = Object.fromEntries(url.searchParams);
       
       let query = `
-        SELECT * FROM companies
+        SELECT 
+          c.*,
+          ${includeStats === 'true' ? `
+            COALESCE(contact_counts.contact_count, 0) as "contactCount",
+            COALESCE(deal_counts.deal_count, 0) as "dealsCount",
+            COALESCE(deal_counts.deal_value, 0) as "dealsValue"
+          ` : '0 as "contactCount", 0 as "dealsCount", 0 as "dealsValue"'}
+        FROM companies c
+        ${includeStats === 'true' ? `
+          LEFT JOIN (
+            SELECT company_id, COUNT(*) as contact_count
+            FROM contacts 
+            WHERE company_id IS NOT NULL
+            GROUP BY company_id
+          ) contact_counts ON c.id = contact_counts.company_id
+          LEFT JOIN (
+            SELECT company_id, COUNT(*) as deal_count, COALESCE(SUM(value), 0) as deal_value
+            FROM deals 
+            WHERE company_id IS NOT NULL
+            GROUP BY company_id
+          ) deal_counts ON c.id = deal_counts.company_id
+        ` : ''}
       `;
       
       const params = [];
+      const conditions = [];
       
       if (search) {
-        query += ` WHERE name ILIKE $1 OR domain ILIKE $1`;
+        conditions.push(`(c.name ILIKE $${params.length + 1} OR c.domain ILIKE $${params.length + 1})`);
         params.push(`%${search}%`);
       }
       
-      query += ` ORDER BY updated_at DESC`;
-      
-      if (limit) {
-        const limitParam = params.length + 1;
-        query += ` LIMIT $${limitParam}`;
-        params.push(parseInt(limit));
+      if (ownerId) {
+        conditions.push(`c.owner_id = $${params.length + 1}`);
+        params.push(ownerId);
       }
       
+      if (conditions.length > 0) {
+        query += ` WHERE ${conditions.join(' AND ')}`;
+      }
+      
+      query += ` ORDER BY c.updated_at DESC`;
+      
+      if (limit) {
+        query += ` LIMIT $${params.length + 1}`;
+        params.push(parseInt(limit));
+      }
+
       const result = await executeQuery(query, params);
       return apiResponse(response, result.rows);
     }

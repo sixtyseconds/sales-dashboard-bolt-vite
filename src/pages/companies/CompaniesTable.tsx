@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Building2, 
   Search, 
@@ -26,24 +26,34 @@ import {
 } from '@/components/ui/table';
 import { OwnerFilter } from '@/components/OwnerFilter';
 import { toast } from 'sonner';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useUser } from '@/lib/hooks/useUser';
+import { API_BASE_URL } from '@/lib/config';
 
 interface Company {
   id: string;
   name: string;
-  domain: string;
-  size: string;
-  industry: string;
-  website: string;
-  linkedin_url: string;
-  description: string;
-  owner_id: string;
-  contactCount: number;
-  dealsCount: number;
-  dealsValue: number;
+  domain?: string;
+  industry?: string;
+  size?: string;
+  website?: string;
+  address?: string;
+  phone?: string;
+  description?: string;
+  linkedin_url?: string;
+  owner_id?: string;
+  contactCount?: number;
+  dealsCount?: number;
+  dealsValue?: number;
   created_at: string;
   updated_at: string;
+}
+
+interface CompaniesResponse {
+  data: Company[];
+  error: string | null;
+  count: number;
 }
 
 type SortField = 'name' | 'domain' | 'size' | 'industry' | 'contactCount' | 'dealsCount' | 'dealsValue' | 'created_at' | 'updated_at';
@@ -61,7 +71,7 @@ export default function CompaniesTable() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   // Fetch companies from API
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchCompanies = async () => {
       try {
         setIsLoading(true);
