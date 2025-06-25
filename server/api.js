@@ -505,10 +505,11 @@ app.get('/api/stages', async (req, res) => {
         name,
         color,
         default_probability,
+        order_position,
         created_at,
         updated_at
       FROM deal_stages
-      ORDER BY name ASC
+      ORDER BY order_position ASC, created_at ASC
     `;
 
     const result = await client.query(query);

@@ -67,7 +67,7 @@ async function handleStagesList(response, searchParams) {
         ${ownerId ? 'WHERE owner_id = $1' : ''}
         GROUP BY stage_id
       ) deal_counts ON ds.id = deal_counts.stage_id
-      ORDER BY ds.order_index ASC, ds.created_at ASC
+      ORDER BY ds.order_position ASC, ds.created_at ASC
     `;
     
     const params = ownerId ? [ownerId] : [];
@@ -122,7 +122,7 @@ async function handleCreateStage(response, request) {
       name,
       color = '#3b82f6',
       default_probability = 50,
-      order_index,
+      order_position,
       is_final = false,
       description
     } = body;
@@ -131,21 +131,21 @@ async function handleCreateStage(response, request) {
       return apiResponse(response, null, 'Stage name is required', 400);
     }
     
-    // If no order_index provided, set it to the highest + 1
-    let finalOrderIndex = order_index;
-    if (finalOrderIndex === undefined) {
-      const maxOrderQuery = `SELECT COALESCE(MAX(order_index), 0) + 1 as next_order FROM deal_stages`;
+    // If no order_position provided, set it to the highest + 1
+    let finalOrderPosition = order_position;
+    if (finalOrderPosition === undefined) {
+      const maxOrderQuery = `SELECT COALESCE(MAX(order_position), 0) + 10 as next_order FROM deal_stages`;
       const maxOrderResult = await executeQuery(maxOrderQuery, []);
-      finalOrderIndex = maxOrderResult.rows[0].next_order;
+      finalOrderPosition = maxOrderResult.rows[0].next_order;
     }
     
     const query = `
-      INSERT INTO deal_stages (name, color, default_probability, order_index, is_final, description)
+      INSERT INTO deal_stages (name, color, default_probability, order_position, is_final, description)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
     
-    const params = [name, color, default_probability, finalOrderIndex, is_final, description];
+    const params = [name, color, default_probability, finalOrderPosition, is_final, description];
     const result = await executeQuery(query, params);
     
     return apiResponse(response, result.rows[0], null, 201);
@@ -163,7 +163,7 @@ async function handleUpdateStage(response, request, stageId) {
       name,
       color,
       default_probability,
-      order_index,
+      order_position,
       is_final,
       description
     } = body;
@@ -173,7 +173,7 @@ async function handleUpdateStage(response, request, stageId) {
       SET name = COALESCE($1, name),
           color = COALESCE($2, color),
           default_probability = COALESCE($3, default_probability),
-          order_index = COALESCE($4, order_index),
+          order_position = COALESCE($4, order_position),
           is_final = COALESCE($5, is_final),
           description = COALESCE($6, description),
           updated_at = NOW()
@@ -181,7 +181,7 @@ async function handleUpdateStage(response, request, stageId) {
       RETURNING *
     `;
     
-    const params = [name, color, default_probability, order_index, is_final, description, stageId];
+    const params = [name, color, default_probability, order_position, is_final, description, stageId];
     const result = await executeQuery(query, params);
     
     if (result.rows.length === 0) {
