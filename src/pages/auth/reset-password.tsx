@@ -19,7 +19,7 @@ export default function ResetPassword() {
   const location = useLocation();
   const { updatePassword } = useAuth();
 
-    // Check if this is a valid password recovery session
+  // Check if this is a valid password recovery session
   useEffect(() => {
     const checkRecoverySession = async () => {
       try {

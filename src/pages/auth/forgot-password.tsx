@@ -97,12 +97,20 @@ export default function ForgotPassword() {
               <p className="text-gray-400 text-sm mb-6">
                 Please check your inbox and follow the instructions to reset your password. The link will expire in 24 hours.
               </p>
-              <button
-                onClick={() => navigate('/auth/login')}
-                className="bg-gray-700/50 hover:bg-gray-700 text-white py-2 px-4 rounded-xl font-medium transition-colors"
-              >
-                Return to Login
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => navigate('/auth/login')}
+                  className="w-full bg-gray-700/50 hover:bg-gray-700 text-white py-2 px-4 rounded-xl font-medium transition-colors"
+                >
+                  Return to Login
+                </button>
+                <button
+                  onClick={() => setIsSubmitted(false)}
+                  className="w-full text-[#37bd7e] hover:text-[#2da76c] text-sm font-medium transition-colors"
+                >
+                  Send to different email
+                </button>
+              </div>
             </div>
           )}
 
