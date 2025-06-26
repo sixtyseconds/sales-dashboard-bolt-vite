@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence, useCycle } from 'framer-motion';
 import { QuickAdd } from '@/components/QuickAdd';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   LayoutDashboard,
@@ -30,6 +30,7 @@ import { useUser } from '@/lib/hooks/useUser';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { userData } = useUser();
+  const { signOut } = useAuth();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, toggleMobileMenu] = useCycle(false, true);
@@ -38,8 +39,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
-      toast.success('Logged out successfully');
+      const { error } = await signOut();
+      if (error) {
+        toast.error('Error logging out: ' + error.message);
+      }
+      // Success toast is handled by AuthContext
     } catch (error: any) {
       toast.error('Error logging out');
       console.error('[Auth]', error);

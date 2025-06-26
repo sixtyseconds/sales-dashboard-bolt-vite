@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Mail, ArrowLeft } from 'lucide-react';
 
@@ -10,24 +10,29 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
+  const { resetPassword } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email.trim()) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Ensure email is lowercased for case-insensitive password reset
-      const lowerEmail = email.toLowerCase();
-      const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
-      });
+      const { error } = await resetPassword(email);
 
-      if (error) throw error;
-
-      setIsSubmitted(true);
-      toast.success('Password reset instructions sent to your email');
+      if (error) {
+        toast.error(error.message);
+      } else {
+        setIsSubmitted(true);
+        toast.success('Password reset instructions sent to your email');
+      }
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +76,7 @@ export default function ForgotPassword() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                     placeholder="sarah@example.com"
+                    disabled={isLoading}
                   />
                 </div>
               </div>

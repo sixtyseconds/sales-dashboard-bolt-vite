@@ -5,7 +5,8 @@ import { Toaster } from '@/components/ui/sonner';
 import { createApiMonitor } from '@/lib/utils/apiUtils';
 import { API_BASE_URL } from '@/lib/config';
 import { AppLayout } from '@/components/AppLayout';
-import { AuthGuard } from '@/components/AuthGuard';
+import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 import Dashboard from '@/pages/Dashboard';
 import ActivityLog from '@/pages/ActivityLog';
 import Heatmap from '@/pages/Heatmap';
@@ -56,31 +57,33 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthGuard>
-        <Routes>
-          <Route path="/auth/login" element={<Login />} />
-          <Route path="/auth/signup" element={<Signup />} />
-          <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-          <Route path="/auth/reset-password" element={<ResetPassword />} />
-          <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
-          <Route path="/activity" element={<AppLayout><ActivityLog /></AppLayout>} />
-          <Route path="/heatmap" element={<AppLayout><Heatmap /></AppLayout>} />
-          <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
-          <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
-          <Route path="/tasks" element={<AppLayout><TasksPage /></AppLayout>} />
-          <Route path="/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
-          <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
-          <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />
-          <Route path="/crm/contacts/:id" element={<AppLayout><ContactRecord /></AppLayout>} />
-          <Route path="/crm/deals/:id" element={<AppLayout><DealRecord /></AppLayout>} />
-          <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
-          <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
-          <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
-          <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
-        </Routes>
+      <AuthProvider>
+        <ProtectedRoute>
+          <Routes>
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/signup" element={<Signup />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
+            <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
+            <Route path="/activity" element={<AppLayout><ActivityLog /></AppLayout>} />
+            <Route path="/heatmap" element={<AppLayout><Heatmap /></AppLayout>} />
+            <Route path="/funnel" element={<AppLayout><SalesFunnel /></AppLayout>} />
+            <Route path="/pipeline" element={<AppLayout><PipelinePage /></AppLayout>} />
+            <Route path="/tasks" element={<AppLayout><TasksPage /></AppLayout>} />
+            <Route path="/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
+            <Route path="/crm/companies" element={<AppLayout><CompaniesTable /></AppLayout>} />
+            <Route path="/crm/contacts" element={<AppLayout><ContactsTable /></AppLayout>} />
+            <Route path="/crm/contacts/:id" element={<AppLayout><ContactRecord /></AppLayout>} />
+            <Route path="/crm/deals/:id" element={<AppLayout><DealRecord /></AppLayout>} />
+            <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
+            <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
+            <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
+            <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
+          </Routes>
+        </ProtectedRoute>
         <Toaster />
         <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(74,74,117,0.15),transparent)] pointer-events-none" />
-      </AuthGuard>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

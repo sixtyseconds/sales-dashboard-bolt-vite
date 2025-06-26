@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
 
@@ -15,6 +15,7 @@ export default function Signup() {
     confirmPassword: '',
   });
   const navigate = useNavigate();
+  const { signUp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,27 +25,30 @@ export default function Signup() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Ensure email is lowercased for case-insensitive registration
-      const email = formData.email.toLowerCase();
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: `${formData.firstName} ${formData.lastName}`,
-          },
-        },
-      });
+      const { error } = await signUp(
+        formData.email, 
+        formData.password, 
+        {
+          full_name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+        }
+      );
 
-      if (error) throw error;
-
-      toast.success('Account created successfully!');
-      navigate('/');
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Account created successfully! Please check your email for verification.');
+        navigate('/auth/login');
+      }
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -84,6 +88,7 @@ export default function Signup() {
                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                     placeholder="Sarah"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -101,6 +106,7 @@ export default function Signup() {
                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                     placeholder="Johnson"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -119,6 +125,7 @@ export default function Signup() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="sarah@example.com"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -132,10 +139,12 @@ export default function Signup() {
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -149,10 +158,12 @@ export default function Signup() {
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
+                  disabled={isLoading}
                 />
               </div>
             </div>

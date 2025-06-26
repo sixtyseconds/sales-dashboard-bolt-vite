@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 
@@ -12,29 +12,23 @@ export default function Login() {
     password: '',
   });
   const navigate = useNavigate();
+  const { signIn } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Ensure email is lowercased for case-insensitive authentication
-      const email = formData.email.toLowerCase();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password: formData.password,
-      });
+      const { error } = await signIn(formData.email, formData.password);
 
-      if (error) throw error;
-
-      // No need for a toast here, useAuth hook will handle it
-      navigate('/');
-    } catch (error: any) {
-      if (error.message === 'Invalid login credentials') {
-        toast.error('Invalid email or password. Please try again.');
+      if (error) {
+        toast.error(error.message);
       } else {
-        toast.error(error.message || 'An unknown error occurred.');
+        // Success is handled by AuthContext
+        navigate('/');
       }
+    } catch (error: any) {
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -73,6 +67,7 @@ export default function Login() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="sarah@example.com"
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -98,6 +93,7 @@ export default function Login() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
+                  disabled={isLoading}
                 />
               </div>
             </div>

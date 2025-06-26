@@ -1,32 +1,74 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase/client';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/lib/contexts/AuthContext';
+import { supabase } from '@/lib/supabase/clientV2';
 import { toast } from 'sonner';
 import { Lock } from 'lucide-react';
 
 export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isValidRecovery, setIsValidRecovery] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
   });
   const navigate = useNavigate();
+  const location = useLocation();
+  const { updatePassword } = useAuth();
 
-  // Check if user is authenticated through the reset link
+  // Check if this is a valid password recovery session
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      
-      // If no session exists or we don't have the recovery flow in URL params
-      // this likely means the user navigated here directly without a valid reset link
-      if (!data.session && !window.location.hash.includes('type=recovery')) {
-        toast.error('Invalid or expired password reset link');
-        navigate('/auth/login');
+    const checkRecoverySession = async () => {
+      try {
+        console.log('Current URL:', window.location.href);
+        console.log('Hash params:', window.location.hash);
+        
+        // Check if we have recovery parameters in the URL
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const type = hashParams.get('type');
+        
+        console.log('Hash params parsed:', { accessToken: !!accessToken, type });
+        
+        if (type === 'recovery' && accessToken) {
+          console.log('Valid recovery link detected');
+          
+          // Let Supabase handle the recovery session automatically
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          console.log('Session after recovery:', { session: !!session, error });
+          
+          if (error) {
+            console.error('Session error:', error);
+            toast.error('Invalid or expired password reset link');
+            navigate('/auth/forgot-password');
+            return;
+          }
+          
+          if (session) {
+            setIsValidRecovery(true);
+          } else {
+            toast.error('Invalid password reset link');
+            navigate('/auth/forgot-password');
+          }
+        } else {
+          console.log('No valid recovery parameters found');
+          toast.error('Invalid password reset link');
+          navigate('/auth/forgot-password');
+        }
+        
+        setIsCheckingSession(false);
+      } catch (error) {
+        console.error('Recovery check error:', error);
+        toast.error('Invalid password reset link');
+        navigate('/auth/forgot-password');
+        setIsCheckingSession(false);
       }
     };
-    
-    checkSession();
+
+    checkRecoverySession();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,27 +80,50 @@ export default function ResetPassword() {
     }
 
     if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error('Password must be at least 6 characters long');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: formData.password,
-      });
+      const { error } = await updatePassword(formData.password);
 
-      if (error) throw error;
-
-      toast.success('Password updated successfully');
-      navigate('/auth/login');
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success('Password updated successfully! Please sign in with your new password.');
+        navigate('/auth/login');
+      }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to update password');
+      console.error('Password update error:', error);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Show loading state while checking recovery session
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(74,74,117,0.25),transparent)] pointer-events-none" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div className="w-8 h-8 border-2 border-[#37bd7e] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Verifying password reset link...</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Only show the form if we have a valid recovery session
+  if (!isValidRecovery) {
+    return null; // Component will navigate away
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
@@ -89,11 +154,12 @@ export default function ResetPassword() {
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
-                  minLength={6}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -107,11 +173,12 @@ export default function ResetPassword() {
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
-                  minLength={6}
+                  disabled={isLoading}
                 />
               </div>
             </div>
