@@ -75,7 +75,10 @@ VITE_SUPABASE_SERVICE_ROLE_KEY="service-role-key"
 
 ### Phase 6 – Monitoring & Analytics
 - [ ] Add Sentry breadcrumb for each auth event.
-- [ ] Supabase webhook → `admin_logs` table for sign-in/out.
+- [x] Edge Function `auth-logger` → `admin_logs` table for sign-in/out.
+- [x] AuthLogger service integrated with AuthContext.
+- [ ] Rate limiting Edge Function for suspicious auth activity.
+- [ ] Session analytics and anomaly detection.
 
 ### Phase 7 – Deployment & Rollback
 - [ ] Deploy preview branch (`auth-v2-preview`) to Vercel.

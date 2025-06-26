@@ -2,25 +2,27 @@
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const isProduction = window.location.hostname.includes('vercel.app') || !isLocalhost;
 
-// API configuration - Use local server for development, Supabase for production
+// Get Supabase URL from environment variables
+const getSupabaseUrl = () => {
+  return import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_PUBLIC_SUPABASE_URL;
+};
+
+// API configuration - Always use Supabase Edge Functions
 const getApiBaseUrl = () => {
   // If environment variable is explicitly set, use it
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
   
-  // For localhost development, always use the local API server
-  if (isLocalhost) {
-    return 'http://localhost:8000/api';
+  // Always use Supabase Edge Functions for API calls
+  const supabaseUrl = getSupabaseUrl();
+  if (supabaseUrl) {
+    return `${supabaseUrl}/functions/v1`;
   }
   
-  // Use Vercel API routes for production
-  if (isProduction) {
-    return '/api';
-  }
-  
-  // Fallback to localhost for development if Supabase URL not set
-  return 'http://localhost:8000/api';
+  // Fallback - should not happen if environment is properly configured
+  console.error('⚠️ VITE_SUPABASE_URL not found. Please check your environment variables.');
+  return '/api'; // Fallback to relative path
 };
 
 export const API_BASE_URL = getApiBaseUrl();
@@ -31,6 +33,7 @@ export const config = {
   isProduction,
   // Add debug mode
   debug: !isProduction,
+  supabaseUrl: getSupabaseUrl(),
 };
 
 // Helper to log configuration in development
@@ -41,6 +44,7 @@ if (config.debug) {
     isProduction: config.isProduction,
     debug: config.debug,
     apiBaseUrl: API_BASE_URL,
-    note: config.isLocalhost ? 'Using local API server' : 'Using Supabase Edge Functions for API calls'
+    supabaseUrl: config.supabaseUrl,
+    note: 'Using Supabase Edge Functions for all API calls'
   });
 } 

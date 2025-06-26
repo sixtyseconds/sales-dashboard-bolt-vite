@@ -25,6 +25,7 @@ import ContactsTable from '@/pages/contacts/ContactsTable';
 import ContactRecord from '@/pages/contacts/ContactRecord';
 import DealRecord from '@/pages/deals/DealRecord';
 import TasksPage from '@/pages/TasksPage';
+import TestFallback from '@/pages/TestFallback';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,6 +80,7 @@ function App() {
             <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
             <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
             <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
+            <Route path="/test-fallback" element={<ProtectedRoute><TestFallback /></ProtectedRoute>} />
           </Routes>
         </ProtectedRoute>
         <Toaster />

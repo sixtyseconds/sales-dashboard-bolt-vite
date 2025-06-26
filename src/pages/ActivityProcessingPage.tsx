@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { Loader2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { OriginalActivity } from '@/lib/hooks/useOriginalActivities';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/clientV2';
 import { EditActivityEmailModal } from '@/components/activities/EditActivityEmailModal';
 import {
   Select,
@@ -47,7 +47,7 @@ export function ActivityProcessingPage() {
     const fetchUsers = async () => {
       setIsLoadingUsers(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from('profiles')
           .select('id, first_name, last_name')
           .order('first_name', { ascending: true });
@@ -321,7 +321,6 @@ export function ActivityProcessingPage() {
                     <TableCell className="px-3 py-3">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
-                          <AvatarImage src={activity.avatar_url ?? undefined} alt={activity.sales_rep || 'User'} />
                           <AvatarFallback className='text-xs sm:text-sm font-medium text-[#37bd7e] bg-[#37bd7e]/10 border border-[#37bd7e]/20'>
                             {getInitialsFromName(activity.sales_rep)}
                           </AvatarFallback>

@@ -71,20 +71,20 @@ async function handleStagesList(supabaseClient: any, url: URL) {
     const includeDeals = url.searchParams.get('includeDeals') === 'true'
 
     let query = supabaseClient
-      .from('stages')
+      .from('deal_stages')
       .select(`
         id,
         name,
         color,
-        position,
-        is_closed,
+        order_position,
+        default_probability,
         created_at,
         updated_at
         ${includeDeals ? `,
         deals:deals(count)
         ` : ''}
       `)
-      .order('position', { ascending: true })
+      .order('order_position', { ascending: true })
 
     const { data: stages, error } = await query
 
@@ -123,7 +123,7 @@ async function handleStagesList(supabaseClient: any, url: URL) {
 async function handleSingleStage(supabaseClient: any, stageId: string) {
   try {
     const { data: stage, error } = await supabaseClient
-      .from('stages')
+      .from('deal_stages')
       .select(`
         *,
         deals:deals(count)
@@ -171,19 +171,19 @@ async function handleCreateStage(supabaseClient: any, body: any) {
   try {
     // Get the next position
     const { data: maxStage } = await supabaseClient
-      .from('stages')
-      .select('position')
-      .order('position', { ascending: false })
+      .from('deal_stages')
+      .select('order_position')
+      .order('order_position', { ascending: false })
       .limit(1)
       .single()
 
-    const nextPosition = (maxStage?.position || 0) + 1
+    const nextPosition = (maxStage?.order_position || 0) + 1
 
     const { data: stage, error } = await supabaseClient
-      .from('stages')
+      .from('deal_stages')
       .insert({
         ...body,
-        position: nextPosition
+        order_position: nextPosition
       })
       .select()
       .single()
@@ -215,7 +215,7 @@ async function handleCreateStage(supabaseClient: any, body: any) {
 async function handleUpdateStage(supabaseClient: any, stageId: string, body: any) {
   try {
     const { data: stage, error } = await supabaseClient
-      .from('stages')
+      .from('deal_stages')
       .update(body)
       .eq('id', stageId)
       .select()
@@ -263,7 +263,7 @@ async function handleDeleteStage(supabaseClient: any, stageId: string) {
     }
 
     const { error } = await supabaseClient
-      .from('stages')
+      .from('deal_stages')
       .delete()
       .eq('id', stageId)
 

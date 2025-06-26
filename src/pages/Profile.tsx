@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useUser } from '@/lib/hooks/useUser';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/clientV2';
 import { Camera, Save, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Profile() {
-  const { userData, uploadProfileImage } = useUser();
+  const { userData } = useUser();
+  const { user, updatePassword } = useAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -51,13 +53,18 @@ export default function Profile() {
 
       if (authError) throw authError;
 
-      // Update profile record
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user?.id);
+      // Update profile record if we have a user ID
+      if (user?.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: `${formData.firstName} ${formData.lastName}`,
+            username: formData.email // or whatever field maps to email
+          })
+          .eq('id', user.id);
 
-      if (profileError) throw profileError;
+        if (profileError) throw profileError;
+      }
 
       toast.success('Profile updated successfully');
     } catch (error: any) {
@@ -78,11 +85,8 @@ export default function Profile() {
     }
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: formData.newPassword
-      });
-
-      if (error) throw error;
+      const { error } = await updatePassword(formData.newPassword);
+      if (error) throw new Error(error.message);
       toast.success('Password updated successfully');
       setIsPasswordModalOpen(false);
       setFormData(prev => ({
@@ -116,7 +120,31 @@ export default function Profile() {
       }
 
       setUploading(true);
-      const publicUrl = await uploadProfileImage(file);
+      
+      // Create a simple file upload (you can enhance this later)
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update user profile with new avatar URL
+      if (user?.id) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: publicUrl })
+          .eq('id', user.id);
+          
+        if (updateError) throw updateError;
+      }
+      
       toast.success('Profile picture updated successfully');
     } catch (error) {
       toast.error('Upload failed');

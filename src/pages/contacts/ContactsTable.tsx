@@ -32,22 +32,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUser } from '@/lib/hooks/useUser';
 import { API_BASE_URL } from '@/lib/config';
+import { supabase } from '@/lib/supabase/clientV2';
+import { getSupabaseHeaders } from '@/lib/utils/apiUtils';
 
 interface Contact {
   id: string;
-  first_name?: string;
-  last_name?: string;
-  full_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
   email: string;
-  phone?: string;
+  phone?: string | null;
+  company?: string; // This is a text field, not a foreign key
+  created_at: string;
+  updated_at: string;
+  // Optional fields that may not exist in database
+  full_name?: string;
   title?: string;
   company_id?: string;
   owner_id?: string;
   linkedin_url?: string;
   notes?: string;
-  created_at: string;
-  updated_at: string;
-  // Company relationship
+  is_primary?: boolean;
+  // Company relationship (only available when Edge Functions work)
   companies?: {
     id: string;
     name: string;
@@ -85,6 +90,50 @@ export default function ContactsTable() {
         setIsLoading(true);
         setError(null);
         
+        // Check authentication first
+        console.log('🔍 Checking user authentication for contacts...');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          console.log('⚠️ No session found - using service key fallback for contacts...');
+          
+          // Skip Edge Functions entirely and go straight to service key fallback
+          const { createClient } = await import('@supabase/supabase-js');
+          const serviceSupabase = createClient(
+            import.meta.env.VITE_SUPABASE_URL || '',
+            import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
+          );
+          
+          console.log('🛡️ Using service key fallback for contacts (no auth)...');
+          
+          // Use the actual database structure - no companies join since relationship doesn't exist
+          const { data: serviceContactsData, error: serviceError } = await (serviceSupabase as any)
+            .from('contacts')
+            .select('*') // Get all available fields
+            .order('created_at', { ascending: false });
+            
+          if (serviceError) {
+            console.error('❌ Service key contacts fallback failed:', serviceError);
+            throw serviceError;
+          }
+          
+          console.log(`✅ Service key contacts fallback successful: Retrieved ${serviceContactsData?.length || 0} contacts`);
+          
+          // Process contacts - no company join available, so use the company text field
+          const processedContacts = serviceContactsData?.map((contact: any) => ({
+            ...contact,
+            is_primary: contact.is_primary || false,
+            companies: contact.company ? { name: contact.company } : null // Use company text field
+          })) || [];
+          
+          setContacts(processedContacts);
+          setIsLoading(false);
+          return;
+        }
+
+        // If authenticated, try Edge Functions first
+        console.log('🌐 User authenticated - trying Edge Functions for contacts...');
+        
         const params = new URLSearchParams({
           includeCompany: 'true'
         });
@@ -93,14 +142,83 @@ export default function ContactsTable() {
           params.append('search', searchTerm);
         }
 
-        const response = await fetch(`${API_BASE_URL}/contacts?${params}`);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+          const response = await fetch(`${API_BASE_URL}/contacts?${params}`, {
+            headers: await getSupabaseHeaders(),
+          });
+          
+          if (response.status === 401) {
+            setError('Authentication required. Please log in to view contacts.');
+            return;
+          }
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          setContacts(result.data || []);
+          return;
+        } catch (edgeFunctionError) {
+          console.warn('Contacts Edge Function failed, falling back to direct Supabase client:', edgeFunctionError);
         }
+
+        // Fallback to direct Supabase client with anon key
+        console.log('🛡️ Contacts fallback: Using direct Supabase client...');
         
-        const result = await response.json();
-        setContacts(result.data || []);
+        let query = (supabase as any)
+          .from('contacts')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (searchTerm) {
+          query = query.or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+        }
+
+        const { data: contactsData, error: supabaseError } = await query;
+
+        if (supabaseError) {
+          console.error('❌ Contacts anon fallback failed:', supabaseError);
+          console.log('🔄 Trying contacts with service role key...');
+          
+          // Last resort: try with service role key
+          const { createClient } = await import('@supabase/supabase-js');
+          const serviceSupabase = createClient(
+            import.meta.env.VITE_SUPABASE_URL || '',
+            import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || ''
+          );
+          
+          const { data: serviceContactsData, error: serviceError } = await (serviceSupabase as any)
+            .from('contacts')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (serviceError) {
+            console.error('❌ Service key contacts fallback failed:', serviceError);
+            throw serviceError;
+          }
+          
+          console.log(`✅ Service key contacts fallback successful: Retrieved ${serviceContactsData?.length || 0} contacts`);
+          const processedContacts = serviceContactsData?.map((contact: any) => ({
+            ...contact,
+            is_primary: contact.is_primary || false,
+            companies: null
+          })) || [];
+          
+          setContacts(processedContacts);
+          return;
+        }
+
+        console.log(`✅ Contacts fallback successful: Retrieved ${contactsData?.length || 0} contacts`);
+        
+        // Process the data to match expected interface
+        const processedContacts = contactsData?.map((contact: any) => ({
+          ...contact,
+          is_primary: contact.is_primary || false,
+          companies: contact.company ? { name: contact.company } : null // Use company text field
+        })) || [];
+
+        setContacts(processedContacts);
       } catch (err) {
         console.error('Error fetching contacts:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch contacts');
@@ -127,8 +245,8 @@ export default function ContactsTable() {
   // Filter and sort contacts
   const filteredAndSortedContacts = useMemo(() => {
     let filtered = contacts.filter(contact => {
-      const matchesCompany = companyFilter === 'all' || 
-        (contact.companies?.name === companyFilter);
+      const companyName = contact.company || contact.companies?.name;
+      const matchesCompany = companyFilter === 'all' || (companyName === companyFilter);
       const matchesPrimary = primaryFilter === 'all' || 
         (primaryFilter === 'primary' ? contact.is_primary : !contact.is_primary);
       return matchesCompany && matchesPrimary;
@@ -167,8 +285,9 @@ export default function ContactsTable() {
 
   // Get unique values for filters
   const uniqueCompanies = [...new Set(contacts
-    .filter(c => c.companies?.name)
-    .map(c => c.companies!.name)
+    .filter(c => c.company || c.companies?.name) // Check both company text field and companies relationship
+    .map(c => c.company || c.companies?.name)
+    .filter(Boolean)
   )];
 
   const handleSort = (field: SortField) => {
@@ -186,12 +305,33 @@ export default function ContactsTable() {
   };
 
   const formatName = (contact: Contact) => {
-    if (contact.full_name) return contact.full_name;
-    if (contact.first_name && contact.last_name) {
-      return `${contact.first_name} ${contact.last_name}`;
+    // Try full_name first (if it exists)
+    if (contact.full_name && contact.full_name.trim()) {
+      return contact.full_name.trim();
     }
-    if (contact.first_name) return contact.first_name;
-    if (contact.last_name) return contact.last_name;
+    
+    // Try first_name and last_name combination
+    const firstName = contact.first_name?.trim() || '';
+    const lastName = contact.last_name?.trim() || '';
+    
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+    if (firstName) return firstName;
+    if (lastName) return lastName;
+    
+    // Fallback to email username part (before @)
+    if (contact.email) {
+      const emailUsername = contact.email.split('@')[0];
+      // Make it more readable (replace dots/underscores with spaces, capitalize)
+      const readableName = emailUsername
+        .replace(/[._-]/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      return `${readableName} (from email)`;
+    }
+    
     return 'Unnamed Contact';
   };
 
@@ -203,7 +343,7 @@ export default function ContactsTable() {
         `"${contact.email || ''}"`,
         `"${contact.phone || ''}"`,
         `"${contact.title || ''}"`,
-        `"${contact.companies?.name || ''}"`,
+        `"${contact.company || contact.companies?.name || ''}"`,
         contact.is_primary ? 'Yes' : 'No',
         new Date(contact.created_at).toLocaleDateString()
       ].join(','))

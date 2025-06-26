@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/clientV2';
 import { format, subMonths } from 'date-fns';
 import { useUser } from '@/lib/hooks/useUser';
 
@@ -21,7 +21,7 @@ async function fetchSalesData(startDate: Date, endDate: Date) {
   if (!user) return null;
 
   // Get current month's activities
-  const { data: currentActivities, error: currentError } = await supabase
+  const { data: currentActivities, error: currentError } = await (supabase as any)
     .from('activities')
     .select('*')
     .eq('user_id', user.id)
@@ -35,7 +35,7 @@ async function fetchSalesData(startDate: Date, endDate: Date) {
   const previousMonthStart = subMonths(startDate, 1);
   const previousMonthEnd = subMonths(endDate, 1);
 
-  const { data: previousActivities, error: previousError } = await supabase
+  const { data: previousActivities, error: previousError } = await (supabase as any)
     .from('activities')
     .select('*')
     .eq('user_id', user.id)

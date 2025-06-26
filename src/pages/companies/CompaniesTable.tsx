@@ -89,20 +89,123 @@ export default function CompaniesTable() {
           params.append('ownerId', selectedOwnerId);
         }
 
-        const response = await fetch(`${API_BASE_URL}/companies?${params}`);
+        // Try the companies endpoint
+        try {
+          const response = await fetch(`${API_BASE_URL}/companies?${params}`);
+          
+          if (response.status === 401) {
+            setError('Authentication required. Please log in to view companies.');
+            return;
+          }
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          setCompanies(result.data || []);
+          return;
+        } catch (apiError) {
+          console.warn('Companies API failed:', apiError);
+        }
+
+        // Fallback: Check if companies table exists
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        if (!supabaseUrl || !supabaseKey) {
+          setError('Supabase configuration missing. Please check environment variables.');
+          return;
         }
         
-        const result = await response.json();
-        setCompanies(result.data || []);
-      } catch (err) {
-        console.error('Error fetching companies:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch companies');
-        toast.error('Failed to load companies');
-      } finally {
-        setIsLoading(false);
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Check if user is authenticated
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session) {
+          setError('Please log in to view companies.');
+          return;
+        }
+
+        // Try to query companies table directly
+        const { data: companiesData, error: supabaseError } = await supabase
+          .from('companies')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (supabaseError) {
+          if (supabaseError.message.includes('does not exist')) {
+            setError('Companies table needs to be created. Please contact your administrator or run the setup script.');
+          } else if (supabaseError.message.includes('JWT') || supabaseError.message.includes('auth')) {
+            setError('Session expired. Please log in again.');
+          } else {
+            throw supabaseError;
+          }
+          return;
+        }
+
+        setCompanies(companiesData || []);
+      } catch (error) {
+        console.error('❌ Companies Edge Function failed:', error);
+        
+        // Fallback to direct Supabase client
+        console.log('🛡️ Companies fallback: Using direct Supabase client...');
+        try {
+          const { createClient: createClientFallback } = await import('@supabase/supabase-js');
+          const fallbackUrl = import.meta.env.VITE_SUPABASE_URL;
+          const fallbackKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+          
+          if (!fallbackUrl || !fallbackKey) {
+            throw new Error('Missing Supabase configuration');
+          }
+          
+          const fallbackSupabase = createClientFallback(fallbackUrl, fallbackKey);
+          
+          const { data: companiesData, error: supabaseError } = await (fallbackSupabase as any)
+            .from('companies')
+            .select('*')
+            .order('created_at', { ascending: false });
+          
+          if (supabaseError) {
+            console.error('❌ Companies anon fallback failed:', supabaseError);
+            console.log('🔄 Trying companies with service role key...');
+            
+            // Last resort: try with service role key
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+            
+            if (!supabaseUrl || !serviceKey) {
+              throw new Error('Missing Supabase configuration');
+            }
+            
+            const { createClient } = await import('@supabase/supabase-js');
+            const serviceSupabase = createClient(supabaseUrl, serviceKey);
+            
+            const { data: serviceCompaniesData, error: serviceError } = await (serviceSupabase as any)
+              .from('companies')
+              .select('*')
+              .order('created_at', { ascending: false });
+              
+            if (serviceError) {
+              console.error('❌ Service key companies fallback failed:', serviceError);
+              throw serviceError;
+            }
+            
+            console.log(`✅ Service key companies fallback successful: Retrieved ${serviceCompaniesData?.length || 0} companies`);
+            setCompanies(serviceCompaniesData || []);
+            return;
+          }
+          
+          console.log(`✅ Companies fallback successful: Retrieved ${companiesData?.length || 0} companies`);
+          setCompanies(companiesData || []);
+        } catch (fallbackError) {
+          console.error('❌ All companies fallback methods failed:', fallbackError);
+          setError('Failed to load companies. Please try again.');
+        } finally {
+          setIsLoading(false);
+        }
       }
     };
 

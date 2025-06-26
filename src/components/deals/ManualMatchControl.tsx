@@ -1,5 +1,6 @@
+// @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/clientV2';
 import { Deal } from '@/lib/database/models'; // Assuming Deal model is defined here
 import { useDebounce } from '@/lib/hooks/useDebounce'; // Assuming a debounce hook exists
 

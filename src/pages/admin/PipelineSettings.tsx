@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Slider } from '@/components/ui/slider';
-import { supabaseAdmin } from '@/lib/supabase/client';
+import { supabaseAdmin } from '@/lib/supabase/clientV2';
 
 type DealStage = {
   id: string;
@@ -48,7 +48,7 @@ export default function PipelineSettings() {
   const fetchStages = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await (supabaseAdmin as any)
         .from('deal_stages')
         .select('*')
         .order('order_position');
@@ -113,7 +113,7 @@ export default function PipelineSettings() {
     try {
       if (editingStage.id) {
         // Update existing stage
-        const { error } = await supabaseAdmin
+        const { error } = await (supabaseAdmin as any)
           .from('deal_stages')
           .update({
             name: editingStage.name,
@@ -129,7 +129,7 @@ export default function PipelineSettings() {
         toast.success('Pipeline stage updated successfully');
       } else {
         // Create new stage
-        const { error } = await supabaseAdmin
+        const { error } = await (supabaseAdmin as any)
           .from('deal_stages')
           .insert({
             name: editingStage.name,
@@ -165,7 +165,7 @@ export default function PipelineSettings() {
     }
 
     try {
-      const { error } = await supabaseAdmin
+      const { error } = await (supabaseAdmin as any)
         .from('deal_stages')
         .delete()
         .eq('id', id);
@@ -182,7 +182,7 @@ export default function PipelineSettings() {
 
   const handleProbabilityChange = async (id: string, value: number) => {
     try {
-      const { error } = await supabaseAdmin
+      const { error } = await (supabaseAdmin as any)
         .from('deal_stages')
         .update({
           default_probability: value,

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, authUtils, type Session, type User, type AuthError } from '../supabase/clientV2';
+import { authLogger } from '../services/authLogger';
 import { toast } from 'sonner';
 
 // Auth context types
@@ -47,6 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Initialize auth state
   useEffect(() => {
     let mounted = true;
+    let isInitialLoad = true;
 
     const initializeAuth = async () => {
       try {
@@ -60,6 +62,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else {
             setSession(session);
             setUser(session?.user ?? null);
+            
+                          // Log session restoration without showing toast
+              if (session?.user && isInitialLoad) {
+                console.log('📱 Session restored for:', session.user.email);
+                authLogger.logAuthEvent({
+                  event_type: 'SIGNED_IN',
+                  user_id: session.user.id,
+                  email: session.user.email,
+                });
+              }
           }
           setLoading(false);
         }
@@ -86,9 +98,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Handle specific auth events
           switch (event) {
             case 'SIGNED_IN':
-              toast.success('Successfully signed in!');
+              // Only show success toast for manual sign-ins, not session restoration
+              if (!isInitialLoad) {
+                toast.success('Successfully signed in!');
+                console.log('🔐 Manual sign-in successful for:', session?.user?.email);
+              }
+              
               // Invalidate all queries to refetch with new auth context
               queryClient.invalidateQueries();
+              
+              // Log auth event
+              if (session?.user) {
+                authLogger.logAuthEvent({
+                  event_type: 'SIGNED_IN',
+                  user_id: session.user.id,
+                  email: session.user.email,
+                });
+              }
               break;
               
             case 'SIGNED_OUT':
@@ -96,14 +122,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               // Clear all cached data
               queryClient.clear();
               authUtils.clearAuthStorage();
+              // Note: We don't log SIGNED_OUT since we won't have session data
               break;
               
             case 'TOKEN_REFRESHED':
               console.log('Token refreshed successfully');
+              // Log token refresh for security monitoring
+              if (session?.user) {
+                authLogger.logAuthEvent({
+                  event_type: 'TOKEN_REFRESHED',
+                  user_id: session.user.id,
+                });
+              }
               break;
               
             case 'PASSWORD_RECOVERY':
               console.log('Password recovery initiated');
+              if (session?.user) {
+                authLogger.logAuthEvent({
+                  event_type: 'PASSWORD_RECOVERY',
+                  user_id: session.user.id,
+                  email: session.user.email,
+                });
+              }
               break;
               
             default:
@@ -112,6 +153,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           setLoading(false);
         }
+        
+        // Mark that initial load is complete
+        isInitialLoad = false;
       }
     );
 
@@ -178,8 +222,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Reset password function
   const resetPassword = useCallback(async (email: string) => {
     try {
+      // Determine the correct redirect URL based on environment
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const redirectUrl = isLocalhost 
+        ? 'http://localhost:5173/auth/reset-password'
+        : `${window.location.origin}/auth/reset-password`;
+      
+      console.log('Reset password redirect URL:', redirectUrl);
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: redirectUrl,
       });
 
       if (error) {

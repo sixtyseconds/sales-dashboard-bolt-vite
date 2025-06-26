@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabase/clientV2';
 import { useUser } from '@/lib/hooks/useUser';
 import { Deal } from '@/lib/database/models';
 

@@ -83,35 +83,20 @@ async function handleDealsList(supabaseClient: any, url: URL) {
         value,
         stage_id,
         owner_id,
-        company_id,
-        primary_contact_id,
+        company,
+        contact_name,
+        contact_email,
         probability,
         expected_close_date,
         notes,
         created_at,
         updated_at,
         stage_changed_at,
-        deal_size,
-        next_steps,
-        lead_source,
-        priority,
-        companies:companies(
-          id,
-          name,
-          domain
-        ),
-        contacts:contacts(
-          id,
-          first_name,
-          last_name,
-          full_name,
-          email
-        ),
-        stages:stages(
+        deal_stages:deal_stages(
           id,
           name,
           color,
-          position
+          order_position
         )
       `)
       .range(offset, offset + limit - 1)
@@ -140,15 +125,10 @@ async function handleDealsList(supabaseClient: any, url: URL) {
     // Process deals to add computed fields
     const processedDeals = deals?.map((deal: any) => ({
       ...deal,
-      company_name: deal.companies?.name || null,
-      company_domain: deal.companies?.domain || null,
-      contact_full_name: deal.contacts?.full_name || 
-        (deal.contacts?.first_name && deal.contacts?.last_name 
-          ? `${deal.contacts.first_name} ${deal.contacts.last_name}` 
-          : null),
-      contact_email: deal.contacts?.email || null,
-      stage_name: deal.stages?.name || null,
-      stage_color: deal.stages?.color || null,
+      company_name: deal.company || null,
+      contact_full_name: deal.contact_name || null,
+      stage_name: deal.deal_stages?.name || null,
+      stage_color: deal.deal_stages?.color || null,
       daysInStage: deal.stage_changed_at 
         ? Math.floor((new Date().getTime() - new Date(deal.stage_changed_at).getTime()) / (1000 * 60 * 60 * 24))
         : null
@@ -184,28 +164,11 @@ async function handleSingleDeal(supabaseClient: any, dealId: string, url: URL) {
       .select(`
         *,
         ${includeRelationships ? `
-        companies:companies(
-          id,
-          name,
-          domain,
-          industry,
-          size,
-          website
-        ),
-        contacts:contacts(
-          id,
-          first_name,
-          last_name,
-          full_name,
-          email,
-          phone,
-          title
-        ),
-        stages:stages(
+        deal_stages:deal_stages(
           id,
           name,
           color,
-          position
+          order_position
         )
         ` : ''}
       `)
@@ -226,15 +189,10 @@ async function handleSingleDeal(supabaseClient: any, dealId: string, url: URL) {
     // Process deal to add computed fields
     const processedDeal = {
       ...deal,
-      company_name: deal.companies?.name || null,
-      company_domain: deal.companies?.domain || null,
-      contact_full_name: deal.contacts?.full_name || 
-        (deal.contacts?.first_name && deal.contacts?.last_name 
-          ? `${deal.contacts.first_name} ${deal.contacts.last_name}` 
-          : null),
-      contact_email: deal.contacts?.email || null,
-      stage_name: deal.stages?.name || null,
-      stage_color: deal.stages?.color || null,
+      company_name: deal.company || null,
+      contact_full_name: deal.contact_name || null,
+      stage_name: deal.deal_stages?.name || null,
+      stage_color: deal.deal_stages?.color || null,
       daysInStage: deal.stage_changed_at 
         ? Math.floor((new Date().getTime() - new Date(deal.stage_changed_at).getTime()) / (1000 * 60 * 60 * 24))
         : null
