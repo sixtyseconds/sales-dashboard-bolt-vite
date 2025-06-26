@@ -7,26 +7,50 @@ import { Lock } from 'lucide-react';
 
 export default function ResetPassword() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(true);
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
   });
   const navigate = useNavigate();
 
-  // Check if user is authenticated through the reset link
+  // Check if user has valid recovery session
   useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      
-      // If no session exists or we don't have the recovery flow in URL params
-      // this likely means the user navigated here directly without a valid reset link
-      if (!data.session && !window.location.hash.includes('type=recovery')) {
-        toast.error('Invalid or expired password reset link');
-        navigate('/auth/login');
+    const validateRecoverySession = async () => {
+      try {
+        const hasRecoveryToken = window.location.hash.includes('type=recovery') || 
+                                window.location.search.includes('type=recovery');
+        
+        if (!hasRecoveryToken) {
+          toast.error('Invalid or expired password reset link');
+          navigate('/auth/forgot-password');
+          return;
+        }
+
+        // Check if we can get the session
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session validation error:', error);
+          toast.error('Invalid or expired password reset link');
+          navigate('/auth/forgot-password');
+          return;
+        }
+
+        // For password recovery, we might not have a full session yet
+        // but the recovery token should be valid
+        console.log('Recovery session validation:', session ? 'has session' : 'no session');
+        
+      } catch (error) {
+        console.error('Recovery validation error:', error);
+        toast.error('Something went wrong. Please try requesting a new reset link.');
+        navigate('/auth/forgot-password');
+      } finally {
+        setIsValidating(false);
       }
     };
-    
-    checkSession();
+
+    validateRecoverySession();
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,16 +73,45 @@ export default function ResetPassword() {
         password: formData.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password update error:', error);
+        if (error.message.includes('session')) {
+          toast.error('Your reset link has expired. Please request a new one.');
+          navigate('/auth/forgot-password');
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       toast.success('Password updated successfully');
-      navigate('/auth/login');
+      // Small delay to show success message before redirect
+      setTimeout(() => {
+        navigate('/auth/login');
+      }, 1500);
     } catch (error: any) {
+      console.error('Unexpected error:', error);
       toast.error(error.message || 'Failed to update password');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isValidating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(74,74,117,0.25),transparent)] pointer-events-none" />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div className="w-8 h-8 border-2 border-[#37bd7e] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Validating reset link...</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
@@ -94,6 +147,7 @@ export default function ResetPassword() {
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
                   minLength={6}
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -112,6 +166,7 @@ export default function ResetPassword() {
                   className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                   placeholder="••••••••"
                   minLength={6}
+                  disabled={isLoading}
                 />
               </div>
             </div>

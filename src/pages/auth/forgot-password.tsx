@@ -18,16 +18,34 @@ export default function ForgotPassword() {
     try {
       // Ensure email is lowercased for case-insensitive password reset
       const lowerEmail = email.toLowerCase();
+      
+      // Get the correct redirect URL based on environment
+      const redirectTo = import.meta.env.PROD 
+        ? 'https://sales.sixtyseconds.video/auth/reset-password'
+        : `${window.location.origin}/auth/reset-password`;
+      
+      console.log('Sending password reset to:', lowerEmail, 'with redirect:', redirectTo);
+      
       const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password reset error:', error);
+        throw error;
+      }
 
       setIsSubmitted(true);
       toast.success('Password reset instructions sent to your email');
     } catch (error: any) {
-      toast.error(error.message);
+      console.error('Password reset failed:', error);
+      if (error.message.includes('rate limit')) {
+        toast.error('Too many requests. Please wait a few minutes before trying again.');
+      } else if (error.message.includes('email')) {
+        toast.error('Please enter a valid email address');
+      } else {
+        toast.error(error.message || 'Failed to send reset email');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +89,7 @@ export default function ForgotPassword() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
                     placeholder="sarah@example.com"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -91,12 +110,20 @@ export default function ForgotPassword() {
               <p className="text-gray-400 text-sm mb-6">
                 Please check your inbox and follow the instructions to reset your password. The link will expire in 24 hours.
               </p>
-              <button
-                onClick={() => navigate('/auth/login')}
-                className="bg-gray-700/50 hover:bg-gray-700 text-white py-2 px-4 rounded-xl font-medium transition-colors"
-              >
-                Return to Login
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => navigate('/auth/login')}
+                  className="w-full bg-gray-700/50 hover:bg-gray-700 text-white py-2 px-4 rounded-xl font-medium transition-colors"
+                >
+                  Return to Login
+                </button>
+                <button
+                  onClick={() => setIsSubmitted(false)}
+                  className="w-full text-[#37bd7e] hover:text-[#2da76c] text-sm font-medium transition-colors"
+                >
+                  Send to different email
+                </button>
+              </div>
             </div>
           )}
 

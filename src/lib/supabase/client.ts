@@ -34,7 +34,8 @@ export const supabase = (() => {
           persistSession: true,
           storageKey: 'supabase.auth.token', // Unique storage key
           autoRefreshToken: true,
-          detectSessionInUrl: true
+          detectSessionInUrl: true,
+          flowType: 'pkce' // Enable PKCE flow for better security and reset password support
         }
       });
     } else {
@@ -44,7 +45,9 @@ export const supabase = (() => {
         auth: {
           getSession: () => Promise.resolve({ data: { session: null }, error: null }),
           onAuthStateChange: (callback: any) => ({ data: { subscription: { unsubscribe: () => {} } } }),
-          signOut: () => Promise.resolve({ error: null })
+          signOut: () => Promise.resolve({ error: null }),
+          resetPasswordForEmail: () => Promise.resolve({ data: null, error: { message: 'No credentials configured' } }),
+          updateUser: () => Promise.resolve({ data: null, error: { message: 'No credentials configured' } })
         },
         from: (table: string) => ({
           select: () => ({ 
