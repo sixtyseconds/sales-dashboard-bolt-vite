@@ -20,11 +20,18 @@ export default function ForgotPassword() {
       const lowerEmail = email.toLowerCase();
       
       // Get the correct redirect URL based on environment
-      const redirectTo = import.meta.env.PROD 
-        ? 'https://sales.sixtyseconds.video/auth/reset-password'
-        : `${window.location.origin}/auth/reset-password`;
+      const redirectTo = window.location.hostname === 'localhost'
+        ? `${window.location.origin}/auth/reset-password`
+        : 'https://sales.sixtyseconds.video/auth/reset-password';
       
-      console.log('Sending password reset to:', lowerEmail, 'with redirect:', redirectTo);
+      console.log('🔍 DEBUG INFO:');
+      console.log('Environment MODE:', import.meta.env.MODE);
+      console.log('Environment DEV:', import.meta.env.DEV);
+      console.log('Environment PROD:', import.meta.env.PROD);
+      console.log('Window hostname:', window.location.hostname);
+      console.log('Window origin:', window.location.origin);
+      console.log('Calculated redirectTo:', redirectTo);
+      console.log('Sending password reset to:', lowerEmail);
       
       const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail, {
         redirectTo,
@@ -35,6 +42,7 @@ export default function ForgotPassword() {
         throw error;
       }
 
+      console.log('✅ Password reset email sent successfully');
       setIsSubmitted(true);
       toast.success('Password reset instructions sent to your email');
     } catch (error: any) {
