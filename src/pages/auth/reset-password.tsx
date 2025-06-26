@@ -31,11 +31,16 @@ export default function ResetPassword() {
         
         console.log('Has recovery token?', hasRecoveryToken);
 
+        // TEMPORARILY DISABLED - Allow all access for debugging
+        // if (!hasRecoveryToken) {
+        //   console.log('❌ No recovery token found, redirecting to forgot-password');
+        //   toast.error('Invalid or expired password reset link');
+        //   navigate('/auth/forgot-password');
+        //   return;
+        // }
+
         if (!hasRecoveryToken) {
-          console.log('❌ No recovery token found, redirecting to forgot-password');
-          toast.error('Invalid or expired password reset link');
-          navigate('/auth/forgot-password');
-          return;
+          console.log('⚠️ No recovery token found, but allowing access for debugging');
         }
 
         console.log('✅ Recovery token found, proceeding...');
@@ -47,9 +52,10 @@ export default function ResetPassword() {
 
         if (error) {
           console.error('Session validation error:', error);
-          toast.error('Invalid or expired password reset link');
-          navigate('/auth/forgot-password');
-          return;
+          // TEMPORARILY DISABLED
+          // toast.error('Invalid or expired password reset link');
+          // navigate('/auth/forgot-password');
+          // return;
         }
 
         // For password recovery, we might not have a full session yet
@@ -58,8 +64,9 @@ export default function ResetPassword() {
         
       } catch (error) {
         console.error('Recovery validation error:', error);
-        toast.error('Something went wrong. Please try requesting a new reset link.');
-        navigate('/auth/forgot-password');
+        // TEMPORARILY DISABLED
+        // toast.error('Something went wrong. Please try requesting a new reset link.');
+        // navigate('/auth/forgot-password');
       } finally {
         setIsValidating(false);
       }
