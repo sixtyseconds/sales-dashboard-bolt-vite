@@ -19,23 +19,13 @@ export default function ForgotPassword() {
       // Ensure email is lowercased for case-insensitive password reset
       const lowerEmail = email.toLowerCase();
       
-      // Get the correct redirect URL based on environment
-      const redirectTo = window.location.hostname === 'localhost'
-        ? `${window.location.origin}/auth/reset-password`
-        : 'https://sales.sixtyseconds.video/auth/reset-password';
-      
       console.log('🔍 DEBUG INFO:');
-      console.log('Environment MODE:', import.meta.env.MODE);
-      console.log('Environment DEV:', import.meta.env.DEV);
-      console.log('Environment PROD:', import.meta.env.PROD);
-      console.log('Window hostname:', window.location.hostname);
-      console.log('Window origin:', window.location.origin);
-      console.log('Calculated redirectTo:', redirectTo);
       console.log('Sending password reset to:', lowerEmail);
+      console.log('Using Supabase ConfirmationURL (no custom redirectTo)');
       
-      const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail, {
-        redirectTo,
-      });
+      // REMOVED redirectTo parameter to allow Supabase to use {{ .ConfirmationURL }}
+      // This ensures the email contains the proper tokens
+      const { error } = await supabase.auth.resetPasswordForEmail(lowerEmail);
 
       if (error) {
         console.error('Password reset error:', error);
