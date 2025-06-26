@@ -156,7 +156,6 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
     // Tertiary: Check if stage_id matches a known stage name
     const knownStages: Record<string, string> = {
       'lead': 'Lead',
-      'mql': 'MQL',
       'sql': 'SQL',
       'discovery': 'Discovery',
       'proposal': 'Proposal',

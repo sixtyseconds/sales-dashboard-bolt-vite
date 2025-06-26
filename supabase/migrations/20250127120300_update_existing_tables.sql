@@ -89,7 +89,7 @@ CROSS JOIN (
     ('meeting', 'medium', true, 'SQL'),
     ('proposal', 'medium', true, 'Opportunity'),
     ('sale', 'low', false, 'Closed Won'),
-    ('outbound', 'medium', false, 'MQL')
+    ('outbound', 'medium', false, 'SQL')
 ) AS rule(activity_type, min_priority, auto_create_deal, target_stage_name)
 WHERE p.id IS NOT NULL
 ON CONFLICT (activity_type, owner_id) DO NOTHING; 

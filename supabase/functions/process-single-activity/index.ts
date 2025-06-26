@@ -226,11 +226,11 @@ serve(async (req) => {
              console.log("No existing deal found. Creating new deal.");
              let targetStageName: string;
              switch (activity.type) {
-                 case 'outbound': targetStageName = 'MQL'; break;
+                 case 'outbound': targetStageName = 'SQL'; break;
                  case 'meeting': targetStageName = 'SQL'; break;
                  case 'proposal': targetStageName = 'Opportunity'; break;
                  case 'sale': targetStageName = 'Closed Won'; break;
-                 default: targetStageName = 'MQL'; console.warn(`Unmapped activity type '${activity.type}'. Defaulting stage to MQL.`); 
+                 default: targetStageName = 'SQL'; console.warn(`Unmapped activity type '${activity.type}'. Defaulting stage to SQL.`); 
              }
              console.log(`Activity type '${activity.type}' mapped to stage '${targetStageName}' for new deal`);
 

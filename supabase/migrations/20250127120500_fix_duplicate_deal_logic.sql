@@ -25,7 +25,7 @@ DECLARE
   target_stage_names TEXT[];
 BEGIN
   -- Define stage names that indicate an active deal
-  target_stage_names := ARRAY['Lead', 'MQL', 'SQL', 'Qualified', 'Opportunity', 'Proposal', 'Negotiation'];
+  target_stage_names := ARRAY['Lead', 'SQL', 'Qualified', 'Opportunity', 'Proposal', 'Negotiation'];
   
   -- First, try to find deal by primary contact
   SELECT d.id INTO existing_deal_id
@@ -94,8 +94,8 @@ BEGIN
       WHEN 'meeting' THEN 'SQL'
       WHEN 'proposal' THEN 'Opportunity'
       WHEN 'sale' THEN 'Closed Won'
-      WHEN 'outbound' THEN 'MQL'
-      ELSE 'MQL'
+      WHEN 'outbound' THEN 'SQL'
+      ELSE 'SQL'
     END;
   END IF;
   
