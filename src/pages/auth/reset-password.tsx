@@ -18,18 +18,33 @@ export default function ResetPassword() {
   useEffect(() => {
     const validateRecoverySession = async () => {
       try {
+        console.log('🔍 RESET PASSWORD DEBUG:');
+        console.log('Full URL:', window.location.href);
+        console.log('Hash:', window.location.hash);
+        console.log('Search:', window.location.search);
+        console.log('Pathname:', window.location.pathname);
+
         const hasRecoveryToken = window.location.hash.includes('type=recovery') || 
-                                window.location.search.includes('type=recovery');
+                                window.location.search.includes('type=recovery') ||
+                                window.location.hash.includes('access_token') ||
+                                window.location.search.includes('access_token');
         
+        console.log('Has recovery token?', hasRecoveryToken);
+
         if (!hasRecoveryToken) {
+          console.log('❌ No recovery token found, redirecting to forgot-password');
           toast.error('Invalid or expired password reset link');
           navigate('/auth/forgot-password');
           return;
         }
 
+        console.log('✅ Recovery token found, proceeding...');
+
         // Check if we can get the session
         const { data: { session }, error } = await supabase.auth.getSession();
         
+        console.log('Session check result:', { session: !!session, error });
+
         if (error) {
           console.error('Session validation error:', error);
           toast.error('Invalid or expired password reset link');
@@ -39,7 +54,7 @@ export default function ResetPassword() {
 
         // For password recovery, we might not have a full session yet
         // but the recovery token should be valid
-        console.log('Recovery session validation:', session ? 'has session' : 'no session');
+        console.log('Recovery session validation completed');
         
       } catch (error) {
         console.error('Recovery validation error:', error);
@@ -69,6 +84,8 @@ export default function ResetPassword() {
     setIsLoading(true);
 
     try {
+      console.log('🔐 Attempting to update password...');
+      
       const { error } = await supabase.auth.updateUser({
         password: formData.password,
       });
@@ -84,6 +101,7 @@ export default function ResetPassword() {
         return;
       }
 
+      console.log('✅ Password updated successfully');
       toast.success('Password updated successfully');
       // Small delay to show success message before redirect
       setTimeout(() => {
