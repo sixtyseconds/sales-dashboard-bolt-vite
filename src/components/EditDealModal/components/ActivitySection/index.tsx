@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Users, PencilLine, Calendar, PhoneCall, Mail, Plus, Clock, AlertCircle } from 'lucide-react';
+import { Users, PencilLine, Calendar, PhoneCall, Mail, Plus, Clock, AlertCircle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -14,7 +14,6 @@ import { format, addDays, addHours } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { FileText } from 'lucide-react';
 
 interface ActivitySectionProps {
   dealId?: string;
@@ -45,91 +44,156 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
     notes?: string;
     due_date?: string;
     contact_email?: string;
-  }) => {
+  }): Promise<void> => {
     if (!dealId) {
       toast.error('No deal ID available');
       return;
     }
 
     try {
+      console.log('Creating activity:', { activityData, dealId });
+      
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
         throw new Error('User not authenticated');
       }
 
+      console.log('User authenticated:', userData.user.email);
+
       // Use simple user email as sales rep name
       const salesRepName = userData.user.email || 'Unknown Rep';
 
       if (activityData.activity_type === 'note') {
+        console.log('Adding note to deal...');
+        
         // For notes, get current notes and append new one
-        const { data: currentDeal } = await (supabase as any)
+        const { data: currentDeal, error: fetchError } = await (supabase as any)
           .from('deals')
           .select('notes')
           .eq('id', dealId)
           .single();
 
+        if (fetchError) {
+          console.error('Error fetching current deal:', fetchError);
+          throw fetchError;
+        }
+
+        console.log('Current deal notes:', currentDeal?.notes);
+
         const currentNotes = currentDeal?.notes || '';
         const newNote = `${new Date().toLocaleDateString()}: ${activityData.notes}\n\n${currentNotes}`;
         
-        const { error } = await (supabase as any)
+        const { error: updateError } = await (supabase as any)
           .from('deals')
           .update({ notes: newNote })
           .eq('id', dealId);
 
-        if (error) throw error;
+        if (updateError) {
+          console.error('Error updating deal notes:', updateError);
+          throw updateError;
+        }
+
+        console.log('Note added successfully');
         toast.success('Note added to deal');
+        return;
         
       } else if (activityData.activity_type === 'task') {
+        console.log('Creating task activity...');
+        
         // For tasks, add to main activities as outbound
-        const { error } = await (supabase as any)
-          .from('activities')
-          .insert({
-            user_id: userData.user.id,
-            type: 'outbound',
-            status: 'pending',
-            priority: 'medium',
-            client_name: company || 'Unknown Company',
-            sales_rep: salesRepName,
-            details: `Task: ${activityData.notes}${activityData.due_date ? ` (Due: ${new Date(activityData.due_date).toLocaleDateString()})` : ''}`,
-            date: new Date().toISOString(),
-            quantity: 1,
-            contact_identifier: contactEmail,
-            contact_identifier_type: 'email',
-            deal_id: dealId
-          });
+        // Try with enhanced columns first, fallback to basic if they don't exist
+        const basicData = {
+          user_id: userData.user.id,
+          type: 'outbound',
+          status: 'pending',
+          priority: 'medium',
+          client_name: company || 'Unknown Company',
+          sales_rep: salesRepName,
+          details: `Task: ${activityData.notes}${activityData.due_date ? ` (Due: ${new Date(activityData.due_date).toLocaleDateString()})` : ''}`,
+          date: new Date().toISOString()
+        };
 
-        if (error) throw error;
-        toast.success('Task scheduled');
+        // Try to add enhanced tracking columns
+        const enhancedData = {
+          ...basicData,
+          deal_id: dealId,
+          contact_identifier: contactEmail,
+          contact_identifier_type: 'email',
+          quantity: 1
+        };
+
+        let { error: insertError } = await (supabase as any)
+          .from('activities')
+          .insert(enhancedData);
+
+        // If enhanced insert fails, try basic insert
+        if (insertError && insertError.message?.includes('column')) {
+          console.log('Enhanced columns not available, trying basic insert...');
+          const { error: basicError } = await (supabase as any)
+            .from('activities')
+            .insert(basicData);
+          insertError = basicError;
+        }
+
+        if (insertError) {
+          console.error('Error creating task activity:', insertError);
+          throw insertError;
+        }
+
+        console.log('Task activity created successfully');
+        toast.success('Task scheduled and added to activity log');
+        return;
         
       } else if (activityData.activity_type === 'call' || activityData.activity_type === 'email') {
+        console.log(`Creating ${activityData.activity_type} activity...`);
+        
         // For calls and emails, add to main activities as outbound
-        const { error } = await (supabase as any)
+        const basicData = {
+          user_id: userData.user.id,
+          type: 'outbound',
+          status: 'completed',
+          priority: 'medium',
+          client_name: company || 'Unknown Company',
+          sales_rep: salesRepName,
+          details: `${activityData.activity_type === 'call' ? 'Call' : 'Email'}: ${activityData.notes || 'No details provided'}`,
+          date: new Date().toISOString()
+        };
+
+        // Try to add enhanced tracking columns
+        const enhancedData = {
+          ...basicData,
+          deal_id: dealId,
+          contact_identifier: contactEmail,
+          contact_identifier_type: 'email',
+          quantity: 1
+        };
+
+        let { error: insertError } = await (supabase as any)
           .from('activities')
-          .insert({
-            user_id: userData.user.id,
-            type: 'outbound',
-            status: 'completed',
-            priority: 'medium',
-            client_name: company || 'Unknown Company',
-            sales_rep: salesRepName,
-            details: `${activityData.activity_type === 'call' ? 'Call' : 'Email'}: ${activityData.notes || 'No details provided'}`,
-            date: new Date().toISOString(),
-            quantity: 1,
-            contact_identifier: contactEmail,
-            contact_identifier_type: 'email',
-            deal_id: dealId
-          });
+          .insert(enhancedData);
 
-        if (error) throw error;
-        toast.success(`${activityData.activity_type === 'call' ? 'Call' : 'Email'} logged successfully`);
+        // If enhanced insert fails, try basic insert
+        if (insertError && insertError.message?.includes('column')) {
+          console.log('Enhanced columns not available, trying basic insert...');
+          const { error: basicError } = await (supabase as any)
+            .from('activities')
+            .insert(basicData);
+          insertError = basicError;
+        }
+
+        if (insertError) {
+          console.error(`Error creating ${activityData.activity_type} activity:`, insertError);
+          throw insertError;
+        }
+
+        console.log(`${activityData.activity_type} activity created successfully`);
+        toast.success(`${activityData.activity_type === 'call' ? 'Call' : 'Email'} logged successfully and added to activity tracking`);
+        return;
       }
-
-      // Refresh the page to show updates
-      setTimeout(() => window.location.reload(), 1000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating activity:', error);
-      toast.error('Failed to add activity. Please try again.');
+      toast.error(`Failed to add activity: ${error?.message || 'Unknown error'}`);
     }
   };
   
@@ -158,8 +222,16 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
   }
   
   // Handle adding a note
-  const handleAddNote = async () => {
+  const handleAddNote = async (e?: React.MouseEvent) => {
+    console.log('handleAddNote called');
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Event prevented and stopped');
+    }
+    
     if (activityNote.trim() && dealId) {
+      console.log('About to create note activity');
       await createDealActivity({
         activity_type: 'note',
         notes: activityNote.trim()
@@ -171,21 +243,41 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
+    } else {
+      console.log('Note not added - missing note or dealId:', { note: activityNote.trim(), dealId });
     }
   };
 
   // Handle scheduling a task
-  const handleScheduleTask = () => {
+  const handleScheduleTask = (e?: React.MouseEvent) => {
+    console.log('handleScheduleTask called');
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Event prevented and stopped');
+    }
     setShowTaskForm(true);
   };
 
   // Handle logging a call
-  const handleLogCall = () => {
+  const handleLogCall = (e?: React.MouseEvent) => {
+    console.log('handleLogCall called');
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Event prevented and stopped');
+    }
     setShowCallForm(true);
   };
 
   // Handle logging an email
-  const handleLogEmail = () => {
+  const handleLogEmail = (e?: React.MouseEvent) => {
+    console.log('handleLogEmail called');
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Event prevented and stopped');
+    }
     setShowEmailForm(true);
   };
   
@@ -232,6 +324,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
         
         <div className="flex flex-wrap gap-2">
           <Button
+            type="button"
             size="sm"
             onClick={handleAddNote}
             disabled={!activityNote.trim() || !dealId}
@@ -242,6 +335,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
           </Button>
           
           <Button
+            type="button"
             variant="outline"
             size="sm"
             className="gap-1.5"
@@ -252,6 +346,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
           </Button>
           
           <Button
+            type="button"
             variant="outline"
             size="sm"
             className="gap-1.5"
@@ -262,6 +357,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
           </Button>
           
           <Button
+            type="button"
             variant="outline"
             size="sm"
             className="gap-1.5"
@@ -276,11 +372,23 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
       {/* Activities List */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-700">Recent Activities</h4>
+          <h4 className="text-sm font-medium text-gray-700">Activity Tracking</h4>
         </div>
         
-        <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
-          Activities will appear here after they are logged. Use the buttons above to add notes, schedule tasks, or log calls and emails.
+        <div className="text-sm text-gray-600 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <div className="text-blue-500 mt-0.5">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-medium text-blue-900 mb-1">Activity Logging Active</p>
+              <p className="text-blue-700">
+                • <strong>Notes</strong> are saved to this deal<br/>
+                • <strong>Tasks, Calls & Emails</strong> are logged to your Activity Dashboard<br/>
+                • View all activities in the main Activity Log or Dashboard
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

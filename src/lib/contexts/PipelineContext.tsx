@@ -304,27 +304,40 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     return groupedDeals;
   }, [deals, stages, searchTerm, filterOptions, userData?.id, applyQuickFilter, matchesSearch, matchesDateRange, matchesLeadSource, getTimeStatus]);
   
-  // Calculate pipeline value (total of all deals)
+  // Calculate pipeline value (total of filtered deals)
   const pipelineValue = useMemo(() => {
-    if (!deals) return 0;
-    return deals.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
-  }, [deals]);
+    let totalValue = 0;
+    Object.values(dealsByStage).forEach(stageDeals => {
+      stageDeals.forEach(deal => {
+        totalValue += Number(deal.value || 0);
+      });
+    });
+    return totalValue;
+  }, [dealsByStage]);
   
-  // Calculate weighted pipeline value (based on probability)
+  // Calculate weighted pipeline value (based on probability) - use filtered deals
   const weightedPipelineValue = useMemo(() => {
-    if (!deals) return 0;
-    return deals.reduce((sum, deal) => {
-      const probability = deal.probability || deal.deal_stages?.default_probability || 0;
-      return sum + (Number(deal.value || 0) * (Number(probability) / 100));
-    }, 0);
-  }, [deals]);
+    if (!stages) return 0;
+    
+    // Sum up weighted values from all filtered deals by stage
+    let totalWeighted = 0;
+    Object.values(dealsByStage).forEach(stageDeals => {
+      stageDeals.forEach(deal => {
+        const stage = stages.find(s => s.id === deal.stage_id);
+        const probability = deal.probability || deal.deal_stages?.default_probability || stage?.default_probability || 0;
+        totalWeighted += Number(deal.value || 0) * (Number(probability) / 100);
+      });
+    });
+    
+    return totalWeighted;
+  }, [dealsByStage, stages]);
   
-  // Calculate total count and value by stage
+  // Calculate total count and value by stage (using filtered deals)
   const stageMetrics = useMemo(() => {
-    if (!deals || !stages) return [];
+    if (!stages) return [];
     
     const metrics = stages.map(stage => {
-      const stageDeals = deals.filter(deal => deal.stage_id === stage.id);
+      const stageDeals = dealsByStage[stage.id] || [];
       const count = stageDeals.length;
       const value = stageDeals.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
       const weightedValue = stageDeals.reduce((sum, deal) => {
@@ -342,7 +355,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     });
     
     return metrics;
-  }, [deals, stages]);
+  }, [dealsByStage, stages]);
   
   // Memoize the context value to prevent unnecessary re-renders
   const value = useMemo(() => ({
