@@ -548,7 +548,7 @@ app.get('/api/stages', async (req, res) => {
   }
 });
 
-// Owners/Sales Reps endpoint
+// Owners/Sales Reps endpoint - Return ALL active sales reps
 app.get('/api/owners', async (req, res) => {
   try {
     const query = `
@@ -558,15 +558,20 @@ app.get('/api/owners', async (req, res) => {
         p.last_name,
         p.stage,
         p.email,
-        (p.first_name || ' ' || p.last_name) as full_name
+        (p.first_name || ' ' || p.last_name) as full_name,
+        COALESCE(deal_counts.deal_count, 0) as deal_count,
+        COALESCE(deal_counts.total_value, 0) as total_value
       FROM profiles p
-      WHERE p.id IN (
-        SELECT DISTINCT owner_id FROM companies WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM deals WHERE owner_id IS NOT NULL
-        UNION
-        SELECT DISTINCT owner_id FROM contacts WHERE owner_id IS NOT NULL
-      )
+      LEFT JOIN (
+        SELECT 
+          owner_id,
+          COUNT(*) as deal_count,
+          COALESCE(SUM(value), 0) as total_value
+        FROM deals
+        GROUP BY owner_id
+      ) deal_counts ON p.id = deal_counts.owner_id
+      WHERE p.id IS NOT NULL
+        AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL OR p.email IS NOT NULL)
       ORDER BY p.first_name, p.last_name
     `;
 

@@ -25,7 +25,12 @@ const getApiBaseUrl = () => {
   return '/api'; // Fallback to relative path
 };
 
-export const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = import.meta.env.VITE_SUPABASE_URL 
+  ? `${import.meta.env.VITE_SUPABASE_URL.replace('/rest/v1', '')}/functions/v1`
+  : '';
+
+// Temporary flag to disable Edge Functions after Neon -> Supabase migration
+export const DISABLE_EDGE_FUNCTIONS = true;
 
 // Database configuration (using Supabase only)
 export const config = {

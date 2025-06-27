@@ -101,24 +101,24 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
 
   // Determine time indicator status
   const timeIndicator = useMemo(() => {
-    if (!deal.daysInStage) return { status: 'normal', text: 'New deal' };
+    if (!deal.daysInStage) return { status: 'normal', text: 'New', icon: null };
 
     if (deal.daysInStage > 14) {
       return {
         status: 'danger',
-        text: `${deal.daysInStage} days in stage`,
+        text: `${deal.daysInStage}d`,
         icon: AlertCircle
       };
     } else if (deal.daysInStage > 7) {
       return {
         status: 'warning',
-        text: `${deal.daysInStage} days in stage`,
+        text: `${deal.daysInStage}d`,
         icon: Clock
       };
     } else {
       return {
         status: 'normal',
-        text: `${deal.daysInStage} days in stage`,
+        text: `${deal.daysInStage}d`,
         icon: Clock
       };
     }
@@ -196,148 +196,113 @@ export function DealCard({ deal, onClick, isDragOverlay = false }: DealCardProps
       className={`
         bg-gray-800/50 rounded-xl p-4 hover:bg-gray-800/70
         transition-all border border-gray-800/80
-        hover:border-gray-700 shadow-md hover:shadow-lg group
-        ${isDragging || isDragOverlay ? 'shadow-xl cursor-grabbing z-[9999]' : 'cursor-grab'}
+        hover:border-gray-700 shadow-sm hover:shadow-md group
+        ${isDragging || isDragOverlay ? 'shadow-lg cursor-grabbing z-[9999]' : 'cursor-grab'}
         relative overflow-hidden
       `}
       style={style}
     >
-      {/* Only show shine effect when not dragging */}
+      {/* Shine effect */}
       {!isDragging && !isDragOverlay && (
         <div className="absolute inset-0 bg-gradient-to-r from-transparent
-          via-white/[0.03] to-transparent translate-x-[-200%]
+          via-white/[0.02] to-transparent translate-x-[-200%]
           group-hover:translate-x-[200%] transition-transform duration-1000 pointer-events-none
           z-[1]"
         />
       )}
 
-      <div className="relative z-[2] flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          {/* Company name with icon */}
-          <div className="flex items-center gap-2 mb-2">
-            <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
-            <h3 className="font-medium text-white group-hover:text-blue-400
-              transition-colors duration-300 text-lg truncate"
-              title={companyInfo.name}
-            >
-              {companyInfo.name}
-            </h3>
-            {companyInfo.domain && (
-              <span className="text-xs text-gray-500 px-1.5 py-0.5 bg-gray-700/50 rounded">
-                {companyInfo.domain}
-              </span>
-            )}
-          </div>
-
-          {/* Contact information */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1.5 text-gray-400 text-sm">
+      <div className="relative z-[2]">
+        {/* Header with company and value */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />
+              <h3 className="font-medium text-white text-base truncate"
+                  title={companyInfo.name}
+              >
+                {companyInfo.name}
+              </h3>
+            </div>
+            
+            {/* Contact info */}
+            <div className="flex items-center gap-2 text-sm text-gray-400">
               <User className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="truncate" title={contactInfo.name}>
                 {contactInfo.name}
-                {contactInfo.title && (
-                  <span className="text-gray-500"> • {contactInfo.title}</span>
-                )}
               </span>
               {hasMultipleContacts && (
-                <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">
+                <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[10px]">
                   +{deal.deal_contacts.length - 1}
                 </span>
               )}
             </div>
+          </div>
 
-            {/* Contact details (email/phone) - only show if normalized and space allows */}
-            {contactInfo.isNormalized && (contactInfo.email || contactInfo.phone) && (
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                {contactInfo.email && (
-                  <div className="flex items-center gap-1" title={contactInfo.email}>
-                    <Mail className="w-3 h-3" />
-                    <span className="truncate max-w-[120px]">{contactInfo.email}</span>
-                  </div>
-                )}
-                {contactInfo.phone && (
-                  <div className="flex items-center gap-1" title={contactInfo.phone}>
-                    <Phone className="w-3 h-3" />
-                    <span>{contactInfo.phone}</span>
-                  </div>
-                )}
-              </div>
-            )}
+          <div className="text-emerald-400 font-semibold text-lg ml-3 flex-shrink-0">
+            {formattedValue}
           </div>
         </div>
 
-        <div className="text-emerald-400 font-bold ml-3 flex-shrink-0">
-          {formattedValue}
-        </div>
-      </div>
+        {/* Badges row */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {/* Due date badge if exists */}
+          {deal.expected_close_date && (
+            <span className={`
+              inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+              ${isPastDue(deal.expected_close_date) 
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              }
+            `}>
+              <Calendar className="w-3 h-3 mr-1" />
+              {format(new Date(deal.expected_close_date), 'MMM d')}
+            </span>
+          )}
 
-      <div className="relative z-[2] flex flex-wrap gap-1.5 mt-3">
-        {/* Stage badge */}
-        {deal.deal_stages?.color ? (
-          <span
-            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border"
-            style={stageBadgeStyle}
-          >
-            {stageName}
-          </span>
-        ) : (
-          <Badge
-            color={getColorFromHex(deal.deal_stages?.color)}
-          >
-            {stageName}
-          </Badge>
-        )}
+          {/* Company size badge (if normalized) */}
+          {companyInfo.isNormalized && companyInfo.size && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+              bg-gray-500/20 text-gray-400 border border-gray-500/30">
+              {companyInfo.size}
+            </span>
+          )}
 
-        {/* Company size badge (if normalized) */}
-        {companyInfo.isNormalized && companyInfo.size && (
-          <Badge color="gray">
-            {companyInfo.size}
-          </Badge>
-        )}
-
-        {/* Due date badge if exists */}
-        {deal.expected_close_date && (
-          <Badge
-            color={isPastDue(deal.expected_close_date) ? 'red' : 'blue'}
-          >
-            <Calendar className="w-3 h-3 mr-1" />
-            {format(new Date(deal.expected_close_date), 'MMM d')}
-          </Badge>
-        )}
-
-        {/* CRM status indicator */}
-        {companyInfo.isNormalized && contactInfo.isNormalized && (
-          <Badge color="emerald">
-            <span className="text-xs">CRM</span>
-          </Badge>
-        )}
-      </div>
-
-      <div className="relative z-[2] flex items-center justify-between mt-4">
-        {/* Time in stage indicator */}
-        <div className={`
-          flex items-center gap-1.5 text-xs
-          ${timeIndicator.status === 'danger' ? 'text-red-400' :
-            timeIndicator.status === 'warning' ? 'text-yellow-400' : 'text-gray-400'}
-        `}>
-          {timeIndicator.icon && <timeIndicator.icon className="w-3.5 h-3.5" />}
-          <span>{timeIndicator.text}</span>
+          {/* CRM status indicator */}
+          {companyInfo.isNormalized && contactInfo.isNormalized && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+              bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              CRM
+            </span>
+          )}
         </div>
 
-        {/* Probability indicator */}
-        <div className="flex items-center gap-2">
-          <div className="w-12 h-1 bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${probability}%`,
-                backgroundColor: stageColor
-              }}
-            />
+        {/* Bottom row - time indicator and probability */}
+        <div className="flex items-center justify-between">
+          {/* Time in stage indicator */}
+          <div className={`
+            flex items-center gap-1.5 text-xs
+            ${timeIndicator.status === 'danger' ? 'text-red-400' :
+              timeIndicator.status === 'warning' ? 'text-yellow-400' : 'text-gray-400'}
+          `}>
+            {timeIndicator.icon && <timeIndicator.icon className="w-3.5 h-3.5" />}
+            <span>{timeIndicator.text}</span>
           </div>
-          <span className="text-xs font-medium text-gray-300">
-            {probability}%
-          </span>
+
+          {/* Probability indicator */}
+          <div className="flex items-center gap-2">
+            <div className="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${probability}%`,
+                  backgroundColor: stageColor
+                }}
+              />
+            </div>
+            <span className="text-xs font-medium text-gray-300">
+              {probability}%
+            </span>
+          </div>
         </div>
       </div>
     </div>

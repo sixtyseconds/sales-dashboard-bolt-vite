@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '@/lib/config';
+import { API_BASE_URL, DISABLE_EDGE_FUNCTIONS } from '@/lib/config';
 import { fetchWithRetry, apiCall } from '@/lib/utils/apiUtils';
 import { supabase } from '@/lib/supabase/clientV2';
 import { createClient } from '@supabase/supabase-js';
@@ -88,19 +88,15 @@ export function useDeals(ownerId?: string) {
       setError(null);
       
       // Check authentication first
-      console.log('🔍 Checking user authentication for deals...');
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.log('⚠️ No session found - skipping Edge Functions, going straight to service key fallback...');
-        
         // Skip Edge Functions entirely and go straight to service key fallback
         const serviceSupabase = createClient(
           import.meta.env.VITE_SUPABASE_URL,
           import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
         );
         
-        console.log('🛡️ Using service key fallback for deals (no auth)...');
         const { data: serviceDealsData, error: serviceError } = await (serviceSupabase as any)
           .from('deals')
           .select(`
@@ -111,11 +107,8 @@ export function useDeals(ownerId?: string) {
           .order('created_at', { ascending: false });
           
         if (serviceError) {
-          console.error('❌ Service key fallback failed:', serviceError);
           throw serviceError;
         }
-        
-        console.log(`✅ Service key fallback successful: Retrieved ${serviceDealsData?.length || 0} deals`);
         
         const processedDeals = serviceDealsData?.map((deal: any) => ({
           ...deal,
@@ -133,8 +126,12 @@ export function useDeals(ownerId?: string) {
       }
 
       // Try Edge Functions if authenticated
-      console.log('🌐 User authenticated - trying Edge Functions...');
       try {
+        // Check if Edge Functions are disabled
+        if (DISABLE_EDGE_FUNCTIONS) {
+          throw new Error('Edge Functions disabled due to migration');
+        }
+
         const response = await apiCall<{ data: DealWithRelationships[] }>(
           `${API_BASE_URL}/deals?owner_id=${ownerId}&includeRelationships=true`
         );
@@ -153,10 +150,7 @@ export function useDeals(ownerId?: string) {
         setIsLoading(false);
         return;
       } catch (edgeFunctionError) {
-        console.log('Deals Edge Function failed, falling back to direct Supabase client:', edgeFunctionError);
-        
         // Fallback to direct Supabase client
-        console.log('🛡️ Using fallback: Direct Supabase client query...');
         const { data: dealsData, error: supabaseError } = await (supabase as any)
           .from('deals')
           .select(`
@@ -167,9 +161,6 @@ export function useDeals(ownerId?: string) {
           .order('created_at', { ascending: false });
         
         if (supabaseError) {
-          console.error('❌ Fallback query failed:', supabaseError);
-          console.log('🔄 Trying with service role key...');
-          
           // Last resort: try with service role key
           try {
             const serviceSupabase = createClient(
@@ -187,11 +178,8 @@ export function useDeals(ownerId?: string) {
               .order('created_at', { ascending: false });
               
             if (serviceError) {
-              console.error('❌ Service key fallback also failed:', serviceError);
               throw serviceError;
             }
-            
-            console.log(`✅ Service key fallback successful: Retrieved ${serviceDealsData?.length || 0} deals`);
             
             // Process deals to match expected format
             const processedDeals = serviceDealsData?.map((deal: any) => ({
@@ -209,12 +197,9 @@ export function useDeals(ownerId?: string) {
             return;
             
           } catch (serviceError) {
-            console.error('❌ All fallback methods failed:', serviceError);
             throw serviceError;
           }
         }
-        
-        console.log(`✅ Fallback successful: Retrieved ${dealsData?.length || 0} deals`);
         
         // Process deals to match expected format
         const processedDeals = dealsData?.map((deal: any) => ({
@@ -251,8 +236,6 @@ export function useDeals(ownerId?: string) {
         setStages(result || []);
         return;
       } catch (edgeFunctionError) {
-        console.warn('Stages Edge Function failed, falling back to direct Supabase client:', edgeFunctionError);
-        
         // Fallback to direct Supabase client
         const { data: stagesData, error: supabaseError } = await (supabase as any)
           .from('deal_stages')
@@ -306,7 +289,6 @@ export function useDeals(ownerId?: string) {
         await fetchDeals(); // Refresh to get updated data
         return true;
       } catch (edgeFunctionError) {
-        console.warn('Create deal Edge Function failed, falling back to direct Supabase client');
         
         // Fallback to direct Supabase client
         const { data: deal, error } = await (supabase as any)
@@ -348,7 +330,6 @@ export function useDeals(ownerId?: string) {
         await fetchDeals(); // Refresh to get updated data
         return true;
       } catch (edgeFunctionError) {
-        console.warn('Update deal Edge Function failed, falling back to direct Supabase client');
         
         // Fallback to direct Supabase client
         const updateData = { ...updates };
@@ -401,7 +382,6 @@ export function useDeals(ownerId?: string) {
         await fetchDeals(); // Refresh data
         return true;
       } catch (edgeFunctionError) {
-        console.warn('Delete deal Edge Function failed, falling back to direct Supabase client');
         
         // Fallback to direct Supabase client
         const { error } = await (supabase as any)
@@ -441,7 +421,6 @@ export function useDeals(ownerId?: string) {
         await fetchDeals(); // Refresh data
         return true;
       } catch (edgeFunctionError) {
-        console.warn('Move deal Edge Function failed, falling back to direct Supabase client');
         
         // Fallback to direct Supabase client
         const { data: deal, error } = await (supabase as any)

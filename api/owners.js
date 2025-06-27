@@ -18,7 +18,7 @@ export default async function handler(request, response) {
   }
 }
 
-// List all owners
+// List all owners - Return ALL active sales reps, not just those with existing data
 async function handleOwnersList(response) {
   try {
     const query = `
@@ -50,6 +50,8 @@ async function handleOwnersList(response) {
         FROM activities
         GROUP BY user_id
       ) activity_counts ON p.id = activity_counts.user_id
+      WHERE p.id IS NOT NULL
+        AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL OR p.email IS NOT NULL)
       ORDER BY p.first_name ASC, p.last_name ASC
     `;
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, User, Filter } from 'lucide-react';
+import { Users, User, Filter, ChevronDown } from 'lucide-react';
 import { useOwners } from '@/lib/hooks/useOwners';
 import { useUser } from '@/lib/hooks/useUser';
 
@@ -39,9 +39,9 @@ export function OwnerFilter({
   if (isLoading) {
     return (
       <div className={`relative ${className}`}>
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-800/50 border border-gray-700 rounded-xl text-gray-400">
-          <Filter className="w-4 h-4" />
-          <span className="text-sm">Loading...</span>
+        <div className="flex items-center gap-2 px-3 py-3 bg-gray-900/80 border border-gray-700 rounded-lg text-gray-400">
+          <Users className="w-4 h-4" />
+          <span>Loading sales reps...</span>
         </div>
       </div>
     );
@@ -52,36 +52,39 @@ export function OwnerFilter({
       <select
         value={selectedOwnerId || ''}
         onChange={(e) => onOwnerChange(e.target.value || undefined)}
-        className="appearance-none w-full px-3 py-2 pl-10 bg-gray-800/50 border border-gray-700 rounded-xl text-white text-sm focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 hover:bg-gray-800/70 transition-colors cursor-pointer"
+        className="appearance-none w-full px-3 py-3 pl-10 pr-10 bg-gray-900/80 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-violet-500 focus:border-violet-500 hover:bg-gray-800/70 transition-colors cursor-pointer"
       >
         <option value="" className="bg-gray-800 text-white">
-          All Sales Reps
+          All Sales Representatives
         </option>
         
         {userData && (
           <option value={userData.id} className="bg-gray-800 text-white">
-            👤 My Items
+            👤 My Items Only
           </option>
         )}
         
-        <option disabled className="bg-gray-700 text-gray-400 font-medium">
-          ──────────────
-        </option>
+        {owners.length > 0 && (
+          <option disabled className="bg-gray-700 text-gray-400 font-medium">
+            ──────────────
+          </option>
+        )}
         
         {owners.map((owner) => (
           <option key={owner.id} value={owner.id} className="bg-gray-800 text-white">
-            {getOwnerDisplayName(owner)} ({owner.stage})
+            {getOwnerDisplayName(owner)}
+            {owner.stage && ` (${owner.stage})`}
           </option>
         ))}
       </select>
       
       <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-        <Filter className="w-4 h-4 text-gray-400" />
+        <Users className="w-4 h-4 text-gray-400" />
       </div>
       
       {/* Selected owner indicator */}
       {selectedOwnerId && (
-        <div className="absolute right-10 top-1/2 transform -translate-y-1/2 pointer-events-none">
+        <div className="absolute right-8 top-1/2 transform -translate-y-1/2 pointer-events-none">
           {selectedOwnerId === userData?.id ? (
             <User className="w-4 h-4 text-violet-400" />
           ) : (
@@ -96,9 +99,7 @@ export function OwnerFilter({
       
       {/* Dropdown arrow */}
       <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown className="w-4 h-4 text-gray-400" />
       </div>
     </div>
   );

@@ -42,32 +42,57 @@ export function PipelineColumn({
     return totalValue * probability;
   }, [totalValue, stage.default_probability]);
 
+  // Format values for display
+  const formattedWeighted = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+    notation: weightedValue >= 1000000 ? 'compact' : 'standard'
+  }).format(weightedValue);
+  
+  const formattedTotal = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+    notation: totalValue >= 1000000 ? 'compact' : 'standard'
+  }).format(totalValue);
+
   return (
     <div
       data-testid={`pipeline-column-${stage.id}`}
-      className="min-w-[320px] max-w-[320px] bg-gray-900/50 backdrop-blur-xl
-        rounded-xl border border-gray-800/50 flex flex-col max-h-[calc(100vh-200px)]"
+      className="flex-1 min-w-[280px] max-w-[400px] bg-gray-900/50 backdrop-blur-xl
+        rounded-xl border border-gray-800/50 flex flex-col max-h-[calc(100vh-250px)]"
       style={{
         isolation: 'isolate',
         transition: 'border-color 150ms ease'
       }}
     >
-      {/* Column Header */}
+      {/* Column Header with Stage Metrics */}
       <div
-        className="p-4 border-b border-gray-800/50 flex items-center justify-between sticky top-0 z-10 bg-gray-900/80 backdrop-blur-xl"
+        className="p-4 border-b border-gray-800/50 sticky top-0 z-10 bg-gray-900/80 backdrop-blur-xl"
         style={{
           borderBottomColor: isOver ? `${stage.color}80` : undefined
         }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-4 h-4 rounded-md"
-            style={{ backgroundColor: stage.color }}
-          />
-          <h3 className="font-semibold text-white">{stage.name}</h3>
+        {/* Stage Name and Count */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-4 h-4 rounded-md"
+              style={{ backgroundColor: stage.color }}
+            />
+            <h3 className="font-semibold text-white text-lg">{stage.name}</h3>
+          </div>
+          <div className="bg-gray-800/50 px-2.5 py-0.5 rounded-full text-xs text-gray-400">
+            {deals.length}
+          </div>
         </div>
-        <div className="bg-gray-800/50 px-2.5 py-0.5 rounded-full text-xs text-gray-400">
-          {deals.length}
+
+        {/* Stage Metrics */}
+        <div className="text-sm text-gray-400">
+          <span className="font-medium text-emerald-400">{formattedWeighted}</span>
+          <span className="text-gray-500"> of </span>
+          <span className="text-gray-300">{formattedTotal}</span>
         </div>
       </div>
 
@@ -110,28 +135,19 @@ export function PipelineColumn({
           className="w-full h-12 flex items-center justify-center gap-2
             bg-transparent border border-dashed border-gray-700 rounded-lg
             text-gray-400 hover:text-gray-300 hover:bg-gray-800/30
-            transition-colors mt-2"
+            transition-colors mt-3"
         >
           <PlusCircle className="w-4 h-4" />
           <span className="text-sm">Add deal</span>
         </button>
       </div>
 
-      {/* Weighted Value Summary */}
+      {/* Bottom Summary (Optional - can be removed if you prefer the header metrics only) */}
       {deals.length > 0 && (
         <div className="p-3 border-t border-gray-800/50 bg-gray-900/70">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>Total Value:</span>
-              <span>{formatCurrency(totalValue)}</span>
-            </div>
-            <div className="flex items-center justify-between font-medium">
-              <div className="flex items-center gap-1 text-sm">
-                <PoundSterling className="w-3.5 h-3.5 text-[#37bd7e]" />
-                <span className="text-white">Weighted ({stage.default_probability}%):</span>
-              </div>
-              <span className="text-sm text-[#37bd7e]">{formatCurrency(weightedValue)}</span>
-            </div>
+          <div className="flex items-center justify-between text-xs text-gray-400">
+            <span>Probability: {stage.default_probability}%</span>
+            <span>Total Deals: {deals.length}</span>
           </div>
         </div>
       )}

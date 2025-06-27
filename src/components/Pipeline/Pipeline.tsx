@@ -24,16 +24,14 @@ import { DealCard } from './DealCard';
 import { DealForm } from './DealForm';
 import { PipelineTable } from './PipelineTable';
 import { OwnerFilter } from '@/components/OwnerFilter';
-import { Loader2, ArrowDownUp } from 'lucide-react';
+
+import { Loader2 } from 'lucide-react';
 import EditDealModal from '@/components/EditDealModal';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/clientV2';
 import { ConfettiService } from '@/lib/services/confettiService';
 
-console.log(
-  'Pipeline component loaded with Supabase client:',
-  supabase ? 'Supabase client loaded successfully' : 'Supabase client loading failed'
-);
+
 
 interface ModalProps {
   isOpen: boolean;
@@ -194,16 +192,10 @@ function PipelineContent() {
   };
 
   const handleDealClick = (deal: any) => {
-    // Find the deal in the current state (assuming 'deals' is the state from usePipeline)
     const foundDeal = deals.find(d => d.id === deal.id);
-
-    // *** ADD THIS LOG ***
-    console.log('>>> DEBUG: Deal object being passed to modal:', foundDeal);
- 
-    setSelectedDeal(foundDeal); // Or however you pass the deal data
-    // Make sure this state setter corresponds to the EditDealModal if that's what's used
-    setIsEditModalOpen(true); // Assuming setIsEditModalOpen controls EditDealModal
-    setInitialStageId(null); // Clear initial stage ID when editing
+    setSelectedDeal(foundDeal);
+    setIsEditModalOpen(true);
+    setInitialStageId(null);
   };
 
   const handleSaveDeal = async (formData: any) => {
@@ -211,60 +203,19 @@ function PipelineContent() {
     let savedOrCreatedDeal = null; // To hold the result for logging
 
     if (selectedDeal) {
-      // Update existing deal
-      console.log("handleSaveDeal: Updating deal ID:", selectedDeal.id);
       success = await updateDeal(selectedDeal.id, formData);
-      // If updateDeal doesn't return the updated deal, we might need to fetch it
-      // For now, let's assume the 'deals' state will update via subscription/refetch
     } else {
-      // Create new deal
-      console.log("handleSaveDeal: Creating new deal");
       savedOrCreatedDeal = await createDeal(formData);
       success = !!savedOrCreatedDeal;
     }
 
     if (success) {
-      // Access the 'deals' state from usePipeline right after the operation completes
-      // NOTE: This might show state BEFORE the real-time subscription updates it fully.
-      // A slight delay might be needed, or check state in a subsequent render cycle.
-      console.log('>>> DEBUG: Deals state in Pipeline.tsx immediately after save operation:', deals);
-
-      // Close the correct modal
-      setShowDealForm(false); // Close the simple form modal if it was used
-      setIsEditModalOpen(false); // Close the edit modal if it was used
-
-    } else {
-      console.error("handleSaveDeal: Save operation failed.");
-      // Toast/error handling might already be in useDeals or EditDealModal
-    }
-    // Clear selection regardless of success/failure if appropriate
-    // setSelectedDeal(null);
+      setShowDealForm(false);
+      setIsEditModalOpen(false);
+          }
   };
 
-  const toggleSorting = () => {
-    const sortOptions: Array<'none' | 'value' | 'date' | 'alpha'> = [
-      'none',
-      'value',
-      'date',
-      'alpha',
-    ];
-    const currentIndex = sortOptions.indexOf(sortBy);
-    const nextIndex = (currentIndex + 1) % sortOptions.length;
-    setSortBy(sortOptions[nextIndex]);
-  };
 
-  const getSortLabel = () => {
-    switch (sortBy) {
-      case 'value':
-        return 'Sort: Value ↓';
-      case 'date':
-        return 'Sort: Date ↓';
-      case 'alpha':
-        return 'Sort: A-Z';
-      default:
-        return 'Sort: Manual';
-    }
-  };
 
   // Find the stageId for a given dealId or stageId
   const findStageForId = (id: string): string | undefined => {
@@ -485,29 +436,14 @@ function PipelineContent() {
         onAddDealClick={() => handleAddDealClick()}
         view={view}
         onViewChange={setView}
+        selectedOwnerId={selectedOwnerId}
+        onOwnerChange={setSelectedOwnerId}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
       />
 
       {view === 'kanban' ? (
         <>
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-2 md:gap-4">
-              <button
-                onClick={toggleSorting}
-                className="flex items-center gap-1.5 text-sm text-gray-400 px-3 py-1.5 rounded-lg border border-gray-700 bg-gray-800/50 hover:bg-gray-800 transition-colors"
-              >
-                <ArrowDownUp className="w-4 h-4" />
-                <span>{getSortLabel()}</span>
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <OwnerFilter
-                selectedOwnerId={selectedOwnerId}
-                onOwnerChange={setSelectedOwnerId}
-                className="w-[280px]"
-              />
-            </div>
-          </div>
 
           <DndContext
             key={`dnd-context-${refreshKey}`}
@@ -529,7 +465,12 @@ function PipelineContent() {
               interval: 10,
             }}
           >
-            <div className="flex gap-4 overflow-x-auto pb-6">
+            <div className="grid gap-3 pb-6 overflow-x-auto" style={{
+              gridTemplateColumns: stages.length <= 4 
+                ? `repeat(${stages.length}, minmax(280px, 1fr))`
+                : `repeat(${stages.length}, minmax(280px, 350px))`,
+              maxWidth: '100%'
+            }}>
               {stages.map(stage => (
                 <PipelineColumn
                   key={stage.id}
@@ -574,9 +515,13 @@ function PipelineContent() {
       >
         <DealForm
           key={initialStageId || 'new-deal'} // Add key for reset
-          deal={null} // Ensure it's always null for new deals via this path
+          deal={selectedDeal}
           onSave={handleSaveDeal}
-          onCancel={() => setShowDealForm(false)}
+          onCancel={() => {
+            setShowDealForm(false);
+            setSelectedDeal(null);
+            setInitialStageId(null);
+          }}
           initialStageId={initialStageId}
         />
       </Modal>
@@ -588,7 +533,7 @@ export function Pipeline() {
   return (
     <PipelineProvider>
       <div className="max-w-full w-full min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
-        <div className="px-4 sm:px-6 py-8 overflow-hidden">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 overflow-hidden">
           <div className="relative">
             <PipelineContent />
           </div>
