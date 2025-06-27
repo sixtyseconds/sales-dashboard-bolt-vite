@@ -24,6 +24,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
     client_name: '',
     details: '',
     amount: '',
+    oneOffRevenue: '',
+    monthlyMrr: '',
     saleType: 'one-off',
     outboundCount: '1',
     outboundType: 'Call',
@@ -48,6 +50,8 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
       client_name: '',
       details: '',
       amount: '',
+      oneOffRevenue: '',
+      monthlyMrr: '',
       saleType: 'one-off',
       outboundCount: '1',
       outboundType: 'Call',
@@ -760,19 +764,56 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                 )}
 
                 {(selectedAction === 'sale' || selectedAction === 'proposal') && (
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-400/90">
-                      Amount (£)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
-                      value={formData.amount}
-                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                    />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        One-off Revenue (£)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0"
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.oneOffRevenue || ''}
+                        onChange={(e) => setFormData({...formData, oneOffRevenue: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-400/90">
+                        Monthly Recurring Revenue (£)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0"
+                        className="w-full bg-gray-800/30 border border-gray-700/30 rounded-xl px-4 py-2 text-white/90 focus:ring-2 focus:ring-[#37bd7e] focus:border-transparent transition-colors hover:bg-gray-800/50"
+                        value={formData.monthlyMrr || ''}
+                        onChange={(e) => setFormData({...formData, monthlyMrr: e.target.value})}
+                      />
+                    </div>
+                    
+                    {(formData.oneOffRevenue || formData.monthlyMrr) && (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                        <div className="text-sm text-emerald-400">
+                          <span className="font-medium">Total Deal Value: </span>
+                          £{(
+                            (parseFloat(formData.oneOffRevenue || '0') || 0) + 
+                            ((parseFloat(formData.monthlyMrr || '0') || 0) * 3)
+                          ).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </div>
+                        {formData.monthlyMrr && parseFloat(formData.monthlyMrr) > 0 && (
+                          <div className="text-xs text-gray-400 mt-1">
+                            Annual Value: £{(
+                              (parseFloat(formData.oneOffRevenue || '0') || 0) + 
+                              ((parseFloat(formData.monthlyMrr || '0') || 0) * 12)
+                            ).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

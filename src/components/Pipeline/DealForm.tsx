@@ -18,6 +18,8 @@ interface FormData {
   contact_email: string;
   contact_phone: string;
   value: string | number;
+  one_off_revenue?: string | number;
+  monthly_mrr?: string | number;
   stage_id: string;
   expected_close_date: string;
   description: string;
@@ -230,55 +232,104 @@ export function DealForm({
           />
         </div>
         
-        {/* Deal Value and Stage side by side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">
-              Deal Value (£)
-            </label>
-            <div className="flex items-center border border-gray-700 rounded-lg
-              bg-gray-900/80 focus-within:border-violet-500/50 transition-colors"
-            >
-              <span className="pl-3 text-gray-500">
-                <PoundSterling className="w-5 h-5" />
-              </span>
-              <input
-                type="number"
-                name="value"
-                value={formData.value}
-                onChange={handleChange}
-                required
-                min="0"
-                step="1"
-                placeholder="Enter deal value"
-                className="w-full p-2.5 bg-transparent border-none
-                  outline-none text-white"
-              />
+        {/* Revenue Model */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-gray-300">Deal Revenue</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                One-off Revenue (£)
+              </label>
+              <div className="flex items-center border border-gray-700 rounded-lg
+                bg-gray-900/80 focus-within:border-violet-500/50 transition-colors"
+              >
+                <span className="pl-3 text-gray-500">
+                  <PoundSterling className="w-5 h-5" />
+                </span>
+                <input
+                  type="number"
+                  name="one_off_revenue"
+                  value={formData.one_off_revenue || ''}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  className="w-full p-2.5 bg-transparent border-none
+                    outline-none text-white"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                Monthly Recurring Revenue (£)
+              </label>
+              <div className="flex items-center border border-gray-700 rounded-lg
+                bg-gray-900/80 focus-within:border-violet-500/50 transition-colors"
+              >
+                <span className="pl-3 text-gray-500">
+                  <PoundSterling className="w-5 h-5" />
+                </span>
+                <input
+                  type="number"
+                  name="monthly_mrr"
+                  value={formData.monthly_mrr || ''}
+                  onChange={handleChange}
+                  min="0"
+                  step="0.01"
+                  placeholder="0"
+                  className="w-full p-2.5 bg-transparent border-none
+                    outline-none text-white"
+                />
+              </div>
             </div>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">
-              Pipeline Stage
-            </label>
-            <select
-              name="stage_id"
-              value={formData.stage_id}
-              onChange={handleChange}
-              required
-              className="w-full p-2.5 bg-gray-900/80 border border-gray-700
-                rounded-lg text-white outline-none focus:border-violet-500/50
-                transition-colors appearance-none"
-              style={{ backgroundImage: "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
-            >
-              <option value="">Select stage</option>
-              {stages && stages.map(stage => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Total Deal Value Display */}
+          {(formData.one_off_revenue || formData.monthly_mrr) && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+              <div className="text-sm text-emerald-400">
+                <span className="font-medium">Total Deal Value: </span>
+                £{(
+                  (parseFloat(formData.one_off_revenue as string) || 0) + 
+                  ((parseFloat(formData.monthly_mrr as string) || 0) * 3)
+                ).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              </div>
+              {formData.monthly_mrr && parseFloat(formData.monthly_mrr as string) > 0 && (
+                <div className="text-xs text-gray-400 mt-1">
+                  Annual Value: £{(
+                    (parseFloat(formData.one_off_revenue as string) || 0) + 
+                    ((parseFloat(formData.monthly_mrr as string) || 0) * 12)
+                  ).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {/* Pipeline Stage */}
+        <div>
+          <label className="block text-sm font-medium text-gray-400 mb-1">
+            Pipeline Stage
+          </label>
+          <select
+            name="stage_id"
+            value={formData.stage_id}
+            onChange={handleChange}
+            required
+            className="w-full p-2.5 bg-gray-900/80 border border-gray-700
+              rounded-lg text-white outline-none focus:border-violet-500/50
+              transition-colors appearance-none"
+            style={{ backgroundImage: "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
+          >
+            <option value="">Select stage</option>
+            {stages && stages.map(stage => (
+              <option key={stage.id} value={stage.id}>
+                {stage.name}
+              </option>
+            ))}
+          </select>
         </div>
         
         {/* Close Date and Probability side by side */}

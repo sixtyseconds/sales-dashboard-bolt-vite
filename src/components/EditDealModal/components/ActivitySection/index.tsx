@@ -1,10 +1,20 @@
-import React, { useState, useRef } from 'react';
-import { Users, PencilLine, Calendar, PhoneCall, Mail } from 'lucide-react';
-import { Button } from '../../../ui/button';
+import React, { useState, useRef, useEffect } from 'react';
+import { Users, PencilLine, Calendar, PhoneCall, Mail, Plus, Clock, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '../../../ui/badge';
 import ActivityItem from './ActivityItem';
 import { DealActivity } from '@/lib/database/models';
-import { useDealActivities } from '@/lib/hooks/useDealActivities';
 import { useEditDeal } from '../../contexts/EditDealContext';
+import { useFormContext } from 'react-hook-form';
+import { supabase } from '@/lib/supabase/clientV2';
+import { toast } from 'sonner';
+import { format, addDays, addHours } from 'date-fns';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { FileText } from 'lucide-react';
 
 interface ActivitySectionProps {
   dealId?: string;
@@ -12,41 +22,116 @@ interface ActivitySectionProps {
 
 const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
   const [activityNote, setActivityNote] = useState('');
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showCallForm, setShowCallForm] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { state } = useEditDeal();
+  const { watch } = useFormContext();
   
-  // Use the deal activities hook to fetch and manage activities
-  const { 
-    activities, 
-    isLoading, 
-    error, 
-    createActivity 
-  } = useDealActivities(dealId || state?.deal?.id);
+  // Get deal and contact information from form
+  const dealName = watch('name');
+  const contactName = watch('contactName');
+  const contactEmail = watch('contactEmail');
+  const company = watch('company');
   
-  // Default example activities (only shown when no real activities exist)
-  const defaultActivities = [
-    {
-      type: 'stage_change',
-      title: 'Stage updated to Proposal',
-      description: 'Sarah changed the deal stage from Discovery to Proposal',
-      timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      user: 'Sarah'
-    },
-    {
-      type: 'note',
-      title: 'Note added',
-      description: 'Had a detailed discovery call with John. They expressed strong interest in our Growth Plan and requested a detailed proposal to present to their leadership team next week.',
-      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      user: 'Sarah'
-    },
-    {
-      type: 'creation',
-      title: 'Deal created',
-      description: 'Deal was created and assigned to Sarah',
-      timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      user: 'System'
+  // Simple state for activities
+  const [activities, setActivities] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Simplified activity creation functions using direct database calls
+  const createDealActivity = async (activityData: {
+    activity_type: string;
+    notes?: string;
+    due_date?: string;
+    contact_email?: string;
+  }) => {
+    if (!dealId) {
+      toast.error('No deal ID available');
+      return;
     }
-  ];
+
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Use simple user email as sales rep name
+      const salesRepName = userData.user.email || 'Unknown Rep';
+
+      if (activityData.activity_type === 'note') {
+        // For notes, get current notes and append new one
+        const { data: currentDeal } = await (supabase as any)
+          .from('deals')
+          .select('notes')
+          .eq('id', dealId)
+          .single();
+
+        const currentNotes = currentDeal?.notes || '';
+        const newNote = `${new Date().toLocaleDateString()}: ${activityData.notes}\n\n${currentNotes}`;
+        
+        const { error } = await (supabase as any)
+          .from('deals')
+          .update({ notes: newNote })
+          .eq('id', dealId);
+
+        if (error) throw error;
+        toast.success('Note added to deal');
+        
+      } else if (activityData.activity_type === 'task') {
+        // For tasks, add to main activities as outbound
+        const { error } = await (supabase as any)
+          .from('activities')
+          .insert({
+            user_id: userData.user.id,
+            type: 'outbound',
+            status: 'pending',
+            priority: 'medium',
+            client_name: company || 'Unknown Company',
+            sales_rep: salesRepName,
+            details: `Task: ${activityData.notes}${activityData.due_date ? ` (Due: ${new Date(activityData.due_date).toLocaleDateString()})` : ''}`,
+            date: new Date().toISOString(),
+            quantity: 1,
+            contact_identifier: contactEmail,
+            contact_identifier_type: 'email',
+            deal_id: dealId
+          });
+
+        if (error) throw error;
+        toast.success('Task scheduled');
+        
+      } else if (activityData.activity_type === 'call' || activityData.activity_type === 'email') {
+        // For calls and emails, add to main activities as outbound
+        const { error } = await (supabase as any)
+          .from('activities')
+          .insert({
+            user_id: userData.user.id,
+            type: 'outbound',
+            status: 'completed',
+            priority: 'medium',
+            client_name: company || 'Unknown Company',
+            sales_rep: salesRepName,
+            details: `${activityData.activity_type === 'call' ? 'Call' : 'Email'}: ${activityData.notes || 'No details provided'}`,
+            date: new Date().toISOString(),
+            quantity: 1,
+            contact_identifier: contactEmail,
+            contact_identifier_type: 'email',
+            deal_id: dealId
+          });
+
+        if (error) throw error;
+        toast.success(`${activityData.activity_type === 'call' ? 'Call' : 'Email'} logged successfully`);
+      }
+
+      // Refresh the page to show updates
+      setTimeout(() => window.location.reload(), 1000);
+      
+    } catch (error) {
+      console.error('Error creating activity:', error);
+      toast.error('Failed to add activity. Please try again.');
+    }
+  };
   
   // Display loading state
   if (isLoading) {
@@ -72,37 +157,36 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
     );
   }
   
-  // Determine what activities to display
-  const displayActivities = activities && activities.length > 0 
-    ? activities.map(activity => ({
-        type: activity.activity_type,
-        title: getActivityTitle(activity),
-        description: activity.notes || '',
-        timestamp: activity.created_at,
-        user: activity.profiles?.full_name || 'Unknown'
-      }))
-    : defaultActivities;
-  
+  // Handle adding a note
   const handleAddNote = async () => {
     if (activityNote.trim() && dealId) {
-      try {
-        await createActivity({
-          deal_id: dealId,
-          activity_type: 'note',
-          notes: activityNote.trim(),
-          completed: true
-        });
-        
-        setActivityNote('');
-        
-        // Focus back on textarea after adding note
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-      } catch (error) {
-        console.error('Error adding note:', error);
+      await createDealActivity({
+        activity_type: 'note',
+        notes: activityNote.trim()
+      });
+      
+      setActivityNote('');
+      
+      // Focus back on textarea after adding note
+      if (textareaRef.current) {
+        textareaRef.current.focus();
       }
     }
+  };
+
+  // Handle scheduling a task
+  const handleScheduleTask = () => {
+    setShowTaskForm(true);
+  };
+
+  // Handle logging a call
+  const handleLogCall = () => {
+    setShowCallForm(true);
+  };
+
+  // Handle logging an email
+  const handleLogEmail = () => {
+    setShowEmailForm(true);
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -161,6 +245,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
             variant="outline"
             size="sm"
             className="gap-1.5"
+            onClick={handleScheduleTask}
           >
             <Calendar className="w-3.5 h-3.5" />
             Schedule Task
@@ -170,6 +255,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
             variant="outline"
             size="sm"
             className="gap-1.5"
+            onClick={handleLogCall}
           >
             <PhoneCall className="w-3.5 h-3.5" />
             Log Call
@@ -179,6 +265,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
             variant="outline"
             size="sm"
             className="gap-1.5"
+            onClick={handleLogEmail}
           >
             <Mail className="w-3.5 h-3.5" />
             Log Email
@@ -186,26 +273,319 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ dealId }) => {
         </div>
       </div>
       
-      <div className="mt-6 space-y-0">
-        {displayActivities.map((activity, index) => (
-          <ActivityItem 
-            key={`${activity.type}-${index}`}
-            activity={activity}
-          />
-        ))}
+      {/* Activities List */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-700">Recent Activities</h4>
+        </div>
         
-        {displayActivities.length === 0 && (
-          <div className="text-center py-6 text-gray-500">
-            No activity recorded yet.
-          </div>
-        )}
+        <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+          Activities will appear here after they are logged. Use the buttons above to add notes, schedule tasks, or log calls and emails.
+        </div>
       </div>
+
+      {/* Task Form Modal */}
+      {showTaskForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <TaskForm 
+            dealId={dealId}
+            contactName={contactName}
+            contactEmail={contactEmail}
+            company={company}
+            onClose={() => setShowTaskForm(false)}
+            onSubmit={createDealActivity}
+          />
+        </div>
+      )}
+
+      {/* Call Log Form Modal */}
+      {showCallForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <CallLogForm 
+            dealId={dealId}
+            contactName={contactName}
+            contactEmail={contactEmail}
+            company={company}
+            onClose={() => setShowCallForm(false)}
+            onSubmit={createDealActivity}
+          />
+        </div>
+      )}
+
+      {/* Email Log Form Modal */}
+      {showEmailForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <EmailLogForm 
+            dealId={dealId}
+            contactName={contactName}
+            contactEmail={contactEmail}
+            company={company}
+            onClose={() => setShowEmailForm(false)}
+            onSubmit={createDealActivity}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Task Form Component
+const TaskForm: React.FC<{
+  dealId?: string;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+}> = ({ dealId, contactName, contactEmail, company, onClose, onSubmit }) => {
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskNotes, setTaskNotes] = useState('');
+  const [dueDate, setDueDate] = useState(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
+  const [dueTime, setDueTime] = useState('09:00');
+  const [priority, setPriority] = useState('medium');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskTitle.trim()) return;
+
+    const dueDatetime = `${dueDate}T${dueTime}:00`;
+    
+    await onSubmit({
+      activity_type: 'task',
+      notes: `Task: ${taskTitle}\n\nNotes: ${taskNotes}\n\nPriority: ${priority}`,
+      due_date: dueDatetime,
+      contact_email: contactEmail
+    });
+    
+    onClose();
+  };
+
+  return (
+    <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+      <h3 className="text-lg font-semibold text-white mb-4">Schedule Task</h3>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Task Title</label>
+          <Input
+            value={taskTitle}
+            onChange={(e) => setTaskTitle(e.target.value)}
+            placeholder="Enter task title..."
+            className="bg-gray-800 border-gray-700 text-white"
+            required
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Notes</label>
+          <textarea
+            value={taskNotes}
+            onChange={(e) => setTaskNotes(e.target.value)}
+            placeholder="Additional notes..."
+            className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500"
+            rows={3}
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Due Date</label>
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Due Time</label>
+            <Input
+              type="time"
+              value={dueTime}
+              onChange={(e) => setDueTime(e.target.value)}
+              className="bg-gray-800 border-gray-700 text-white"
+            />
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Priority</label>
+          <Select value={priority} onValueChange={setPriority}>
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex gap-2 pt-4">
+          <Button type="submit" className="flex-1">Schedule Task</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// Call Log Form Component
+const CallLogForm: React.FC<{
+  dealId?: string;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+}> = ({ dealId, contactName, contactEmail, company, onClose, onSubmit }) => {
+  const [callNotes, setCallNotes] = useState('');
+  const [outcome, setOutcome] = useState('');
+  const [duration, setDuration] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!callNotes.trim()) return;
+
+    await onSubmit({
+      activity_type: 'call',
+      notes: `Call with ${contactName || contactEmail}\n\nOutcome: ${outcome}\nDuration: ${duration} minutes\n\nNotes: ${callNotes}`,
+      contact_email: contactEmail
+    });
+    
+    onClose();
+  };
+
+  return (
+    <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+      <h3 className="text-lg font-semibold text-white mb-4">Log Call</h3>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Call Outcome</label>
+          <Select value={outcome} onValueChange={setOutcome}>
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Select outcome..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="connected">Connected</SelectItem>
+              <SelectItem value="voicemail">Left Voicemail</SelectItem>
+              <SelectItem value="no-answer">No Answer</SelectItem>
+              <SelectItem value="busy">Busy</SelectItem>
+              <SelectItem value="meeting-scheduled">Meeting Scheduled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Duration (minutes)</label>
+          <Input
+            type="number"
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            placeholder="5"
+            className="bg-gray-800 border-gray-700 text-white"
+            min="1"
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Call Notes</label>
+          <textarea
+            value={callNotes}
+            onChange={(e) => setCallNotes(e.target.value)}
+            placeholder="What was discussed during the call..."
+            className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500"
+            rows={4}
+            required
+          />
+        </div>
+        
+        <div className="flex gap-2 pt-4">
+          <Button type="submit" className="flex-1">Log Call</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// Email Log Form Component
+const EmailLogForm: React.FC<{
+  dealId?: string;
+  contactName?: string;
+  contactEmail?: string;
+  company?: string;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+}> = ({ dealId, contactName, contactEmail, company, onClose, onSubmit }) => {
+  const [subject, setSubject] = useState('');
+  const [direction, setDirection] = useState('outbound');
+  const [emailNotes, setEmailNotes] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject.trim() || !emailNotes.trim()) return;
+
+    await onSubmit({
+      activity_type: 'email',
+      notes: `Email ${direction} - ${contactName || contactEmail}\n\nSubject: ${subject}\n\nNotes: ${emailNotes}`,
+      contact_email: contactEmail
+    });
+    
+    onClose();
+  };
+
+  return (
+    <div className="bg-gray-900 rounded-lg p-6 w-full max-w-md mx-4">
+      <h3 className="text-lg font-semibold text-white mb-4">Log Email</h3>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Direction</label>
+          <Select value={direction} onValueChange={setDirection}>
+            <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="outbound">Sent Email</SelectItem>
+              <SelectItem value="inbound">Received Email</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Subject</label>
+          <Input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Email subject..."
+            className="bg-gray-800 border-gray-700 text-white"
+            required
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">Email Summary</label>
+          <textarea
+            value={emailNotes}
+            onChange={(e) => setEmailNotes(e.target.value)}
+            placeholder="Summary of the email content and any follow-up actions..."
+            className="w-full p-2 bg-gray-800 border border-gray-700 rounded text-white placeholder-gray-500"
+            rows={4}
+            required
+          />
+        </div>
+        
+        <div className="flex gap-2 pt-4">
+          <Button type="submit" className="flex-1">Log Email</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        </div>
+      </form>
     </div>
   );
 };
 
 // Helper function to get activity title
-const getActivityTitle = (activity: DealActivity): string => {
+const getActivityTitle = (activity: any): string => {
   switch (activity.activity_type) {
     case 'note':
       return 'Note added';

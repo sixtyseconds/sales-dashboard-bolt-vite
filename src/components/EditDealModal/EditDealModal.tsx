@@ -84,7 +84,11 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       name: deal?.name || '',
       company: deal?.company || '',
       contactName: deal?.contact_name || '',
+      contactEmail: deal?.contact_email || '',
+      contactPhone: deal?.contact_phone || '',
       amount: deal?.value || '',
+      oneOffRevenue: deal?.one_off_revenue || '',
+      monthlyMrr: deal?.monthly_mrr || '',
       closeDate: deal?.expected_close_date || '',
       notes: deal?.notes || deal?.description || '',
       probability: deal?.probability || 20,
@@ -246,11 +250,18 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
         }
       }
       
+      // Calculate total value from revenue fields
+      const oneOffRevenue = formData.oneOffRevenue ? parseFloat(formData.oneOffRevenue as string) : 0;
+      const monthlyMrr = formData.monthlyMrr ? parseFloat(formData.monthlyMrr as string) : 0;
+      const totalValue = oneOffRevenue + (monthlyMrr * 3);
+      
       // Map form field names to database column names
       const dataToSave = {
         name: formData.name,
         company: formData.company || null,
-        value: formData.amount ? parseFloat(formData.amount as string) : null,
+        value: totalValue > 0 ? totalValue : (formData.amount ? parseFloat(formData.amount as string) : null),
+        one_off_revenue: oneOffRevenue > 0 ? oneOffRevenue : null,
+        monthly_mrr: monthlyMrr > 0 ? monthlyMrr : null,
         // Try expected_close_date first, fallback to close_date if column doesn't exist
         expected_close_date: processedCloseDate,
         close_date: processedCloseDate, // Fallback field name
@@ -260,6 +271,8 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
         priority: formData.priority === '' ? null : formData.priority,
         next_steps: formData.nextAction, // Always include nextAction even if empty
         contact_name: formData.contactName || null,
+        contact_email: formData.contactEmail || null,
+        contact_phone: formData.contactPhone || null,
         deal_size: formData.dealSize === '' ? null : formData.dealSize,
         lead_source_type: formData.leadSourceType === '' ? null : formData.leadSourceType,
         lead_source_channel: formData.leadSourceChannel === '' ? null : formData.leadSourceChannel
@@ -350,7 +363,11 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
         name: nameValue,
         company: companyValue,
         contactName: contactNameValue,
+        contactEmail: deal.contact_email || '',
+        contactPhone: deal.contact_phone || '',
         amount: amountValue,
+        oneOffRevenue: deal.one_off_revenue ?? '',
+        monthlyMrr: deal.monthly_mrr ?? '',
         closeDate: closeDateValue,
         notes: notesValue,
         probability: probabilityValue,
@@ -369,7 +386,11 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       methods.setValue('name', nameValue, setValueOptions);
       methods.setValue('company', companyValue, setValueOptions);
       methods.setValue('contactName', contactNameValue, setValueOptions);
+      methods.setValue('contactEmail', deal.contact_email || '', setValueOptions);
+      methods.setValue('contactPhone', deal.contact_phone || '', setValueOptions);
       methods.setValue('amount', amountValue, setValueOptions);
+      methods.setValue('oneOffRevenue', deal.one_off_revenue ?? '', setValueOptions);
+      methods.setValue('monthlyMrr', deal.monthly_mrr ?? '', setValueOptions);
       methods.setValue('closeDate', closeDateValue, setValueOptions);
       methods.setValue('notes', notesValue, setValueOptions);
       methods.setValue('probability', probabilityValue, setValueOptions);
