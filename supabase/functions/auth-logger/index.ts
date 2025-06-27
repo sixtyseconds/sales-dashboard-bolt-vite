@@ -36,24 +36,29 @@ serve(async (req) => {
     const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     const userAgent = req.headers.get('user-agent') || 'unknown'
 
-    // Log to admin_logs table
-    const { error: logError } = await supabaseAdmin
-      .from('admin_logs')
-      .insert({
-        action: `AUTH_${authEvent.event_type}`,
-        target_user_id: authEvent.user_id,
-        details: {
-          email: authEvent.email,
-          ip_address: clientIP,
-          user_agent: userAgent,
-          ...authEvent.metadata
-        },
-        performed_by: authEvent.user_id // Self-performed auth action
-      })
+    // Log to admin_logs table (if it exists)
+    try {
+      const { error: logError } = await supabaseAdmin
+        .from('admin_logs')
+        .insert({
+          action: `AUTH_${authEvent.event_type}`,
+          target_user_id: authEvent.user_id,
+          details: {
+            email: authEvent.email,
+            ip_address: clientIP,
+            user_agent: userAgent,
+            ...authEvent.metadata
+          },
+          performed_by: authEvent.user_id // Self-performed auth action
+        })
 
-    if (logError) {
-      console.error('Failed to log auth event:', logError)
-      // Don't fail the request if logging fails
+      if (logError) {
+        console.warn('Failed to log auth event (table may not exist):', logError)
+        // Don't fail the request if logging fails
+      }
+    } catch (logException) {
+      console.warn('Auth logging disabled (admin_logs table not found):', logException)
+      // Continue without logging
     }
 
     // Optional: Additional security checks based on event type

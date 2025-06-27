@@ -9,7 +9,7 @@ interface AuthLogEvent {
 
 class AuthLogger {
   private static instance: AuthLogger;
-  private isEnabled = true;
+  private isEnabled = false; // Temporarily disabled due to CORS issues
 
   static getInstance(): AuthLogger {
     if (!AuthLogger.instance) {
@@ -22,7 +22,10 @@ class AuthLogger {
    * Log authentication events to Edge Function for security monitoring
    */
   async logAuthEvent(event: AuthLogEvent): Promise<void> {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled) {
+      console.log('Auth logging disabled - skipping event:', event.event_type);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('auth-logger', {

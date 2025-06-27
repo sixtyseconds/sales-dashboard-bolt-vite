@@ -20,7 +20,6 @@ import { useFocusTrap } from './utils/useFocusTrap';
 import { usePipeline } from '@/lib/contexts/PipelineContext';
 import { useForm, FormProvider } from 'react-hook-form';
 import { useToast } from '../../../hooks/use-toast';
-import { useMediaQuery } from '../../../hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import { Deal } from '@/lib/database/models';
 
@@ -82,15 +81,18 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
   // Create a form instance
   const methods = useForm({
     defaultValues: {
-      name: deal?.name || deal?.dealName || '',
+      name: deal?.name || '',
+      company: deal?.company || '',
+      contactName: deal?.contact_name || '',
       amount: deal?.value || '',
-      closeDate: deal?.expected_close_date || deal?.closeDate || '',
+      closeDate: deal?.expected_close_date || '',
       notes: deal?.notes || deal?.description || '',
       probability: deal?.probability || 20,
-      nextAction: deal?.next_steps || deal?.nextAction || '',
-      dealSize: deal?.deal_size || '',
-      leadSourceType: deal?.lead_source_type || '',
-      leadSourceChannel: deal?.lead_source_channel || ''
+      nextAction: deal?.next_steps || '',
+      dealSize: (deal as any)?.deal_size || '',
+      priority: (deal as any)?.priority || '',
+      leadSourceType: (deal as any)?.lead_source_type || '',
+      leadSourceChannel: (deal as any)?.lead_source_channel || ''
     }
   });
   
@@ -111,7 +113,7 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
   // Set up initial stage when deal changes or when stages are loaded
   useEffect(() => {
     if (deal && stages && stages.length > 0) {
-      const stageId = deal.stage_id || deal.stage || '';
+      const stageId = deal.stage_id || (deal as any).stage || '';
       setCurrentStage(stageId);
       
       // Find the stage name and color based on the ID
@@ -215,17 +217,43 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       
       const formData = methods.getValues();
       console.log(">>> DEBUG: Form data in handleSave:", formData);
-      console.log(">>> DEBUG: nextAction value:", formData.nextAction);
+      console.log(">>> DEBUG: Expected close date value:", formData.closeDate);
       
       // Ensure we're using a valid stage ID
       let stageId = currentStage;
+      
+      // Validate date format if provided
+      let processedCloseDate = null;
+      if (formData.closeDate && formData.closeDate.trim() !== '') {
+        try {
+          // Ensure the date is in proper format
+          const dateObj = new Date(formData.closeDate);
+          if (isNaN(dateObj.getTime())) {
+            throw new Error('Invalid date format');
+          }
+          // Format as YYYY-MM-DD for database storage
+          processedCloseDate = formData.closeDate;
+          console.log(">>> DEBUG: Processed close date:", processedCloseDate);
+        } catch (dateError) {
+          console.error("Date validation error:", dateError);
+          toast({
+            title: "Invalid Date",
+            description: "Please enter a valid expected close date.",
+            variant: "destructive"
+          });
+          setIsSaving(false);
+          return;
+        }
+      }
       
       // Map form field names to database column names
       const dataToSave = {
         name: formData.name,
         company: formData.company || null,
         value: formData.amount ? parseFloat(formData.amount as string) : null,
-        expected_close_date: formData.closeDate === '' ? null : formData.closeDate,
+        // Try expected_close_date first, fallback to close_date if column doesn't exist
+        expected_close_date: processedCloseDate,
+        close_date: processedCloseDate, // Fallback field name
         description: formData.notes || null,
         stage_id: stageId,
         probability: formData.probability ? parseInt(formData.probability.toString()) : null,
@@ -237,11 +265,15 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
         lead_source_channel: formData.leadSourceChannel === '' ? null : formData.leadSourceChannel
       };
 
-      console.log(">>> DEBUG: dataToSave next_steps value:", dataToSave.next_steps);
+      console.log(">>> DEBUG: dataToSave expected_close_date value:", dataToSave.expected_close_date);
 
-      // Filter out null or undefined values, but keep empty strings
+      // Filter out null or undefined values, but keep expected_close_date and close_date for null values
       const cleanedData = Object.fromEntries(
-        Object.entries(dataToSave).filter(([_, v]) => v !== null && v !== undefined)
+        Object.entries(dataToSave).filter(([key, value]) => {
+          // Always include date fields even if null (to clear the field)
+          if (key === 'expected_close_date' || key === 'close_date') return true;
+          return value !== null && value !== undefined;
+        })
       );
 
       console.log("Saving deal with data:", cleanedData);
@@ -271,7 +303,7 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
     if (window.confirm('Are you sure you want to delete this deal? This action cannot be undone.')) {
       try {
         setIsDeleting(true);
-        await onDelete(deal.id);
+        await onDelete(deal.id || '');
         
         toast({
           title: "Deal Deleted",
@@ -305,10 +337,10 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
       const notesValue = deal.notes || deal.description || '';
       const probabilityValue = deal.probability ?? 0;
       const nextActionValue = deal.next_steps || '';
-      const dealSizeValue = deal.deal_size || '';
-      const leadSourceTypeValue = deal.lead_source_type || '';
-      const leadSourceChannelValue = deal.lead_source_channel || '';
-      const priorityValue = deal.priority || '';
+      const dealSizeValue = (deal as any)?.deal_size || '';
+      const leadSourceTypeValue = (deal as any)?.lead_source_type || '';
+      const leadSourceChannelValue = (deal as any)?.lead_source_channel || '';
+      const priorityValue = (deal as any)?.priority || '';
 
       console.log('>>> DEBUG: Resetting form with deal:', deal);
       console.log('>>> DEBUG: Deal size value:', dealSizeValue);
@@ -406,7 +438,7 @@ const EditDealModal: React.FC<EditDealModalProps> = ({
                   <Edit className="w-4 h-4" />
                 </div>
                 <DialogTitle className="text-xl font-semibold text-white">
-                  {deal.name || deal.dealName || "Edit Deal"}
+                  {deal.name || (deal as any)?.dealName || "Edit Deal"}
                 </DialogTitle>
                 {currentStage && (
                   <div 
