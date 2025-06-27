@@ -98,9 +98,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Handle specific auth events
           switch (event) {
             case 'SIGNED_IN':
-              // Only show success toast for manual sign-ins, not session restoration
+              // Only log for manual sign-ins, not session restoration
               if (!isInitialLoad) {
-                toast.success('Successfully signed in!');
                 console.log('🔐 Manual sign-in successful for:', session?.user?.email);
               }
               
