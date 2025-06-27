@@ -82,26 +82,50 @@ export function useDealActivities(filters?: ActivityFilters) {
       setIsLoading(true);
       setError(null);
       
-      let query = supabase
-        .from('deal_activities_with_profile')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (filters?.deal_id) {
-        query = query.eq('deal_id', filters.deal_id);
-      }
-      if (filters?.is_matched !== undefined) {
-         query = query.eq('is_matched', filters.is_matched);
+      // Build query parameters
+      const queryParams: Record<string, string> = {};
+      if (filters?.deal_id) queryParams.deal_id = filters.deal_id;
+      if (filters?.is_matched !== undefined) queryParams.is_matched = filters.is_matched.toString();
+      
+      // Use the edge function with proper parameter handling
+      const { data, error } = await supabase.functions.invoke('deal-activities', {
+        body: queryParams, // Send as body for better parameter handling
+        method: 'POST' // Use POST to send parameters in body
+      });
+      
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
       }
       
-      const { data, error } = await query;
-        
-      if (error) throw error;
-      
-      setActivities(data || []);
+      setActivities(data?.data || []);
     } catch (err: any) {
       console.error('Error fetching deal activities:', err);
-      setError(err);
+      
+      // Fallback: Try to fetch directly from the view if edge function fails
+      try {
+        console.log('Attempting fallback query...');
+        let query = supabase
+          .from('deal_activities_with_profile')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (filters?.deal_id) {
+          query = query.eq('deal_id', filters.deal_id);
+        }
+        
+        const { data: fallbackData, error: fallbackError } = await query;
+        
+        if (fallbackError) {
+          throw fallbackError;
+        }
+        
+        setActivities(fallbackData || []);
+        console.log('Fallback query successful');
+      } catch (fallbackErr: any) {
+        console.error('Fallback query also failed:', fallbackErr);
+        setError(fallbackErr);
+      }
     } finally {
       setIsLoading(false);
     }

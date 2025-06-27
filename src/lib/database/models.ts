@@ -144,6 +144,11 @@ export interface Deal {
   company_id?: string;
   primary_contact_id?: string;
   
+  // REVENUE MODEL FIELDS
+  one_off_revenue?: number;
+  monthly_mrr?: number;
+  annual_value?: number;
+  
   // Joined relations
   companies?: Company;
   contacts?: Contact; // Primary contact
