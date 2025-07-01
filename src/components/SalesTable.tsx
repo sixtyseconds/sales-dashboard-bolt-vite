@@ -218,7 +218,7 @@ export function SalesTable() {
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
     const activeDeals = filteredActivities
-      .filter(a => a.status === 'completed').length; // Assuming completed = won deal
+      .filter(a => a.type === 'sale' && a.status === 'completed').length; // Only count completed sales as won deals
     const salesActivities = filteredActivities.filter(a => a.type === 'sale').length;
     const proposalActivities = filteredActivities.filter(a => a.type === 'proposal').length;
     const meetingActivities = filteredActivities.filter(a => a.type === 'meeting').length;
@@ -244,7 +244,7 @@ export function SalesTable() {
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
     const activeDeals = previousPeriodActivities
-      .filter(a => a.status === 'completed').length;
+      .filter(a => a.type === 'sale' && a.status === 'completed').length; // Only count completed sales as won deals
     const salesActivities = previousPeriodActivities.filter(a => a.type === 'sale').length;
     const proposalActivities = previousPeriodActivities.filter(a => a.type === 'proposal').length;
     const meetingActivities = previousPeriodActivities.filter(a => a.type === 'meeting').length;
