@@ -741,10 +741,10 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                         <option value="">Select meeting type</option>
                         <option value="Discovery Call">Discovery Call</option>
                         <option value="Discovery Meeting">Discovery Meeting</option>
-                        <option value="Product Demo">Product Demo</option>
-                        <option value="Client Call">Client Call</option>
-                        <option value="Follow-up">Follow-up</option>
                         <option value="Demo">Demo</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Proposal">Proposal</option>
+                        <option value="Client Call">Client Call</option>
                         <option value="Other">Other</option>
                       </select>
                     </div>

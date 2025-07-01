@@ -165,9 +165,9 @@ export function SalesTable() {
           if (filterType === 'discovery call' || filterType === 'discovery meeting') {
             // Match either "Discovery Call" or "Discovery Meeting" when user selects either discovery option
             matchesSubType = details.includes('discovery call') || details.includes('discovery meeting');
-          } else if (filterType === 'product demo' || filterType === 'demo') {
-            // Match either "Product Demo" or "Demo" 
-            matchesSubType = details.includes('product demo') || details.includes('demo');
+          } else if (filterType === 'demo') {
+            // Match "Demo" 
+            matchesSubType = details.includes('demo');
           } else {
             // For other types (Follow-up, Other), match exactly
             matchesSubType = details.includes(filterType);
@@ -806,9 +806,10 @@ export function SalesTable() {
                             <>
                               <option value="Discovery Call">Discovery Call</option>
                               <option value="Discovery Meeting">Discovery Meeting</option>
-                              <option value="Product Demo">Product Demo</option>
-                              <option value="Follow-up">Follow-up</option>
                               <option value="Demo">Demo</option>
+                              <option value="Follow-up">Follow-up</option>
+                              <option value="Proposal">Proposal</option>
+                              <option value="Client Call">Client Call</option>
                               <option value="Other">Other</option>
                             </>
                           )}

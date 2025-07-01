@@ -14,6 +14,7 @@ import SalesFunnel from '@/pages/SalesFunnel';
 import Profile from '@/pages/Profile';
 import Users from '@/pages/admin/Users';
 import PipelineSettings from '@/pages/admin/PipelineSettings';
+import AuditLogs from '@/pages/admin/AuditLogs';
 import Login from '@/pages/auth/login';
 import Signup from '@/pages/auth/signup';
 import ForgotPassword from '@/pages/auth/forgot-password';
@@ -80,6 +81,7 @@ function App() {
             <Route path="/activity-processing" element={<AppLayout><ActivityProcessingPage /></AppLayout>} />
             <Route path="/admin/users" element={<AppLayout><Users /></AppLayout>} />
             <Route path="/admin/pipeline-settings" element={<AppLayout><PipelineSettings /></AppLayout>} />
+            <Route path="/admin/audit-logs" element={<AppLayout><AuditLogs /></AppLayout>} />
             <Route path="/test-fallback" element={<ProtectedRoute><TestFallback /></ProtectedRoute>} />
           </Routes>
         </ProtectedRoute>
