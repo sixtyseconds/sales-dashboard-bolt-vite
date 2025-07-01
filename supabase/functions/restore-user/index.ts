@@ -13,6 +13,14 @@ serve(async (req) => {
   }
 
   try {
+    // Get the JWT and API key from headers
+    const authHeader = req.headers.get('Authorization')
+    const apiKey = req.headers.get('apikey')
+
+    if (!authHeader || !apiKey) {
+      throw new Error('Missing authorization headers')
+    }
+
     // Create Supabase client with service role key
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -25,22 +33,37 @@ serve(async (req) => {
       }
     )
 
-    // Get user to restore
+    // Get the JWT token
+    const token = authHeader.replace('Bearer ', '')
+
+    // Verify the JWT and get the user (this should be the impersonated user)
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !user) {
+      throw new Error('Invalid token')
+    }
+
+    // Get the original user ID to restore
     const { userId } = await req.json()
-    const { data: user, error: userError } = await supabaseAdmin
+    
+    if (!userId) {
+      throw new Error('Original user ID is required')
+    }
+
+    // Get original user to restore
+    const { data: originalUser, error: userError } = await supabaseAdmin
       .from('profiles')
       .select('email')
       .eq('id', userId)
       .single()
 
-    if (userError || !user) {
-      throw new Error('User not found')
+    if (userError || !originalUser) {
+      throw new Error('Original user not found')
     }
 
-    // Generate temporary password
+    // Generate temporary password for original user
     const tempPassword = Math.random().toString(36).slice(-8)
 
-    // Update user password
+    // Update original user password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
       { password: tempPassword }
@@ -52,7 +75,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        email: user.email,
+        email: originalUser.email,
         password: tempPassword
       }),
       {
