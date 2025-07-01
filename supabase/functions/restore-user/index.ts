@@ -56,6 +56,11 @@ serve(async (req) => {
       throw new Error('Original user not found')
     }
 
+    // Validate that the original user has an email address
+    if (!originalUser.user.email || originalUser.user.email.trim() === '') {
+      throw new Error('Original user does not have a valid email address')
+    }
+
     if (originalUser.user.email !== email) {
       throw new Error('Email mismatch for original user')
     }
@@ -84,7 +89,7 @@ serve(async (req) => {
         admin_id: userId,
         admin_email: email,
         target_user_id: user.id,
-        target_user_email: user.email,
+        target_user_email: user.email || 'unknown',
         action: 'end_impersonation',
         created_at: new Date().toISOString()
       })

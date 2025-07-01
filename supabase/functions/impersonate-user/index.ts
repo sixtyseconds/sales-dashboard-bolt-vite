@@ -72,10 +72,15 @@ serve(async (req) => {
       throw new Error('User not found')
     }
 
+    // Validate that the target user has an email address
+    if (!targetUser.user.email || targetUser.user.email.trim() === '') {
+      throw new Error('Target user does not have a valid email address. Cannot generate magic link for impersonation.')
+    }
+
     // Generate magic link for the target user
     const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
-      email: targetUser.user.email!,
+      email: targetUser.user.email,
       options: {
         redirectTo: redirectTo,
         data: {
