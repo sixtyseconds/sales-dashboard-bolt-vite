@@ -54,6 +54,7 @@ interface PipelineContextType {
   dealsByStage: Record<string, any[]>;
   pipelineValue: number;
   weightedPipelineValue: number;
+  activePipelineValue: number;
   stageMetrics: StageMetric[];
   selectedOwnerId: string | undefined;
   setSelectedOwnerId: (ownerId: string | undefined) => void;
@@ -331,6 +332,32 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     
     return totalWeighted;
   }, [dealsByStage, stages]);
+
+  // Calculate active pipeline value (excludes Closed Lost and Closed Won) - only weighted amount
+  const activePipelineValue = useMemo(() => {
+    if (!stages) return 0;
+    
+    // Get stages to exclude (Closed Lost and Closed Won)
+    const excludedStages = stages.filter(stage => 
+      stage.name.toLowerCase().includes('closed')
+    );
+    const excludedStageIds = excludedStages.map(stage => stage.id);
+    
+    // Sum up weighted values from active deals only (SQL, Opportunity, Verbal)
+    let totalWeighted = 0;
+    Object.entries(dealsByStage).forEach(([stageId, stageDeals]) => {
+      // Skip closed stages
+      if (excludedStageIds.includes(stageId)) return;
+      
+      stageDeals.forEach(deal => {
+        const stage = stages.find(s => s.id === deal.stage_id);
+        const probability = deal.probability || deal.deal_stages?.default_probability || stage?.default_probability || 0;
+        totalWeighted += Number(deal.value || 0) * (Number(probability) / 100);
+      });
+    });
+    
+    return totalWeighted;
+  }, [dealsByStage, stages]);
   
   // Calculate total count and value by stage (using filtered deals)
   const stageMetrics = useMemo(() => {
@@ -376,6 +403,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     dealsByStage,
     pipelineValue,
     weightedPipelineValue,
+    activePipelineValue,
     stageMetrics,
     selectedOwnerId,
     setSelectedOwnerId
@@ -397,6 +425,7 @@ export function PipelineProvider({ children }: PipelineProviderProps) {
     dealsByStage, 
     pipelineValue, 
     weightedPipelineValue, 
+    activePipelineValue,
     stageMetrics,
     selectedOwnerId,
     setSelectedOwnerId

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/clientV2';
+import { toast } from 'sonner';
 
 export const USER_STAGES = [
   'Trainee',
@@ -9,12 +10,101 @@ export const USER_STAGES = [
   'Director'
 ];
 
+export const stopImpersonating = async () => {
+  try {
+    const originalUserId = localStorage.getItem('originalUserId');
+    if (!originalUserId) {
+      throw new Error('No impersonation session found');
+    }
+
+    // Call the restore-user edge function
+    const { data, error } = await supabase.functions.invoke('restore-user', {
+      body: { userId: originalUserId }
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    // Clear the original user ID from localStorage
+    localStorage.removeItem('originalUserId');
+
+    if (data?.email && data?.password) {
+      // Sign in as original user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      toast.success('Stopped impersonating successfully');
+      window.location.reload();
+    } else {
+      throw new Error('Invalid restore response');
+    }
+  } catch (error: any) {
+    console.error('Stop impersonation error:', error);
+    // Clear localStorage even if there's an error to prevent user from being stuck
+    localStorage.removeItem('originalUserId');
+    toast.error('Failed to stop impersonation: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
+};
+
+export const impersonateUser = async (userId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('impersonate-user', {
+      body: { userId }
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.email && data?.password) {
+      // Store original user ID
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        localStorage.setItem('originalUserId', currentUser.id);
+      }
+
+      // Sign in as target user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      toast.success('Impersonation started successfully');
+      window.location.reload();
+    } else {
+      throw new Error('Invalid impersonation response');
+    }
+  } catch (error: any) {
+    console.error('Impersonation error:', error);
+    toast.error('Failed to impersonate user: ' + (error.message || 'Unknown error'));
+    throw error;
+  }
+};
+
 export function useUser() {
   const [userData, setUserData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const [isImpersonating, setIsImpersonating] = useState(false);
+  const [originalUserData, setOriginalUserData] = useState<any>(null);
 
   useEffect(() => {
+    // Check if we're in an impersonation session
+    const originalUserId = localStorage.getItem('originalUserId');
+    setIsImpersonating(!!originalUserId);
+
     async function fetchUser() {
       try {
         setIsLoading(true);
@@ -77,6 +167,20 @@ export function useUser() {
           } else {
             setUserData(profile);
           }
+
+          // If we're impersonating, also get the original user data
+          if (originalUserId && originalUserId !== user.id) {
+            try {
+              const { data: originalProfile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', originalUserId)
+                .single();
+              setOriginalUserData(originalProfile);
+            } catch (error) {
+              console.warn('Could not fetch original user data:', error);
+            }
+          }
         } else {
           // No user session - create a mock user for development
           console.log('No authenticated user, creating mock user for development');
@@ -120,6 +224,8 @@ export function useUser() {
         } else if (event === 'SIGNED_OUT') {
           // User signed out
           setUserData(null);
+          setOriginalUserData(null);
+          setIsImpersonating(false);
         }
       }
     );
@@ -131,18 +237,36 @@ export function useUser() {
     try {
       await supabase.auth.signOut();
       setUserData(null);
+      setOriginalUserData(null);
+      setIsImpersonating(false);
+      // Clear impersonation data
+      localStorage.removeItem('originalUserId');
     } catch (error) {
       console.error('Error signing out:', error);
       // Force clear user data even if signOut fails
       setUserData(null);
+      setOriginalUserData(null);
+      setIsImpersonating(false);
+      localStorage.removeItem('originalUserId');
+    }
+  };
+
+  const handleStopImpersonation = async () => {
+    try {
+      await stopImpersonating();
+    } catch (error) {
+      console.error('Error stopping impersonation:', error);
     }
   };
 
   return {
     userData,
+    originalUserData,
     isLoading,
     error,
     signOut,
-    isAuthenticated: !!userData
+    isAuthenticated: !!userData,
+    isImpersonating,
+    stopImpersonating: handleStopImpersonation
   };
 }

@@ -94,9 +94,13 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
   const totalRef = useRef<HTMLDivElement>(null);
 
   const handleClick = () => {
-    if (type) {
-      setFilters({ type, dateRange });
-      navigate('/activity', { state: { preserveFilters: true } });
+    try {
+      if (type) {
+        setFilters({ type, dateRange });
+        navigate('/activity', { state: { preserveFilters: true } });
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
     }
   };
 
@@ -115,10 +119,16 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
     }
   };
 
-  // Calculate trend against previous month's total
-  const totalTrend = previousMonthTotal 
-    ? Math.round(((value - previousMonthTotal) / previousMonthTotal) * 100) 
-    : 0;
+  // Calculate trend against previous month's total with error handling
+  const totalTrend = useMemo(() => {
+    try {
+      if (!previousMonthTotal || previousMonthTotal === 0) return 0;
+      return Math.round(((value - previousMonthTotal) / previousMonthTotal) * 100);
+    } catch (error) {
+      console.error('Error calculating total trend:', error);
+      return 0;
+    }
+  }, [value, previousMonthTotal]);
 
   // Helper function for arrow styling
   const getArrowClass = (trendValue: number) => {
@@ -136,25 +146,33 @@ const MetricCard = ({ title, value, target, trend, icon: Icon, type, dateRange, 
 
   // Handle mouse enter for trend tooltip
   const handleTrendMouseEnter = () => {
-    if (trendRef.current) {
-      const rect = trendRef.current.getBoundingClientRect();
-      setTrendPosition({ 
-        x: rect.left + rect.width / 2, 
-        y: rect.top 
-      });
-      setShowTrendTooltip(true);
+    try {
+      if (trendRef.current) {
+        const rect = trendRef.current.getBoundingClientRect();
+        setTrendPosition({ 
+          x: rect.left + rect.width / 2, 
+          y: rect.top 
+        });
+        setShowTrendTooltip(true);
+      }
+    } catch (error) {
+      console.error('Error showing trend tooltip:', error);
     }
   };
 
   // Handle mouse enter for total tooltip
   const handleTotalMouseEnter = () => {
-    if (totalRef.current) {
-      const rect = totalRef.current.getBoundingClientRect();
-      setTotalPosition({ 
-        x: rect.left + rect.width / 2, 
-        y: rect.top 
-      });
-      setShowTotalTooltip(true);
+    try {
+      if (totalRef.current) {
+        const rect = totalRef.current.getBoundingClientRect();
+        setTotalPosition({ 
+          x: rect.left + rect.width / 2, 
+          y: rect.top 
+        });
+        setShowTotalTooltip(true);
+      }
+    } catch (error) {
+      console.error('Error showing total tooltip:', error);
     }
   };
 
@@ -373,46 +391,89 @@ export default function Dashboard() {
   }), [selectedMonth]);
 
   // Get the current day of month for comparing with the same day in previous month
-  const currentDayOfMonth = useMemo(() => getDate(new Date()), []);
+  const currentDayOfMonth = useMemo(() => {
+    try {
+      return getDate(new Date());
+    } catch (error) {
+      console.error('Error getting current day of month:', error);
+      return 1; // Fallback to 1st of month
+    }
+  }, []);
 
   // Filter activities for selected month and calculate metrics
-  const selectedMonthActivities = useMemo(() => 
-    activities?.filter(activity => {
-      const activityDate = new Date(activity.date);
-      return activityDate >= selectedMonthRange.start && activityDate <= selectedMonthRange.end;
-    }) || [], [activities, selectedMonthRange]);
+  const selectedMonthActivities = useMemo(() => {
+    try {
+      if (!activities || !Array.isArray(activities)) return [];
+      
+      return activities.filter(activity => {
+        try {
+          if (!activity?.date) return false;
+          const activityDate = new Date(activity.date);
+          if (isNaN(activityDate.getTime())) return false;
+          return activityDate >= selectedMonthRange.start && activityDate <= selectedMonthRange.end;
+        } catch (error) {
+          console.error('Error filtering activity:', error);
+          return false;
+        }
+      });
+    } catch (error) {
+      console.error('Error filtering selected month activities:', error);
+      return [];
+    }
+  }, [activities, selectedMonthRange]);
 
   // Get previous month's activities up to the SAME DAY for proper trend calculation
   const previousMonthToDateActivities = useMemo(() => {
-    // Get the previous month's range
-    const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
-    
-    // Calculate the cutoff date (same day of month as today, but in previous month)
-    const dayOfMonth = Math.min(currentDayOfMonth, getDate(endOfMonth(prevMonthStart)));
-    const prevMonthCutoff = new Date(prevMonthStart);
-    prevMonthCutoff.setDate(dayOfMonth);
-    
-    return activities?.filter(activity => {
-      const activityDate = new Date(activity.date);
-      return activityDate >= prevMonthStart && activityDate <= prevMonthCutoff;
-    }) || [];
+    try {
+      if (!activities || !Array.isArray(activities)) return [];
+      
+      // Get the previous month's range
+      const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+      
+      // Calculate the cutoff date (same day of month as today, but in previous month)
+      const dayOfMonth = Math.min(currentDayOfMonth, getDate(endOfMonth(prevMonthStart)));
+      const prevMonthCutoff = new Date(prevMonthStart);
+      prevMonthCutoff.setDate(dayOfMonth);
+      
+      return activities.filter(activity => {
+        try {
+          if (!activity?.date) return false;
+          const activityDate = new Date(activity.date);
+          if (isNaN(activityDate.getTime())) return false;
+          return activityDate >= prevMonthStart && activityDate <= prevMonthCutoff;
+        } catch (error) {
+          console.error('Error filtering previous month activity:', error);
+          return false;
+        }
+      });
+    } catch (error) {
+      console.error('Error calculating previous month activities:', error);
+      return [];
+    }
   }, [activities, selectedMonth, currentDayOfMonth]);
 
   // Calculate metrics for selected month
-  const metrics = useMemo(() => ({
-    revenue: selectedMonthActivities
-      .filter(a => a.type === 'sale')
-      .reduce((sum, a) => sum + (a.amount || 0), 0),
-    outbound: selectedMonthActivities
-      .filter(a => a.type === 'outbound')
-      .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    meetings: selectedMonthActivities
-      .filter(a => a.type === 'meeting')
-      .reduce((sum, a) => sum + (a.quantity || 1), 0),
-    proposals: selectedMonthActivities
-      .filter(a => a.type === 'proposal')
-      .reduce((sum, a) => sum + (a.quantity || 1), 0)
-  }), [selectedMonthActivities]);
+  const metrics = useMemo(() => {
+    try {
+      return {
+        revenue: selectedMonthActivities
+          .filter((a: any) => a.type === 'sale')
+          .reduce((sum: number, a: any) => sum + (a.amount || 0), 0),
+        outbound: selectedMonthActivities
+          .filter((a: any) => a.type === 'outbound')
+          .reduce((sum: number, a: any) => sum + (a.quantity || 1), 0),
+        meetings: selectedMonthActivities
+          .filter((a: any) => a.type === 'meeting')
+          .reduce((sum: number, a: any) => sum + (a.quantity || 1), 0),
+        proposals: selectedMonthActivities
+          .filter((a: any) => a.type === 'proposal')
+          .reduce((sum: number, a: any) => sum + (a.quantity || 1), 0)
+      };
+    } catch (error) {
+      console.error('Error calculating metrics:', error);
+      return { revenue: 0, outbound: 0, meetings: 0, proposals: 0 };
+    }
+  }, [selectedMonthActivities]);
 
   // Calculate metrics for previous month TO SAME DATE (for fair comparison)
   const previousMetricsToDate = useMemo(() => ({
@@ -655,7 +716,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-left sm:text-right">
                   <div className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors duration-300">
-                    £{deal.amount.toLocaleString()}
+                    £{(deal.amount || 0).toLocaleString()}
                   </div>
                   <div className="text-sm text-emerald-500 group-hover:text-emerald-400 transition-colors duration-300">Signed</div>
                 </div>

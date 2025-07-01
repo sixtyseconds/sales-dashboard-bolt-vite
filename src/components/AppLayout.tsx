@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userData } = useUser();
+  const { userData, isImpersonating, stopImpersonating } = useUser();
   const { signOut } = useAuth();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -39,13 +39,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     try {
-      const { error } = await signOut();
-      if (error) {
-        toast.error('Error logging out: ' + error.message);
+      if (isImpersonating) {
+        // Stop impersonating instead of logging out
+        await stopImpersonating();
+      } else {
+        // Normal logout
+        const { error } = await signOut();
+        if (error) {
+          toast.error('Error logging out: ' + error.message);
+        }
       }
-      // Success toast is handled by AuthContext
+      // Success toast is handled by the respective functions
     } catch (error: any) {
-      toast.error('Error logging out');
+      toast.error(isImpersonating ? 'Error stopping impersonation' : 'Error logging out');
       console.error('[Auth]', error);
     }
   };
@@ -87,15 +93,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-gray-100">
       {/* Impersonation Banner */}
-      {/* {isImpersonating && (
+      {isImpersonating && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500/10 backdrop-blur-sm text-center py-1 px-2 text-amber-400 text-xs font-medium border-b border-amber-500/20">
           <span className="flex items-center justify-center gap-1">
-            <UserX className="w-3 h-3" /> You are viewing as {userData?.first_name} {userData?.last_name}
+            <UserX className="w-3 h-3" /> You are impersonating {userData?.first_name} {userData?.last_name}
           </span>
         </div>
-      )} */}
+      )}
       
-      <div className="fixed top-0 left-0 right-0 flex items-center justify-between z-50 p-4 bg-gray-950/50 backdrop-blur-sm border-b border-gray-800/50 lg:hidden">
+      <div className={cn(
+        "fixed top-0 left-0 right-0 flex items-center justify-between z-50 p-4 bg-gray-950/50 backdrop-blur-sm border-b border-gray-800/50 lg:hidden",
+        isImpersonating ? "mt-6" : ""
+      )}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg overflow-hidden">
             {userData?.avatar_url ? (
@@ -246,10 +255,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   
                   <button 
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
+                      isImpersonating 
+                        ? "text-amber-400 hover:bg-amber-500/10" 
+                        : "text-red-400 hover:bg-red-500/10"
+                    )}
                   >
-                    <LogOut className="w-5 h-5" />
-                    Logout
+                    {isImpersonating ? (
+                      <>
+                        <UserX className="w-5 h-5" />
+                        Stop Impersonation
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-5 h-5" />
+                        Logout
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -263,10 +286,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         initial={!hasMounted ? { opacity: 0, x: -20 } : false}
         animate={!hasMounted ? { opacity: 1, x: 0 } : false}
         className={cn( 
-          'fixed top-0 left-0 h-screen bg-gray-900/50 backdrop-blur-xl border-r border-gray-800/50 p-6',
+          'fixed left-0 h-screen bg-gray-900/50 backdrop-blur-xl border-r border-gray-800/50 p-6',
           'transition-[width] duration-300 ease-in-out flex-shrink-0',
           isCollapsed ? 'w-[80px]' : 'w-[256px]',
-          'hidden lg:block z-[100]'
+          'hidden lg:block z-[100]',
+          isImpersonating ? 'top-6' : 'top-0'
         )}
       >
         <div className={cn(
@@ -409,21 +433,46 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             
             <button 
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              className={cn(
+                "flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                isImpersonating 
+                  ? "text-amber-400 hover:bg-amber-500/10" 
+                  : "text-red-400 hover:bg-red-500/10"
+              )}
             >
-              <LogOut className="w-4 h-4" />
-              <AnimatePresence>
-                {!isCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    className="overflow-hidden whitespace-nowrap"
-                  >
-                    Logout
-                  </motion.span>
-                )}
-              </AnimatePresence>
+              {isImpersonating ? (
+                <>
+                  <UserX className="w-4 h-4" />
+                  <AnimatePresence>
+                    {!isCollapsed && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        Stop Impersonation
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </>
+              ) : (
+                <>
+                  <LogOut className="w-4 h-4" />
+                  <AnimatePresence>
+                    {!isCollapsed && (
+                      <motion.span
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: 'auto' }}
+                        exit={{ opacity: 0, width: 0 }}
+                        className="overflow-hidden whitespace-nowrap"
+                      >
+                        Logout
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -431,7 +480,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <main className={cn(
         'flex-1 transition-[margin] duration-300 ease-in-out',
         isCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[256px]',
-        'ml-0 pt-16 lg:pt-0'
+        'ml-0',
+        isImpersonating ? 'pt-22 lg:pt-6' : 'pt-16 lg:pt-0'
       )}>
         {children}
         <QuickAdd isOpen={isQuickAddOpen} onClose={() => setIsQuickAddOpen(false)} />

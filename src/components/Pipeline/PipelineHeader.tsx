@@ -30,6 +30,7 @@ export function PipelineHeader({
     setFilterOptions,
     pipelineValue,
     weightedPipelineValue,
+    activePipelineValue,
     stages
   } = usePipeline();
   
@@ -47,6 +48,12 @@ export function PipelineHeader({
     currency: 'GBP',
     maximumFractionDigits: 0
   }).format(weightedPipelineValue);
+
+  const formattedActivePipelineValue = new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0
+  }).format(activePipelineValue);
 
   const hasActiveFilters = filterOptions.minValue || filterOptions.maxValue || filterOptions.probability || 
     filterOptions.tags.length || selectedOwnerId || filterOptions.stages.length || filterOptions.priorities.length ||
@@ -278,10 +285,10 @@ export function PipelineHeader({
           <div className="flex flex-col justify-center px-4 py-2.5 bg-gray-800/50 rounded-lg border border-gray-700/50 min-h-[44px]">
             <div className="text-xs text-gray-400">Total Pipeline</div>
             <div className="text-lg font-bold text-emerald-400 leading-tight">
-              {formattedPipelineValue}
+              {formattedActivePipelineValue}
             </div>
             <div className="text-xs text-gray-500 leading-tight">
-              Weighted: {formattedWeightedValue}
+              SQL + Opportunity + Verbal (Weighted)
             </div>
           </div>
           
