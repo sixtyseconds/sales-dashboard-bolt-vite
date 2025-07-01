@@ -659,6 +659,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                     }
                     required={selectedAction !== 'outbound'}
                     placeholder={selectedAction !== 'outbound' ? 'Required: Enter email address' : 'Optional: Enter email address'}
+                    label=""
                   />
                 </div>
                 
