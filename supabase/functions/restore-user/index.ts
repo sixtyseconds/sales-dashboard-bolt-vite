@@ -42,41 +42,60 @@ serve(async (req) => {
       throw new Error('Invalid token')
     }
 
-    // Get the original user ID to restore
-    const { userId } = await req.json()
+    // Get the request body
+    const { userId, email, redirectTo } = await req.json()
     
-    if (!userId) {
-      throw new Error('Original user ID is required')
+    if (!userId || !email || !redirectTo) {
+      throw new Error('Missing required parameters: userId, email, and redirectTo are required')
     }
 
-    // Get original user to restore
-    const { data: originalUser, error: userError } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('id', userId)
-      .single()
+    // Verify that the provided userId exists and matches the email
+    const { data: originalUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId)
 
     if (userError || !originalUser) {
       throw new Error('Original user not found')
     }
 
-    // Generate temporary password for original user
-    const tempPassword = Math.random().toString(36).slice(-8)
+    if (originalUser.user.email !== email) {
+      throw new Error('Email mismatch for original user')
+    }
 
-    // Update original user password
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: tempPassword }
-    )
+    // Generate magic link for the original admin user
+    const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: email,
+      options: {
+        redirectTo: redirectTo,
+        data: {
+          restored_from_impersonation: true,
+          impersonated_user_id: user.id
+        }
+      }
+    })
 
-    if (updateError) {
-      throw updateError
+    if (magicLinkError || !magicLinkData) {
+      throw new Error('Failed to generate magic link for restoration')
+    }
+
+    // Log the restoration for audit purposes
+    const { error: logError } = await supabaseAdmin
+      .from('impersonation_logs')
+      .insert({
+        admin_id: userId,
+        admin_email: email,
+        target_user_id: user.id,
+        target_user_email: user.email,
+        action: 'end_impersonation',
+        created_at: new Date().toISOString()
+      })
+
+    if (logError) {
+      console.error('Failed to log restoration:', logError)
     }
 
     return new Response(
       JSON.stringify({
-        email: originalUser.email,
-        password: tempPassword
+        magicLink: magicLinkData.properties.action_link
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -84,6 +103,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Restoration error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       {

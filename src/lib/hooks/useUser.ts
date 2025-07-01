@@ -15,22 +15,22 @@ export const USER_STAGES = [
 
 // Helper functions for managing impersonation state
 export const setImpersonationData = (adminId: string, adminEmail: string) => {
-  localStorage.setItem('originalUserId', adminId);
-  localStorage.setItem('originalUserEmail', adminEmail);
-  localStorage.setItem('isImpersonating', 'true');
+  sessionStorage.setItem('originalUserId', adminId);
+  sessionStorage.setItem('originalUserEmail', adminEmail);
+  sessionStorage.setItem('isImpersonating', 'true');
 };
 
 export const clearImpersonationData = () => {
-  localStorage.removeItem('originalUserId');
-  localStorage.removeItem('originalUserEmail');
-  localStorage.removeItem('isImpersonating');
+  sessionStorage.removeItem('originalUserId');
+  sessionStorage.removeItem('originalUserEmail');
+  sessionStorage.removeItem('isImpersonating');
 };
 
 export const getImpersonationData = () => {
   return {
-    originalUserId: localStorage.getItem('originalUserId'),
-    originalUserEmail: localStorage.getItem('originalUserEmail'),
-    isImpersonating: localStorage.getItem('isImpersonating') === 'true'
+    originalUserId: sessionStorage.getItem('originalUserId'),
+    originalUserEmail: sessionStorage.getItem('originalUserEmail'),
+    isImpersonating: sessionStorage.getItem('isImpersonating') === 'true'
   };
 };
 
@@ -68,7 +68,7 @@ export const stopImpersonating = async () => {
     }
   } catch (error: any) {
     console.error('Stop impersonation error:', error);
-    // Clear localStorage even if there's an error to prevent user from being stuck
+    // Clear sessionStorage even if there's an error to prevent user from being stuck
     clearImpersonationData();
     toast.error('Failed to stop impersonation: ' + (error.message || 'Unknown error'));
     throw error;
@@ -292,9 +292,7 @@ export function useUser() {
       setUserData(null);
       setOriginalUserData(null);
       setIsImpersonating(false);
-      localStorage.removeItem('originalUserId');
-      localStorage.removeItem('originalUserEmail');
-      localStorage.removeItem('isImpersonating');
+      clearImpersonationData();
     }
   };
 
