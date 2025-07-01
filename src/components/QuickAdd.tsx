@@ -739,8 +739,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                         onChange={(e) => setFormData({...formData, details: e.target.value})}
                       >
                         <option value="">Select meeting type</option>
-                        <option value="Discovery Call">Discovery Call</option>
-                        <option value="Discovery Meeting">Discovery Meeting</option>
+                        <option value="Discovery">Discovery</option>
                         <option value="Demo">Demo</option>
                         <option value="Follow-up">Follow-up</option>
                         <option value="Proposal">Proposal</option>
