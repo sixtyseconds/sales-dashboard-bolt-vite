@@ -77,14 +77,13 @@ export function useUsers() {
       
       const usersData = (profiles || []).map((profile) => ({
         id: profile.id,
-        // Only show email for current user due to privacy constraints
-        email: profile.id === authUser?.id ? authUser.email! : `user_${profile.id.slice(0, 8)}@private.local`,
-        first_name: profile.full_name?.split(' ')[0] || null,
-        last_name: profile.full_name?.split(' ').slice(1).join(' ') || null,
-        stage: 'user', // Default stage
+        email: profile.email || `user_${profile.id.slice(0, 8)}@private.local`,
+        first_name: profile.first_name || profile.full_name?.split(' ')[0] || null,
+        last_name: profile.last_name || profile.full_name?.split(' ').slice(1).join(' ') || null,
+        stage: profile.stage || 'Trainee', // Use actual stage from profile
         avatar_url: profile.avatar_url,
-        is_admin: false, // Default to non-admin
-        created_at: profile.updated_at || new Date().toISOString(),
+        is_admin: profile.is_admin || false,
+        created_at: profile.created_at || profile.updated_at || new Date().toISOString(),
         last_sign_in_at: null,
         targets: [] // Will be loaded separately if needed
       }));
@@ -172,6 +171,11 @@ export function useUsers() {
         throw new Error('No authenticated user found');
       }
 
+      // Validate current user has email
+      if (!currentUser.email) {
+        throw new Error('Current user does not have an email address');
+      }
+
       // Call the impersonate-user edge function to get a magic link
       const { data, error } = await supabase.functions.invoke('impersonate-user', {
         body: { 
@@ -186,6 +190,30 @@ export function useUsers() {
         throw error;
       }
 
+      console.log('Impersonate response:', data);
+
+      // Check if we got the old response format (email/password)
+      if (data?.email && data?.password) {
+        console.warn('Edge Function is returning old format. Using fallback password-based impersonation.');
+        
+        // Store original user info for restoration
+        setImpersonationData(currentUser.id, currentUser.email!);
+        
+        // Sign in with the temporary password (old method)
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password
+        });
+
+        if (signInError) {
+          throw signInError;
+        }
+
+        toast.success('Impersonation started (legacy mode)');
+        window.location.reload();
+        return;
+      }
+
       if (data?.magicLink) {
         // Store original user info for restoration
         setImpersonationData(currentUser.id, currentUser.email!);
@@ -195,7 +223,8 @@ export function useUsers() {
         // Redirect to the magic link
         window.location.href = data.magicLink;
       } else {
-        throw new Error('Failed to generate magic link for impersonation');
+        console.error('Unexpected response format:', data);
+        throw new Error('Failed to generate magic link for impersonation. Response: ' + JSON.stringify(data));
       }
     } catch (error: any) {
       console.error('Impersonation error:', error);

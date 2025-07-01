@@ -55,6 +55,28 @@ export const stopImpersonating = async () => {
       throw error;
     }
 
+    // Check if we got the old response format (email/password)
+    if (data?.email && data?.password) {
+      console.warn('Edge Function is returning old format. Using fallback password-based restoration.');
+      
+      // Clear impersonation data
+      clearImpersonationData();
+      
+      // Sign in with the temporary password (old method)
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      toast.success('Session restored (legacy mode)');
+      window.location.reload();
+      return;
+    }
+
     if (data?.magicLink) {
       // Clear impersonation data
       clearImpersonationData();
@@ -64,7 +86,7 @@ export const stopImpersonating = async () => {
       // Redirect to the magic link
       window.location.href = data.magicLink;
     } else {
-      throw new Error('Failed to generate magic link for restoration');
+      throw new Error('Failed to generate magic link for restoration. Response: ' + JSON.stringify(data));
     }
   } catch (error: any) {
     console.error('Stop impersonation error:', error);
