@@ -77,14 +77,13 @@ export function useUsers() {
       
       const usersData = (profiles || []).map((profile) => ({
         id: profile.id,
-        // Only show email for current user due to privacy constraints
-        email: profile.id === authUser?.id ? authUser.email! : `user_${profile.id.slice(0, 8)}@private.local`,
-        first_name: profile.full_name?.split(' ')[0] || null,
-        last_name: profile.full_name?.split(' ').slice(1).join(' ') || null,
-        stage: 'user', // Default stage
+        email: profile.email || `user_${profile.id.slice(0, 8)}@private.local`,
+        first_name: profile.first_name || profile.full_name?.split(' ')[0] || null,
+        last_name: profile.last_name || profile.full_name?.split(' ').slice(1).join(' ') || null,
+        stage: profile.stage || 'Trainee', // Use actual stage from profile
         avatar_url: profile.avatar_url,
-        is_admin: false, // Default to non-admin
-        created_at: profile.updated_at || new Date().toISOString(),
+        is_admin: profile.is_admin || false,
+        created_at: profile.created_at || profile.updated_at || new Date().toISOString(),
         last_sign_in_at: null,
         targets: [] // Will be loaded separately if needed
       }));
