@@ -379,6 +379,43 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showContent, setShowContent] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+  
+  // Safe month navigation handlers
+  const handlePreviousMonth = () => {
+    try {
+      setSelectedMonth(prev => {
+        const newMonth = subMonths(prev, 1);
+        // Ensure the date is valid
+        if (isNaN(newMonth.getTime())) {
+          console.error('Invalid date after subtracting month');
+          return prev;
+        }
+        return newMonth;
+      });
+    } catch (error) {
+      console.error('Error navigating to previous month:', error);
+    }
+  };
+  
+  const handleNextMonth = () => {
+    try {
+      setSelectedMonth(prev => {
+        const newMonth = addMonths(prev, 1);
+        // Ensure the date is valid
+        if (isNaN(newMonth.getTime())) {
+          console.error('Invalid date after adding month');
+          return prev;
+        }
+        // Don't go beyond current month
+        if (newMonth > new Date()) {
+          return prev;
+        }
+        return newMonth;
+      });
+    } catch (error) {
+      console.error('Error navigating to next month:', error);
+    }
+  };
   const { userData } = useUser();
   const navigate = useNavigate();
   const { activities, isLoading: isLoadingActivities } = useActivities();
@@ -493,31 +530,43 @@ export default function Dashboard() {
 
   // Calculate previous month's complete total metrics (for the entire previous month)
   const previousMonthTotals = useMemo(() => {
-    // First, get the full previous month date range
-    const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
-    const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
-    
-    // Get all activities from the previous month (entire month)
-    const fullPreviousMonthActivities = activities?.filter(activity => {
-      const activityDate = new Date(activity.date);
-      return !isBefore(activityDate, prevMonthStart) && !isAfter(activityDate, prevMonthEnd);
-    }) || [];
-    
-    // Calculate the full month totals
-    return {
-      revenue: fullPreviousMonthActivities
-        .filter(a => a.type === 'sale')
-        .reduce((sum, a) => sum + (a.amount || 0), 0),
-      outbound: fullPreviousMonthActivities
-        .filter(a => a.type === 'outbound')
-        .reduce((sum, a) => sum + (a.quantity || 1), 0),
-      meetings: fullPreviousMonthActivities
-        .filter(a => a.type === 'meeting')
-        .reduce((sum, a) => sum + (a.quantity || 1), 0),
-      proposals: fullPreviousMonthActivities
-        .filter(a => a.type === 'proposal')
-        .reduce((sum, a) => sum + (a.quantity || 1), 0)
-    };
+    try {
+      // First, get the full previous month date range
+      const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+      const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
+      
+      // Get all activities from the previous month (entire month)
+      const fullPreviousMonthActivities = activities?.filter(activity => {
+        try {
+          if (!activity?.date) return false;
+          const activityDate = new Date(activity.date);
+          if (isNaN(activityDate.getTime())) return false;
+          return !isBefore(activityDate, prevMonthStart) && !isAfter(activityDate, prevMonthEnd);
+        } catch (error) {
+          console.error('Error filtering previous month total activity:', error);
+          return false;
+        }
+      }) || [];
+      
+      // Calculate the full month totals
+      return {
+        revenue: fullPreviousMonthActivities
+          .filter(a => a.type === 'sale')
+          .reduce((sum, a) => sum + (a.amount || 0), 0),
+        outbound: fullPreviousMonthActivities
+          .filter(a => a.type === 'outbound')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0),
+        meetings: fullPreviousMonthActivities
+          .filter(a => a.type === 'meeting')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0),
+        proposals: fullPreviousMonthActivities
+          .filter(a => a.type === 'proposal')
+          .reduce((sum, a) => sum + (a.quantity || 1), 0)
+      };
+    } catch (error) {
+      console.error('Error calculating previous month totals:', error);
+      return { revenue: 0, outbound: 0, meetings: 0, proposals: 0 };
+    }
   }, [activities, selectedMonth]);
 
   // Calculate trends (comparing current month-to-date with previous month SAME DATE)
@@ -579,16 +628,23 @@ export default function Dashboard() {
           <p className="text-gray-400">Here's how your sales performance is tracking</p>
           <div className="flex items-center gap-3 bg-gray-900/50 backdrop-blur-xl rounded-xl p-2 border border-gray-800/50">
             <button
-              onClick={() => setSelectedMonth(prev => subMonths(prev, 1))}
+              onClick={handlePreviousMonth}
               className="p-1.5 hover:bg-gray-800/50 rounded-lg transition-colors"
             >
               <ChevronLeft className="w-4 h-4 text-gray-400" />
             </button>
             <span className="text-sm font-medium text-white min-w-[100px] text-center">
-              {format(selectedMonth, 'MMMM yyyy')}
+              {(() => {
+                try {
+                  return format(selectedMonth, 'MMMM yyyy');
+                } catch (error) {
+                  console.error('Error formatting selected month:', error);
+                  return 'Invalid Date';
+                }
+              })()}
             </span>
             <button
-              onClick={() => setSelectedMonth(prev => addMonths(prev, 1))}
+              onClick={handleNextMonth}
               className="p-1.5 hover:bg-gray-800/50 rounded-lg transition-colors"
               disabled={selectedMonth >= new Date()}
             >

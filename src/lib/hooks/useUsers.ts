@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/clientV2';
+import { setImpersonationData } from './useUser';
 
 // Mock implementation - temporarily disabled Supabase calls to avoid 400 errors
 // TODO: Implement with Neon API when user management functionality is needed
@@ -51,8 +52,17 @@ export function useUsers() {
         return;
       }
 
-      // Simple profiles query with type assertion
-      const { data: profiles, error } = await (supabase as any)
+      // Try to use RPC function first for complete user data
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_users_with_targets');
+      
+      if (!rpcError && rpcData) {
+        // RPC function exists and returned data
+        setUsers(rpcData);
+        return;
+      }
+      
+      // Fallback: Query profiles and get auth info via edge function
+      const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
@@ -62,23 +72,32 @@ export function useUsers() {
       }
 
       // Transform data to match expected User interface
-      const usersData = (profiles || []).map((profile: any) => ({
+      // Get current user's email from auth session
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      const usersData = (profiles || []).map((profile) => ({
         id: profile.id,
-        email: profile.email || 'unknown@example.com',
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        stage: profile.stage || 'Trainee',
+        // Only show email for current user due to privacy constraints
+        email: profile.id === authUser?.id ? authUser.email! : `user_${profile.id.slice(0, 8)}@private.local`,
+        first_name: profile.full_name?.split(' ')[0] || null,
+        last_name: profile.full_name?.split(' ').slice(1).join(' ') || null,
+        stage: 'user', // Default stage
         avatar_url: profile.avatar_url,
-        is_admin: profile.is_admin || false,
-        created_at: profile.created_at || new Date().toISOString(),
-        last_sign_in_at: profile.last_sign_in_at || null,
+        is_admin: false, // Default to non-admin
+        created_at: profile.updated_at || new Date().toISOString(),
+        last_sign_in_at: null,
         targets: [] // Will be loaded separately if needed
       }));
 
       setUsers(usersData);
     } catch (error: any) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to load users. User management may be disabled.');
+      if (error.message?.includes('auth.users')) {
+        // If auth.users is not accessible, show a more specific message
+        toast.error('User management requires additional permissions. Please contact your administrator.');
+      } else {
+        toast.error('Failed to load users: ' + error.message);
+      }
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -97,9 +116,20 @@ export function useUsers() {
       
       // Update profile
       if (Object.keys(profileUpdates).length > 0) {
-        const { error: profileError } = await (supabase as any)
+        // Only update allowed profile fields
+        const allowedUpdates: Record<string, any> = {};
+        if ('first_name' in profileUpdates || 'last_name' in profileUpdates) {
+          allowedUpdates.full_name = [profileUpdates.first_name, profileUpdates.last_name]
+            .filter(Boolean)
+            .join(' ') || null;
+        }
+        if ('avatar_url' in profileUpdates) {
+          allowedUpdates.avatar_url = profileUpdates.avatar_url;
+        }
+        
+        const { error: profileError } = await supabase
           .from('profiles')
-          .update(profileUpdates)
+          .update(allowedUpdates)
           .eq('id', userId);
 
         if (profileError) {
@@ -117,7 +147,7 @@ export function useUsers() {
 
   const deleteUser = async (userId: string) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', userId);
@@ -136,35 +166,36 @@ export function useUsers() {
 
   const impersonateUser = async (userId: string) => {
     try {
+      // Store current user info before impersonation
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        throw new Error('No authenticated user found');
+      }
+
+      // Call the impersonate-user edge function to get a magic link
       const { data, error } = await supabase.functions.invoke('impersonate-user', {
-        body: { userId }
+        body: { 
+          userId,
+          adminId: currentUser.id,
+          adminEmail: currentUser.email,
+          redirectTo: window.location.origin
+        }
       });
 
       if (error) {
         throw error;
       }
 
-      if (data?.email && data?.password) {
-        // Store original user ID
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          localStorage.setItem('originalUserId', currentUser.id);
-        }
-
-        // Sign in as target user
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password
-        });
-
-        if (signInError) {
-          throw signInError;
-        }
-
-        toast.success('Impersonation started successfully');
-        window.location.reload();
+      if (data?.magicLink) {
+        // Store original user info for restoration
+        setImpersonationData(currentUser.id, currentUser.email!);
+        
+        toast.success('Starting impersonation...');
+        
+        // Redirect to the magic link
+        window.location.href = data.magicLink;
       } else {
-        throw new Error('Invalid impersonation response');
+        throw new Error('Failed to generate magic link for impersonation');
       }
     } catch (error: any) {
       console.error('Impersonation error:', error);
