@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase/clientV2';
 import { toast } from 'sonner';
+import type { Database } from '@/lib/database.types';
+
+type UserProfile = Database['public']['Tables']['profiles']['Row'];
 
 export const USER_STAGES = [
   'Trainee',
@@ -10,45 +13,63 @@ export const USER_STAGES = [
   'Director'
 ];
 
+// Helper functions for managing impersonation state
+export const setImpersonationData = (adminId: string, adminEmail: string) => {
+  sessionStorage.setItem('originalUserId', adminId);
+  sessionStorage.setItem('originalUserEmail', adminEmail);
+  sessionStorage.setItem('isImpersonating', 'true');
+};
+
+export const clearImpersonationData = () => {
+  sessionStorage.removeItem('originalUserId');
+  sessionStorage.removeItem('originalUserEmail');
+  sessionStorage.removeItem('isImpersonating');
+};
+
+export const getImpersonationData = () => {
+  return {
+    originalUserId: sessionStorage.getItem('originalUserId'),
+    originalUserEmail: sessionStorage.getItem('originalUserEmail'),
+    isImpersonating: sessionStorage.getItem('isImpersonating') === 'true'
+  };
+};
+
 export const stopImpersonating = async () => {
   try {
-    const originalUserId = localStorage.getItem('originalUserId');
-    if (!originalUserId) {
+    const { originalUserId, originalUserEmail } = getImpersonationData();
+    
+    if (!originalUserId || !originalUserEmail) {
       throw new Error('No impersonation session found');
     }
 
-    // Call the restore-user edge function
+    // Call the restore-user edge function to get a magic link
     const { data, error } = await supabase.functions.invoke('restore-user', {
-      body: { userId: originalUserId }
+      body: { 
+        userId: originalUserId,
+        email: originalUserEmail,
+        redirectTo: window.location.origin 
+      }
     });
 
     if (error) {
       throw error;
     }
 
-    // Clear the original user ID from localStorage
-    localStorage.removeItem('originalUserId');
-
-    if (data?.email && data?.password) {
-      // Sign in as original user
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      toast.success('Stopped impersonating successfully');
-      window.location.reload();
+    if (data?.magicLink) {
+      // Clear impersonation data
+      clearImpersonationData();
+      
+      toast.success('Restoring your admin session...');
+      
+      // Redirect to the magic link
+      window.location.href = data.magicLink;
     } else {
-      throw new Error('Invalid restore response');
+      throw new Error('Failed to generate magic link for restoration');
     }
   } catch (error: any) {
     console.error('Stop impersonation error:', error);
-    // Clear localStorage even if there's an error to prevent user from being stuck
-    localStorage.removeItem('originalUserId');
+    // Clear sessionStorage even if there's an error to prevent user from being stuck
+    clearImpersonationData();
     toast.error('Failed to stop impersonation: ' + (error.message || 'Unknown error'));
     throw error;
   }
@@ -56,35 +77,36 @@ export const stopImpersonating = async () => {
 
 export const impersonateUser = async (userId: string) => {
   try {
+    // Store current user info before impersonation
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) {
+      throw new Error('No authenticated user found');
+    }
+
+    // Call the impersonate-user edge function to get a magic link
     const { data, error } = await supabase.functions.invoke('impersonate-user', {
-      body: { userId }
+      body: { 
+        userId,
+        adminId: currentUser.id,
+        adminEmail: currentUser.email,
+        redirectTo: window.location.origin
+      }
     });
 
     if (error) {
       throw error;
     }
 
-    if (data?.email && data?.password) {
-      // Store original user ID
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
-        localStorage.setItem('originalUserId', currentUser.id);
-      }
-
-      // Sign in as target user
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
-      });
-
-      if (signInError) {
-        throw signInError;
-      }
-
-      toast.success('Impersonation started successfully');
-      window.location.reload();
+    if (data?.magicLink) {
+      // Store original user info for restoration
+      setImpersonationData(currentUser.id, currentUser.email!);
+      
+      toast.success('Starting impersonation...');
+      
+      // Redirect to the magic link
+      window.location.href = data.magicLink;
     } else {
-      throw new Error('Invalid impersonation response');
+      throw new Error('Failed to generate magic link for impersonation');
     }
   } catch (error: any) {
     console.error('Impersonation error:', error);
@@ -94,16 +116,16 @@ export const impersonateUser = async (userId: string) => {
 };
 
 export function useUser() {
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<any>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [isImpersonating, setIsImpersonating] = useState(false);
-  const [originalUserData, setOriginalUserData] = useState<any>(null);
+  const [originalUserData, setOriginalUserData] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     // Check if we're in an impersonation session
-    const originalUserId = localStorage.getItem('originalUserId');
-    setIsImpersonating(!!originalUserId);
+    const { isImpersonating: isImpersonated, originalUserId } = getImpersonationData();
+    setIsImpersonating(isImpersonated && !!originalUserId);
 
     async function fetchUser() {
       try {
@@ -154,13 +176,20 @@ export function useUser() {
               // Fall back to basic user data
               setUserData({
                 id: user.id,
-                email: user.email,
+                email: user.email || null,
                 first_name: user.user_metadata?.first_name || 'User',
                 last_name: user.user_metadata?.last_name || '',
-                avatar_url: user.user_metadata?.avatar_url,
+                full_name: null,
+                avatar_url: user.user_metadata?.avatar_url || null,
                 role: 'Junior',
-                department: 'Sales'
-              });
+                department: 'Sales',
+                stage: null,
+                is_admin: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                username: null,
+                website: null
+              } as UserProfile);
             } else {
               setUserData(newProfile);
             }
@@ -189,10 +218,17 @@ export function useUser() {
             email: 'demo@example.com',
             first_name: 'Demo',
             last_name: 'User',
+            full_name: 'Demo User',
             avatar_url: null,
             role: 'Senior',
-            department: 'Sales'
-          });
+            department: 'Sales',
+            stage: 'Senior',
+            is_admin: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            username: null,
+            website: null
+          } as UserProfile);
         }
       } catch (err) {
         console.error('Error fetching user:', err);
@@ -204,10 +240,17 @@ export function useUser() {
           email: 'demo@example.com',
           first_name: 'Demo',
           last_name: 'User',
+          full_name: 'Demo User',
           avatar_url: null,
           role: 'Senior',
-          department: 'Sales'
-        });
+          department: 'Sales',
+          stage: 'Senior',
+          is_admin: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          username: null,
+          website: null
+        } as UserProfile);
       } finally {
         setIsLoading(false);
       }
@@ -217,7 +260,7 @@ export function useUser() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
+      async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           // User signed in, fetch their profile
           fetchUser();
@@ -226,6 +269,8 @@ export function useUser() {
           setUserData(null);
           setOriginalUserData(null);
           setIsImpersonating(false);
+          // Clear all impersonation data
+          clearImpersonationData();
         }
       }
     );
@@ -239,15 +284,15 @@ export function useUser() {
       setUserData(null);
       setOriginalUserData(null);
       setIsImpersonating(false);
-      // Clear impersonation data
-      localStorage.removeItem('originalUserId');
+      // Clear all impersonation data
+      clearImpersonationData();
     } catch (error) {
       console.error('Error signing out:', error);
       // Force clear user data even if signOut fails
       setUserData(null);
       setOriginalUserData(null);
       setIsImpersonating(false);
-      localStorage.removeItem('originalUserId');
+      clearImpersonationData();
     }
   };
 

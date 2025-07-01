@@ -229,6 +229,7 @@ export function DealForm({
             }
             required={true}
             placeholder="Required: Enter email address"
+            label=""
           />
         </div>
         

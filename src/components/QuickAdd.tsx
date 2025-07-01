@@ -659,6 +659,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                     }
                     required={selectedAction !== 'outbound'}
                     placeholder={selectedAction !== 'outbound' ? 'Required: Enter email address' : 'Optional: Enter email address'}
+                    label=""
                   />
                 </div>
                 
@@ -690,6 +691,7 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                         onChange={(e) => setFormData({...formData, outboundType: e.target.value})}
                       >
                         <option value="Call">Call</option>
+                        <option value="Client Call">Client Call</option>
                         <option value="Email">Email</option>
                         <option value="LinkedIn">LinkedIn</option>
                         <option value="Other">Other</option>
@@ -737,11 +739,13 @@ export function QuickAdd({ isOpen, onClose }: QuickAddProps) {
                         onChange={(e) => setFormData({...formData, details: e.target.value})}
                       >
                         <option value="">Select meeting type</option>
-                        <option value="Discovery">Discovery</option>
+                        <option value="Discovery Call">Discovery Call</option>
+                        <option value="Discovery Meeting">Discovery Meeting</option>
+                        <option value="Product Demo">Product Demo</option>
+                        <option value="Client Call">Client Call</option>
+                        <option value="Follow-up">Follow-up</option>
                         <option value="Demo">Demo</option>
-                        <option value="Proposal">Proposal</option>
-                        <option value="Negotiation">Negotiation</option>
-                        <option value="Close">Close</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
                     <div className="space-y-2">

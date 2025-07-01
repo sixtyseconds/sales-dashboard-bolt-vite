@@ -50,38 +50,70 @@ serve(async (req) => {
       .single()
 
     if (profileError || !profile?.is_admin) {
-      throw new Error('Unauthorized')
+      throw new Error('Unauthorized - admin access required')
+    }
+
+    // Get request body
+    const { userId, adminId, adminEmail, redirectTo } = await req.json()
+    
+    if (!userId || !adminId || !adminEmail || !redirectTo) {
+      throw new Error('Missing required parameters')
+    }
+
+    // Verify the admin ID matches the authenticated user
+    if (user.id !== adminId) {
+      throw new Error('Admin ID mismatch')
     }
 
     // Get user to impersonate
-    const { userId } = await req.json()
-    const { data: impersonateUser, error: userError } = await supabaseAdmin
-      .from('profiles')
-      .select('email')
-      .eq('id', userId)
-      .single()
+    const { data: targetUser, error: userError } = await supabaseAdmin.auth.admin.getUserById(userId)
 
-    if (userError || !impersonateUser) {
+    if (userError || !targetUser) {
       throw new Error('User not found')
     }
 
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-8)
+    // Validate that the target user has an email address
+    if (!targetUser.user.email || targetUser.user.email.trim() === '') {
+      throw new Error('Target user does not have a valid email address. Cannot generate magic link for impersonation.')
+    }
 
-    // Update user password
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: tempPassword }
-    )
+    // Generate magic link for the target user
+    const { data: magicLinkData, error: magicLinkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: targetUser.user.email,
+      options: {
+        redirectTo: redirectTo,
+        data: {
+          impersonated_by: adminId,
+          impersonated_by_email: adminEmail,
+          is_impersonation: true
+        }
+      }
+    })
 
-    if (updateError) {
-      throw updateError
+    if (magicLinkError || !magicLinkData) {
+      throw new Error('Failed to generate magic link')
+    }
+
+    // Log the impersonation for audit purposes
+    const { error: logError } = await supabaseAdmin
+      .from('impersonation_logs')
+      .insert({
+        admin_id: adminId,
+        admin_email: adminEmail,
+        target_user_id: userId,
+        target_user_email: targetUser.user.email,
+        action: 'start_impersonation',
+        created_at: new Date().toISOString()
+      })
+
+    if (logError) {
+      console.error('Failed to log impersonation:', logError)
     }
 
     return new Response(
       JSON.stringify({
-        email: impersonateUser.email,
-        password: tempPassword
+        magicLink: magicLinkData.properties.action_link
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -89,6 +121,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Impersonation error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       {
