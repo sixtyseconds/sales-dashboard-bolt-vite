@@ -303,9 +303,7 @@ export default function Roadmap() {
         </div>
 
         {/* Kanban Board */}
-        <div className="bg-gray-900/30 backdrop-blur-xl rounded-xl border border-gray-800/50 p-6">
-          <RoadmapKanban suggestions={filteredSuggestions} />
-        </div>
+        <RoadmapKanban />
       </div>
     </div>
   );
