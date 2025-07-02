@@ -38,14 +38,14 @@ async function rollbackDiscoveryMerge() {
   console.log("AND created_at < '2024-06-01';");
   
   // Show current Discovery count for reference
-  const { data: discoveryCount, error } = await supabase
+  const { data: discoveryData, count: discoveryCount, error } = await supabase
     .from('activities')
     .select('id', { count: 'exact' })
     .eq('type', 'meeting')
     .eq('details', 'Discovery');
 
-  if (!error && discoveryCount) {
-    console.log(`\n📊 Current "Discovery" records that would need to be split: ${discoveryCount.length}`);
+  if (!error && discoveryCount !== null) {
+    console.log(`\n📊 Current "Discovery" records that would need to be split: ${discoveryCount}`);
   }
 }
 

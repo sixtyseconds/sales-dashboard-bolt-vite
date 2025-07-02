@@ -8,6 +8,32 @@ export interface CSVExportOptions {
 }
 
 /**
+ * Properly escapes a value for CSV format
+ * - Wraps in quotes if contains comma, quote, or newline
+ * - Doubles any internal quotes
+ * - Handles null/undefined values
+ */
+const escapeCSVValue = (value: any): string => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  
+  const stringValue = String(value);
+  
+  // Check if the value needs to be quoted (contains comma, quote, newline, or starts/ends with whitespace)
+  const needsQuoting = /[,"\n\r]/.test(stringValue) || 
+                      stringValue.startsWith(' ') || 
+                      stringValue.endsWith(' ');
+  
+  if (needsQuoting) {
+    // Double any existing quotes and wrap in quotes
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  
+  return stringValue;
+};
+
+/**
  * Converts activities data to CSV format and downloads it
  */
 export const exportActivitiesToCSV = (
@@ -38,11 +64,24 @@ export const exportActivitiesToCSV = (
   };
 
   // Determine which columns to include
+  const validColumns = Object.keys(allColumns) as (keyof typeof allColumns)[];
   let columnsToInclude: (keyof typeof allColumns)[];
+  
   if (includeColumns) {
-    columnsToInclude = includeColumns as (keyof typeof allColumns)[];
+    // Validate each column in includeColumns against valid column names
+    columnsToInclude = includeColumns.filter((col): col is keyof typeof allColumns => 
+      validColumns.includes(col as keyof typeof allColumns)
+    ) as (keyof typeof allColumns)[];
+    
+    // Log warning if any invalid columns were filtered out
+    const invalidColumns = includeColumns.filter(col => 
+      !validColumns.includes(col as keyof typeof allColumns)
+    );
+    if (invalidColumns.length > 0) {
+      console.warn(`Invalid column names filtered out from CSV export: ${invalidColumns.join(', ')}`);
+    }
   } else {
-    columnsToInclude = Object.keys(allColumns) as (keyof typeof allColumns)[];
+    columnsToInclude = validColumns;
   }
 
   // Remove excluded columns
@@ -56,27 +95,62 @@ export const exportActivitiesToCSV = (
     return columnsToInclude.map(column => {
       let value = activity[column as keyof Activity];
       
-      // Format specific columns
+      // Format specific columns with proper CSV escaping
       switch (column) {
         case 'date':
-          return value ? format(new Date(value as string), 'yyyy-MM-dd HH:mm') : '';
-        case 'type':
-          return (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
-        case 'status':
-          if (value === 'no_show') return 'No Show';
-          return (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
-        case 'priority':
-          return (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
-        case 'amount':
-          return value ? `£${Number(value).toLocaleString()}` : '';
-        case 'quantity':
-          return value ? value.toString() : '1';
-        default:
-          // Escape quotes and commas for CSV
-          if (typeof value === 'string') {
-            return `"${value.replace(/"/g, '""')}"`;
+          if (!value) return escapeCSVValue('');
+          try {
+            const dateObj = new Date(value as string);
+            // Check if the date is valid
+            if (isNaN(dateObj.getTime())) {
+              console.warn(`Invalid date value in activity: ${value}`);
+              return escapeCSVValue(''); // Return empty string for invalid dates
+            }
+            const formattedDate = format(dateObj, 'yyyy-MM-dd HH:mm');
+            return escapeCSVValue(formattedDate);
+          } catch (error) {
+            console.warn(`Error parsing date for CSV export: ${value}`, error);
+            return escapeCSVValue(''); // Return empty string on parsing error
           }
-          return value?.toString() || '';
+        case 'type':
+          const formattedType = (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
+          return escapeCSVValue(formattedType);
+        case 'status':
+          let formattedStatus = '';
+          if (value === 'no_show') {
+            formattedStatus = 'No Show';
+          } else {
+            formattedStatus = (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
+          }
+          return escapeCSVValue(formattedStatus);
+        case 'priority':
+          const formattedPriority = (value as string)?.charAt(0).toUpperCase() + (value as string)?.slice(1) || '';
+          return escapeCSVValue(formattedPriority);
+        case 'amount':
+          if (!value) return escapeCSVValue('');
+          try {
+            const numericValue = Number(value);
+            if (isNaN(numericValue)) {
+              console.warn(`Invalid amount value in activity: ${value}`);
+              return escapeCSVValue('');
+            }
+            const formattedAmount = `£${numericValue.toLocaleString()}`;
+            return escapeCSVValue(formattedAmount);
+          } catch (error) {
+            console.warn(`Error parsing amount for CSV export: ${value}`, error);
+            return escapeCSVValue('');
+          }
+        case 'quantity':
+          if (!value) return escapeCSVValue('1');
+          try {
+            const quantityValue = value.toString();
+            return escapeCSVValue(quantityValue);
+          } catch (error) {
+            console.warn(`Error formatting quantity for CSV export: ${value}`, error);
+            return escapeCSVValue('1');
+          }
+        default:
+          return escapeCSVValue(value);
       }
     });
   });
@@ -88,18 +162,26 @@ export const exportActivitiesToCSV = (
   ].join('\n');
 
   // Create and download the file
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  
-  if (link.download !== undefined) {
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  try {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } else {
+      throw new Error('File download not supported in this browser');
+    }
+  } catch (error) {
+    console.error('Error downloading CSV file:', error);
+    alert('Failed to download CSV file. Please try again or contact support if the problem persists.');
+    throw error; // Re-throw to allow calling code to handle if needed
   }
 };
 
@@ -123,13 +205,23 @@ export const getExportSummary = (activities: Activity[]) => {
     // Count activity types
     summary.activityTypes[activity.type] = (summary.activityTypes[activity.type] || 0) + 1;
     
-    // Track date range
-    const activityDate = new Date(activity.date);
-    if (!summary.dateRange.start || activityDate < summary.dateRange.start) {
-      summary.dateRange.start = activityDate;
-    }
-    if (!summary.dateRange.end || activityDate > summary.dateRange.end) {
-      summary.dateRange.end = activityDate;
+    // Track date range with error handling
+    try {
+      const activityDate = new Date(activity.date);
+      // Check if the date is valid
+      if (!isNaN(activityDate.getTime())) {
+        if (!summary.dateRange.start || activityDate < summary.dateRange.start) {
+          summary.dateRange.start = activityDate;
+        }
+        if (!summary.dateRange.end || activityDate > summary.dateRange.end) {
+          summary.dateRange.end = activityDate;
+        }
+      } else {
+        console.warn(`Invalid date value in activity for summary: ${activity.date} (Activity ID: ${activity.id || 'unknown'})`);
+      }
+    } catch (error) {
+      console.warn(`Error parsing date for export summary: ${activity.date} (Activity ID: ${activity.id || 'unknown'})`, error);
+      // Continue processing other activities even if this one has a bad date
     }
     
     // Sum revenue

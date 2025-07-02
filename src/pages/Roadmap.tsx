@@ -29,15 +29,50 @@ interface StatCardProps {
   subtitle?: string;
 }
 
+const colorClasses = {
+  gray: {
+    bg: 'bg-gray-500/10',
+    border: 'border-gray-500/20',
+    text: 'text-gray-500'
+  },
+  yellow: {
+    bg: 'bg-yellow-500/10',
+    border: 'border-yellow-500/20',
+    text: 'text-yellow-500'
+  },
+  blue: {
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+    text: 'text-blue-500'
+  },
+  purple: {
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/20',
+    text: 'text-purple-500'
+  },
+  green: {
+    bg: 'bg-green-500/10',
+    border: 'border-green-500/20',
+    text: 'text-green-500'
+  },
+  red: {
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/20',
+    text: 'text-red-500'
+  }
+} as const;
+
 function StatCard({ title, value, icon: Icon, color, subtitle }: StatCardProps) {
+  const colorClass = colorClasses[color as keyof typeof colorClasses] || colorClasses.gray;
+  
   return (
     <motion.div
       whileHover={{ y: -2 }}
       className="bg-gray-900/50 backdrop-blur-xl rounded-xl p-6 border border-gray-800/50"
     >
       <div className="flex items-center gap-4">
-        <div className={`p-3 rounded-lg bg-${color}-500/10 border border-${color}-500/20`}>
-          <Icon className={`w-6 h-6 text-${color}-500`} />
+        <div className={`p-3 rounded-lg ${colorClass.bg} border ${colorClass.border}`}>
+          <Icon className={`w-6 h-6 ${colorClass.text}`} />
         </div>
         <div>
           <p className="text-sm text-gray-400">{title}</p>

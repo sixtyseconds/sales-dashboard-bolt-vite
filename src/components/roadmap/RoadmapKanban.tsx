@@ -170,19 +170,15 @@ export function RoadmapKanban({ suggestions }: RoadmapKanbanProps) {
     }
   };
 
+  const priorityColorClasses = {
+    critical: 'text-red-500 bg-red-500/10 border-red-500/20',
+    high: 'text-orange-500 bg-orange-500/10 border-orange-500/20',
+    medium: 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20',
+    low: 'text-green-500 bg-green-500/10 border-green-500/20'
+  } as const;
+
   const getPriorityColor = (priority: RoadmapSuggestion['priority']) => {
-    switch (priority) {
-      case 'critical':
-        return 'text-red-500 bg-red-500/10 border-red-500/20';
-      case 'high':
-        return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
-      case 'medium':
-        return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-      case 'low':
-        return 'text-green-500 bg-green-500/10 border-green-500/20';
-      default:
-        return 'text-gray-500 bg-gray-500/10 border-gray-500/20';
-    }
+    return priorityColorClasses[priority] || 'text-gray-500 bg-gray-500/10 border-gray-500/20';
   };
 
   return (

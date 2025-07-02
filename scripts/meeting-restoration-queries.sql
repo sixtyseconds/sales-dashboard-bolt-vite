@@ -47,31 +47,53 @@ ORDER BY ah.changed_at DESC;
 */
 
 -- 4. Update "Product Demo" to "Demo" (if not already done)
+BEGIN TRANSACTION;
+
 UPDATE activities
 SET details = 'Demo',
     updated_at = NOW()
 WHERE type = 'meeting' 
     AND details = 'Product Demo';
 
+-- Check the number of affected rows before committing
+-- If this returns an unexpected number, you can ROLLBACK instead of COMMIT
+SELECT 'Updated ' || ROW_COUNT() || ' records from "Product Demo" to "Demo"';
+
+COMMIT;
+
 -- 5. Sample query to restore specific meeting types based on patterns
 -- IMPORTANT: Only run these if you have identified clear patterns
 
 -- Example: If you know certain users always used "Discovery" not "Discovery Call"
 /*
+BEGIN TRANSACTION;
+
 UPDATE activities
 SET details = 'Discovery'
 WHERE type = 'meeting' 
     AND details = 'Discovery Call'
     AND user_id IN (SELECT id FROM profiles WHERE /* your criteria */);
+
+-- Verify the changes before committing
+SELECT 'Updated ' || ROW_COUNT() || ' user-specific records to "Discovery"';
+
+COMMIT;
 */
 
 -- Example: If you know meetings before a certain date used different terminology
 /*
+BEGIN TRANSACTION;
+
 UPDATE activities
 SET details = 'Discovery'
 WHERE type = 'meeting' 
     AND details = 'Discovery Call'
     AND created_at < '2024-01-01';
+
+-- Verify the changes before committing
+SELECT 'Updated ' || ROW_COUNT() || ' date-based records to "Discovery"';
+
+COMMIT;
 */
 
 -- 6. Add any missing "Proposal" meetings if they were incorrectly categorized

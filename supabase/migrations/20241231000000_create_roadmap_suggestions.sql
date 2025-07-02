@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Create roadmap suggestions table
 CREATE TABLE IF NOT EXISTS roadmap_suggestions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -82,7 +84,17 @@ CREATE POLICY "Users can create roadmap suggestions" ON roadmap_suggestions
 CREATE POLICY "Users can update their own suggestions" ON roadmap_suggestions
   FOR UPDATE
   USING (submitted_by = auth.uid())
-  WITH CHECK (submitted_by = auth.uid());
+  WITH CHECK (
+    submitted_by = auth.uid() AND
+    -- Only allow updates to these specific fields
+    (OLD.id = NEW.id) AND
+    (OLD.submitted_by = NEW.submitted_by) AND
+    (OLD.status = NEW.status) AND
+    (OLD.votes_count = NEW.votes_count) AND
+    (OLD.assigned_to = NEW.assigned_to) AND
+    (OLD.created_at = NEW.created_at) AND
+    (OLD.submitted_at = NEW.submitted_at)
+  );
 
 -- Admins can update any suggestion
 CREATE POLICY "Admins can update any roadmap suggestion" ON roadmap_suggestions
@@ -156,23 +168,35 @@ CREATE POLICY "Admins can manage any roadmap comment" ON roadmap_comments
   );
 
 -- Function to update votes count when votes are added/removed
+-- Uses atomic updates to prevent race conditions and negative counts
 CREATE OR REPLACE FUNCTION update_suggestion_votes_count()
 RETURNS TRIGGER AS $$
+DECLARE
+  suggestion_id_to_update UUID;
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    UPDATE roadmap_suggestions 
-    SET votes_count = votes_count + 1,
-        updated_at = NOW()
-    WHERE id = NEW.suggestion_id;
-    RETURN NEW;
+    suggestion_id_to_update := NEW.suggestion_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE roadmap_suggestions 
-    SET votes_count = votes_count - 1,
-        updated_at = NOW()
-    WHERE id = OLD.suggestion_id;
+    suggestion_id_to_update := OLD.suggestion_id;
+  ELSE
+    RETURN NULL;
+  END IF;
+
+  -- Atomically recompute votes_count from actual vote records
+  UPDATE roadmap_suggestions 
+  SET votes_count = (
+    SELECT COUNT(*)
+    FROM roadmap_votes 
+    WHERE suggestion_id = suggestion_id_to_update
+  ),
+  updated_at = NOW()
+  WHERE id = suggestion_id_to_update;
+
+  IF TG_OP = 'INSERT' THEN
+    RETURN NEW;
+  ELSE
     RETURN OLD;
   END IF;
-  RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuditLogs, formatAuditChanges, getChangeDescription } from '@/lib/hooks/useAuditLogs';
 import { format } from 'date-fns';
 import { 
@@ -20,6 +20,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AuditLog } from '@/lib/hooks/useAuditLogs';
 
+interface AuditLogSearchParams {
+  tableName?: string;
+  recordId?: string;
+  userId?: string;
+  action?: 'INSERT' | 'UPDATE' | 'DELETE';
+  startDate?: Date;
+  endDate?: Date;
+  changedField?: string;
+}
+
 export default function AuditLogs() {
   const { isAdmin, loading, error, getRecentAuditLogs, searchAuditLogs } = useAuditLogs();
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -32,33 +42,37 @@ export default function AuditLogs() {
     end: null
   });
 
-  useEffect(() => {
-    if (isAdmin) {
-      loadRecentLogs();
-    }
-  }, [isAdmin]);
-
-  const loadRecentLogs = async () => {
+  const loadRecentLogs = useCallback(async () => {
     try {
       const data = await getRecentAuditLogs(100);
       setLogs(data);
     } catch (err) {
+      // Error is already handled by the useAuditLogs hook's setError
+      // The error state will be displayed in the UI automatically
       console.error('Failed to load audit logs:', err);
     }
-  };
+  }, [getRecentAuditLogs]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadRecentLogs();
+    }
+  }, [isAdmin, loadRecentLogs]);
 
   const handleSearch = async () => {
     try {
-      const searchParams: any = {};
+      const searchParams: AuditLogSearchParams = {};
       
       if (selectedTable) searchParams.tableName = selectedTable;
-      if (selectedAction) searchParams.action = selectedAction as any;
+      if (selectedAction) searchParams.action = selectedAction as 'INSERT' | 'UPDATE' | 'DELETE';
       if (dateRange.start) searchParams.startDate = dateRange.start;
       if (dateRange.end) searchParams.endDate = dateRange.end;
       
       const data = await searchAuditLogs(searchParams);
       setLogs(data);
     } catch (err) {
+      // Error is already handled by the useAuditLogs hook's setError
+      // The error state will be displayed in the UI automatically
       console.error('Failed to search audit logs:', err);
     }
   };
