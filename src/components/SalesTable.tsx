@@ -23,7 +23,8 @@ import {
   UploadCloud, // Added for potential use in import component
   Filter,
   X,
-  Search
+  Search,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useActivities, Activity } from '@/lib/hooks/useActivities';
@@ -43,6 +44,7 @@ import { IdentifierType } from '../components/IdentifierField';
 import { EditActivityForm } from './EditActivityForm';
 import { useActivityFilters } from '@/lib/hooks/useActivityFilters';
 import { ActivityUploadModal } from './admin/ActivityUploadModal'; // Import the new modal
+import { exportActivitiesToCSV, getExportSummary } from '@/lib/utils/csvExport';
 // ActivityFilters component created inline to avoid import issues
 
 // Define type for date range presets
@@ -165,9 +167,9 @@ export function SalesTable() {
           if (filterType === 'discovery call' || filterType === 'discovery meeting') {
             // Match either "Discovery Call" or "Discovery Meeting" when user selects either discovery option
             matchesSubType = details.includes('discovery call') || details.includes('discovery meeting');
-          } else if (filterType === 'product demo' || filterType === 'demo') {
-            // Match either "Product Demo" or "Demo" 
-            matchesSubType = details.includes('product demo') || details.includes('demo');
+          } else if (filterType === 'demo') {
+            // Match "Demo" 
+            matchesSubType = details.includes('demo');
           } else {
             // For other types (Follow-up, Other), match exactly
             matchesSubType = details.includes(filterType);
@@ -218,7 +220,7 @@ export function SalesTable() {
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
     const activeDeals = filteredActivities
-      .filter(a => a.status === 'completed').length; // Assuming completed = won deal
+      .filter(a => a.type === 'sale' && a.status === 'completed').length; // Only count completed sales as won deals
     const salesActivities = filteredActivities.filter(a => a.type === 'sale').length;
     const proposalActivities = filteredActivities.filter(a => a.type === 'proposal').length;
     const meetingActivities = filteredActivities.filter(a => a.type === 'meeting').length;
@@ -244,7 +246,7 @@ export function SalesTable() {
       .filter(a => a.type === 'sale')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
     const activeDeals = previousPeriodActivities
-      .filter(a => a.status === 'completed').length;
+      .filter(a => a.type === 'sale' && a.status === 'completed').length; // Only count completed sales as won deals
     const salesActivities = previousPeriodActivities.filter(a => a.type === 'sale').length;
     const proposalActivities = previousPeriodActivities.filter(a => a.type === 'proposal').length;
     const meetingActivities = previousPeriodActivities.filter(a => a.type === 'meeting').length;
@@ -608,6 +610,30 @@ export function SalesTable() {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(value);
   };
 
+  // Handle CSV export
+  const handleExportCSV = () => {
+    try {
+      if (filteredActivities.length === 0) {
+        toast.error('No data to export. Please adjust your filters.');
+        return;
+      }
+
+      const summary = getExportSummary(filteredActivities);
+      const dateRangeText = summary.dateRange.start && summary.dateRange.end 
+        ? `${format(summary.dateRange.start, 'yyyy-MM-dd')}-to-${format(summary.dateRange.end, 'yyyy-MM-dd')}`
+        : format(new Date(), 'yyyy-MM-dd');
+      
+      const filename = `sales-activities-${dateRangeText}.csv`;
+      
+      exportActivitiesToCSV(filteredActivities, { filename });
+      
+      toast.success(`Exported ${filteredActivities.length} activities to ${filename}`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export data. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -631,6 +657,16 @@ export function SalesTable() {
                   Show All Types
                 </Button>
               )}
+              <Button
+                onClick={handleExportCSV}
+                variant="outline"
+                size="sm"
+                className="bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                disabled={filteredActivities.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV ({filteredActivities.length})
+              </Button>
               <select
                 value={selectedRangeType}
                 onChange={(e) => setSelectedRangeType(e.target.value as DateRangePreset)}
@@ -804,11 +840,11 @@ export function SalesTable() {
                           )}
                           {filters.type === 'meeting' && (
                             <>
-                              <option value="Discovery Call">Discovery Call</option>
-                              <option value="Discovery Meeting">Discovery Meeting</option>
-                              <option value="Product Demo">Product Demo</option>
-                              <option value="Follow-up">Follow-up</option>
+                              <option value="Discovery">Discovery</option>
                               <option value="Demo">Demo</option>
+                              <option value="Follow-up">Follow-up</option>
+                              <option value="Proposal">Proposal</option>
+                              <option value="Client Call">Client Call</option>
                               <option value="Other">Other</option>
                             </>
                           )}
