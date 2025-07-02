@@ -17,16 +17,14 @@ import {
   horizontalListSortingStrategy,
   arrayMove,
 } from '@dnd-kit/sortable';
-import { PipelineProvider, usePipeline } from '@/lib/contexts/PipelineContext';
-import { PipelineHeader } from '../pipeline/PipelineHeader';
-import { PipelineColumn } from '../pipeline/PipelineColumn';
-import { DealCard } from '../pipeline/DealCard';
-import { DealForm } from '../pipeline/DealForm';
-import { PipelineTable } from '../pipeline/PipelineTable';
-import { OwnerFilter } from '@/components/OwnerFilter';
+import { RoadmapProvider, useRoadmapContext } from '@/lib/contexts/RoadmapContext';
+import { RoadmapHeader } from './RoadmapHeader';
+import { RoadmapColumn } from './RoadmapColumn';
+import { SuggestionCard } from './SuggestionCard';
+import { SuggestionForm } from './SuggestionForm';
+import { RoadmapTable } from './RoadmapTable';
 
 import { Loader2 } from 'lucide-react';
-import EditDealModal from '@/components/EditDealModal';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase/clientV2';
 import { ConfettiService } from '@/lib/services/confettiService';
@@ -57,7 +55,7 @@ function Modal({ isOpen, onClose, children }: ModalProps) {
   );
 }
 
-function PipelineSkeleton() {
+function RoadmapSkeleton() {
   return (
     <div className="space-y-6">
       <div className="mb-6 space-y-4">
@@ -72,7 +70,7 @@ function PipelineSkeleton() {
         </div>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-6">
-        {[1, 2, 3, 4, 5].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <div
             key={i}
             className="min-w-[320px] bg-gray-900/50 rounded-xl border border-gray-800/50 flex flex-col h-[600px]"
@@ -98,81 +96,81 @@ function PipelineSkeleton() {
 
 // --- DRAG AND DROP IMPROVEMENTS ---
 
-function PipelineContent() {
+function RoadmapContent() {
   const {
-    deals,
-    stages,
+    suggestions,
+    statuses,
     isLoading,
     error,
-    dealsByStage: contextDealsByStage,
-    createDeal,
-    updateDeal,
-    deleteDeal,
-    moveDealToStage,
-    forceUpdateDealStage,
-    refreshDeals,
-    selectedOwnerId,
-    setSelectedOwnerId
-  } = usePipeline();
+    suggestionsByStatus: contextSuggestionsByStatus,
+    createSuggestion,
+    updateSuggestion,
+    deleteSuggestion,
+    moveSuggestionToStatus,
+    voteForSuggestion,
+    removeVote,
+    refreshSuggestions
+  } = useRoadmapContext();
 
   const [view, setView] = useState<'kanban' | 'table'>('kanban');
-  const [localDealsByStage, setLocalDealsByStage] = useState<Record<string, any[]>>({});
-  const [showDealForm, setShowDealForm] = useState(false);
-  const [selectedDeal, setSelectedDeal] = useState<any>(null);
-  const [initialStageId, setInitialStageId] = useState<string | null>(null);
-  const [activeDeal, setActiveDeal] = useState<any>(null);
-  const [sortBy, setSortBy] = useState<'value' | 'date' | 'alpha' | 'none'>('none');
+  const [localSuggestionsByStatus, setLocalSuggestionsByStatus] = useState<Record<string, any[]>>({});
+  const [showSuggestionForm, setShowSuggestionForm] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] = useState<any>(null);
+  const [initialStatusId, setInitialStatusId] = useState<string | null>(null);
+  const [activeSuggestion, setActiveSuggestion] = useState<any>(null);
+  const [sortBy, setSortBy] = useState<'votes' | 'date' | 'priority' | 'none'>('none');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // DnD state
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [draggedFromStage, setDraggedFromStage] = useState<string | null>(null);
-  const [draggedOverStage, setDraggedOverStage] = useState<string | null>(null);
+  const [draggedFromStatus, setDraggedFromStatus] = useState<string | null>(null);
+  const [draggedOverStatus, setDraggedOverStatus] = useState<string | null>(null);
   const [draggedOverIndex, setDraggedOverIndex] = useState<number | null>(null);
 
-  // Keep a ref to the last valid over stage for drop fallback
-  const lastValidOverStageRef = useRef<string | null>(null);
+  // Keep a ref to the last valid over status for drop fallback
+  const lastValidOverStatusRef = useRef<string | null>(null);
 
-  // State for the complex EditDealModal
+  // State for the edit modal
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Update local state when the context data changes
   useEffect(() => {
-    setLocalDealsByStage(structuredClone(contextDealsByStage));
-  }, [contextDealsByStage]);
+    setLocalSuggestionsByStatus(structuredClone(contextSuggestionsByStatus));
+  }, [contextSuggestionsByStatus]);
 
   // Apply sorting to the local state
   useEffect(() => {
     if (sortBy === 'none') {
-      setLocalDealsByStage(contextDealsByStage);
+      setLocalSuggestionsByStatus(contextSuggestionsByStatus);
       return;
     }
-    const sortedDeals = { ...localDealsByStage };
-    Object.keys(sortedDeals).forEach(stageId => {
-      sortedDeals[stageId] = [...sortedDeals[stageId]].sort((a, b) => {
+    const sortedSuggestions = { ...localSuggestionsByStatus };
+    Object.keys(sortedSuggestions).forEach(statusId => {
+      sortedSuggestions[statusId] = [...sortedSuggestions[statusId]].sort((a, b) => {
         switch (sortBy) {
-          case 'value':
-            return b.value - a.value;
+          case 'votes':
+            return b.votes_count - a.votes_count;
           case 'date':
-            return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-          case 'alpha':
-            return (a.company || '').localeCompare(b.company || '');
+            return new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime();
+          case 'priority':
+            const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+            return priorityOrder[a.priority] - priorityOrder[b.priority];
           default:
             return 0;
         }
       });
     });
-    setLocalDealsByStage(sortedDeals);
-  }, [sortBy, contextDealsByStage]);
+    setLocalSuggestionsByStatus(sortedSuggestions);
+  }, [sortBy, contextSuggestionsByStatus]);
 
   useEffect(() => {
     return () => {
       setDraggedId(null);
-      setDraggedFromStage(null);
-      setDraggedOverStage(null);
+      setDraggedFromStatus(null);
+      setDraggedOverStatus(null);
       setDraggedOverIndex(null);
-      lastValidOverStageRef.current = null;
-      setActiveDeal(null);
+      lastValidOverStatusRef.current = null;
+      setActiveSuggestion(null);
     };
   }, []);
 
@@ -185,134 +183,140 @@ function PipelineContent() {
     })
   );
 
-  const handleAddDealClick = (stageId: string | null = null) => {
-    setSelectedDeal(null);
-    setInitialStageId(stageId);
-    setShowDealForm(true);
+  const handleAddSuggestionClick = (statusId: string | null = null) => {
+    setSelectedSuggestion(null);
+    setInitialStatusId(statusId);
+    setShowSuggestionForm(true);
   };
 
-  const handleDealClick = (deal: any) => {
-    const foundDeal = deals.find(d => d.id === deal.id);
-    setSelectedDeal(foundDeal);
+  const handleSuggestionClick = (suggestion: any) => {
+    const foundSuggestion = suggestions.find(s => s.id === suggestion.id);
+    setSelectedSuggestion(foundSuggestion);
     setIsEditModalOpen(true);
-    setInitialStageId(null);
+    setInitialStatusId(null);
   };
 
-  const handleSaveDeal = async (formData: any) => {
+  const handleSaveSuggestion = async (formData: any) => {
     let success = false;
-    let savedOrCreatedDeal = null; // To hold the result for logging
+    let savedOrCreatedSuggestion = null;
 
-    if (selectedDeal) {
-      success = await updateDeal(selectedDeal.id, formData);
-    } else {
-      savedOrCreatedDeal = await createDeal(formData);
-      success = !!savedOrCreatedDeal;
+    try {
+      if (selectedSuggestion) {
+        await updateSuggestion(selectedSuggestion.id, formData);
+        success = true;
+      } else {
+        savedOrCreatedSuggestion = await createSuggestion(formData);
+        success = !!savedOrCreatedSuggestion;
+      }
+
+      if (success) {
+        setShowSuggestionForm(false);
+        setIsEditModalOpen(false);
+        toast.success(selectedSuggestion ? 'Suggestion updated' : 'Suggestion created');
+      }
+    } catch (error) {
+      toast.error('Failed to save suggestion');
     }
-
-    if (success) {
-      setShowDealForm(false);
-      setIsEditModalOpen(false);
-          }
   };
 
 
 
-  // Find the stageId for a given dealId or stageId
-  const findStageForId = (id: string): string | undefined => {
-    if (id in localDealsByStage) return id;
-    return Object.keys(localDealsByStage).find(stageId =>
-      localDealsByStage[stageId].some(deal => deal.id === id)
+  // Find the statusId for a given suggestionId or statusId
+  const findStatusForId = (id: string): string | undefined => {
+    if (id in localSuggestionsByStatus) return id;
+    return Object.keys(localSuggestionsByStatus).find(statusId =>
+      localSuggestionsByStatus[statusId].some(suggestion => suggestion.id === id)
     );
   };
 
   // --- DND HANDLERS ---
 
-  // On drag start, set the draggedId and fromStage, and set activeDeal for overlay
+  // On drag start, set the draggedId and fromStatus, and set activeSuggestion for overlay
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     const id = String(active.id);
     setDraggedId(id);
-    const fromStage = findStageForId(id);
-    setDraggedFromStage(fromStage || null);
-    setDraggedOverStage(fromStage || null);
+    const fromStatus = findStatusForId(id);
+    setDraggedFromStatus(fromStatus || null);
+    setDraggedOverStatus(fromStatus || null);
     setDraggedOverIndex(
-      fromStage && localDealsByStage[fromStage]
-        ? localDealsByStage[fromStage].findIndex(d => d.id === id)
+      fromStatus && localSuggestionsByStatus[fromStatus]
+        ? localSuggestionsByStatus[fromStatus].findIndex(s => s.id === id)
         : null
     );
-    // Set activeDeal for overlay
-    let deal = null;
-    for (const stageId in localDealsByStage) {
-      deal = localDealsByStage[stageId].find(d => d.id === id);
-      if (deal) break;
+    // Set activeSuggestion for overlay
+    let suggestion = null;
+    for (const statusId in localSuggestionsByStatus) {
+      suggestion = localSuggestionsByStatus[statusId].find(s => s.id === id);
+      if (suggestion) break;
     }
-    setActiveDeal(deal);
+    setActiveSuggestion(suggestion);
     // Disable sorting during drag
     if (sortBy !== 'none') setSortBy('none');
   };
 
-  // On drag over, update the localDealsByStage for visual feedback
+  // On drag over, update the localSuggestionsByStatus for visual feedback
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
     if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    const fromStage = findStageForId(activeId);
-    let toStage = findStageForId(overId);
+    const fromStatus = findStatusForId(activeId);
+    let toStatus = findStatusForId(overId);
 
-    // If overId is a stageId (column), use it directly
-    if (!toStage && stages.find(s => s.id === overId)) {
-      toStage = overId;
+    // If overId is a statusId (column), use it directly
+    if (!toStatus && statuses.find(s => s.id === overId)) {
+      toStatus = overId;
     }
-    if (!fromStage || !toStage) return;
+    if (!fromStatus || !toStatus) return;
 
-    // If dropped on the same stage and same position, do nothing
-    if (fromStage === toStage && overId === activeId) return;
+    // If dropped on the same status and same position, do nothing
+    if (fromStatus === toStatus && overId === activeId) return;
 
-    // Find the index in the target stage
-    let toIndex = localDealsByStage[toStage].findIndex(d => d.id === overId);
-    if (toIndex === -1 || overId === toStage) {
+    // Find the index in the target status
+    let toIndex = localSuggestionsByStatus[toStatus].findIndex(s => s.id === overId);
+    if (toIndex === -1 || overId === toStatus) {
       // If dropped on the column itself or empty space, add to end
-      toIndex = localDealsByStage[toStage].length;
+      toIndex = localSuggestionsByStatus[toStatus].length;
     }
 
     // Prevent unnecessary updates
     if (
       draggedId === activeId &&
-      draggedFromStage === fromStage &&
-      draggedOverStage === toStage &&
+      draggedFromStatus === fromStatus &&
+      draggedOverStatus === toStatus &&
       draggedOverIndex === toIndex
     ) {
       return;
     }
 
-    // Store last valid over stage for drop fallback
-    lastValidOverStageRef.current = toStage;
+    // Store last valid over status for drop fallback
+    lastValidOverStatusRef.current = toStatus;
 
-    // Optimistically update localDealsByStage for visual feedback
-    setLocalDealsByStage(prev => {
-      // Remove from old stage
-      const fromDeals = [...prev[fromStage]];
-      const dealIdx = fromDeals.findIndex(d => d.id === activeId);
-      if (dealIdx === -1) return prev;
-      const [deal] = fromDeals.splice(dealIdx, 1);
+    // Optimistically update localSuggestionsByStatus for visual feedback
+    setLocalSuggestionsByStatus(prev => {
+      // Remove from old status
+      const fromSuggestions = [...prev[fromStatus]];
+      const suggestionIdx = fromSuggestions.findIndex(s => s.id === activeId);
+      if (suggestionIdx === -1) return prev;
+      const [suggestion] = fromSuggestions.splice(suggestionIdx, 1);
 
-      // Insert into new stage
-      const toDeals = [...prev[toStage]];
+      // Insert into new status
+      const toSuggestions = [...prev[toStatus]];
       // Prevent duplicate
-      if (!toDeals.some(d => d.id === activeId)) {
-        toDeals.splice(toIndex, 0, { ...deal, stage_id: toStage });
+      if (!toSuggestions.some(s => s.id === activeId)) {
+        toSuggestions.splice(toIndex, 0, { ...suggestion, status: toStatus });
       }
 
       return {
         ...prev,
-        [fromStage]: fromDeals,
-        [toStage]: toDeals,
+        [fromStatus]: fromSuggestions,
+        [toStatus]: toSuggestions,
       };
     });
 
-    setDraggedOverStage(toStage);
+    setDraggedOverStatus(toStatus);
     setDraggedOverIndex(toIndex);
   };
 
@@ -321,123 +325,115 @@ function PipelineContent() {
     const { active, over } = event;
     const activeId = String(active.id);
 
-    // Determine the final stage
-    let toStage = over ? findStageForId(String(over.id)) : null;
-    if (!toStage && over && stages.find(s => s.id === String(over.id))) {
-      toStage = String(over.id);
+    // Determine the final status
+    let toStatus = over ? findStatusForId(String(over.id)) : null;
+    if (!toStatus && over && statuses.find(s => s.id === String(over.id))) {
+      toStatus = String(over.id);
     }
-    if (!toStage) {
-      toStage = lastValidOverStageRef.current;
+    if (!toStatus) {
+      toStatus = lastValidOverStatusRef.current;
     }
-    const fromStage = draggedFromStage;
+    const fromStatus = draggedFromStatus;
 
     // If no move, cleanup and return
-    if (!fromStage || !toStage || fromStage === toStage) {
+    if (!fromStatus || !toStatus || fromStatus === toStatus) {
       setDraggedId(null);
-      setDraggedFromStage(null);
-      setDraggedOverStage(null);
+      setDraggedFromStatus(null);
+      setDraggedOverStatus(null);
       setDraggedOverIndex(null);
-      setActiveDeal(null);
-      lastValidOverStageRef.current = null;
+      setActiveSuggestion(null);
+      lastValidOverStatusRef.current = null;
       return;
     }
 
-    // Find the deal and its new index
+    // Find the suggestion and its new index
     let toIndex = draggedOverIndex;
     if (over) {
       const overId = String(over.id);
-      toIndex = localDealsByStage[toStage].findIndex(d => d.id === overId);
-      if (toIndex === -1 || overId === toStage) {
-        toIndex = localDealsByStage[toStage].length;
+      toIndex = localSuggestionsByStatus[toStatus].findIndex(s => s.id === overId);
+      if (toIndex === -1 || overId === toStatus) {
+        toIndex = localSuggestionsByStatus[toStatus].length;
       }
     } else if (toIndex == null) {
-      toIndex = localDealsByStage[toStage].length;
+      toIndex = localSuggestionsByStatus[toStatus].length;
     }
 
-    // Update localDealsByStage for final state
-    setLocalDealsByStage(prev => {
-      // Remove from old stage
-      const fromDeals = [...prev[fromStage]];
-      const dealIdx = fromDeals.findIndex(d => d.id === activeId);
-      if (dealIdx === -1) return prev;
-      const [deal] = fromDeals.splice(dealIdx, 1);
+    // Update localSuggestionsByStatus for final state
+    setLocalSuggestionsByStatus(prev => {
+      // Remove from old status
+      const fromSuggestions = [...prev[fromStatus]];
+      const suggestionIdx = fromSuggestions.findIndex(s => s.id === activeId);
+      if (suggestionIdx === -1) return prev;
+      const [suggestion] = fromSuggestions.splice(suggestionIdx, 1);
 
-      // Insert into new stage
-      const toDeals = [...prev[toStage]];
+      // Insert into new status
+      const toSuggestions = [...prev[toStatus]];
       // Remove if already present (shouldn't happen, but for safety)
-      const existingIdx = toDeals.findIndex(d => d.id === activeId);
-      if (existingIdx !== -1) toDeals.splice(existingIdx, 1);
-      toDeals.splice(toIndex!, 0, { ...deal, stage_id: toStage });
+      const existingIdx = toSuggestions.findIndex(s => s.id === activeId);
+      if (existingIdx !== -1) toSuggestions.splice(existingIdx, 1);
+      toSuggestions.splice(toIndex!, 0, { ...suggestion, status: toStatus });
 
       return {
         ...prev,
-        [fromStage]: fromDeals,
-        [toStage]: toDeals,
+        [fromStatus]: fromSuggestions,
+        [toStatus]: toSuggestions,
       };
     });
 
     // Persist to DB
     try {
-      const updatePayload = {
-        stage_id: toStage,
-        stage_changed_at: new Date().toISOString(),
-      };
-      const { error } = await supabase
-        .from('deals')
-        .update(updatePayload)
-        .eq('id', activeId)
-        .select();
-      if (error) throw error;
-
-      // Celebrate if moved to Closed Won
-      const closedWonStage = stages.find(
-        stage => stage.name.toLowerCase() === 'closed won'
-      );
-      if (closedWonStage && toStage === closedWonStage.id) {
+      await moveSuggestionToStatus(activeId, toStatus);
+      
+      // Celebrate if moved to Completed
+      if (toStatus === 'completed') {
         ConfettiService.celebrate();
       }
       setTimeout(() => {
         setRefreshKey(prev => prev + 1);
       }, 100);
     } catch (err) {
-      // Optionally: rollback UI or show error
-      toast.error('Failed to move deal. Please try again.');
+      // Rollback UI on error
+      toast.error('Failed to move suggestion. Please try again.');
+      setLocalSuggestionsByStatus(contextSuggestionsByStatus);
     }
 
     // Cleanup
     setDraggedId(null);
-    setDraggedFromStage(null);
-    setDraggedOverStage(null);
+    setDraggedFromStatus(null);
+    setDraggedOverStatus(null);
     setDraggedOverIndex(null);
-    setActiveDeal(null);
-    lastValidOverStageRef.current = null;
+    setActiveSuggestion(null);
+    lastValidOverStatusRef.current = null;
   };
 
-  const handleDeleteDeal = async (dealId: string) => {
-    await deleteDeal(dealId);
+  const handleDeleteSuggestion = async (suggestionId: string) => {
+    try {
+      await deleteSuggestion(suggestionId);
+      toast.success('Suggestion deleted');
+    } catch (error) {
+      toast.error('Failed to delete suggestion');
+    }
   };
 
   if (isLoading) {
-    return <PipelineSkeleton />;
+    return <RoadmapSkeleton />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <div className="text-red-500 mb-4">Error loading pipeline data</div>
-        <div className="text-gray-400">{error.message}</div>
+        <div className="text-red-500 mb-4">Error loading roadmap data</div>
+        <div className="text-gray-400">{error}</div>
       </div>
     );
   }
 
   return (
     <>
-      <PipelineHeader
-        onAddDealClick={() => handleAddDealClick()}
+      <RoadmapHeader
+        onAddSuggestionClick={() => handleAddSuggestionClick()}
         view={view}
         onViewChange={setView}
-        selectedOwnerId={selectedOwnerId}
-        onOwnerChange={setSelectedOwnerId}
         sortBy={sortBy}
         onSortChange={setSortBy}
       />
@@ -466,26 +462,26 @@ function PipelineContent() {
             }}
           >
             <div className="grid gap-3 pb-6 overflow-x-auto" style={{
-              gridTemplateColumns: stages.length <= 4 
-                ? `repeat(${stages.length}, minmax(280px, 1fr))`
-                : `repeat(${stages.length}, minmax(280px, 350px))`,
+              gridTemplateColumns: statuses.length <= 4 
+                ? `repeat(${statuses.length}, minmax(280px, 1fr))`
+                : `repeat(${statuses.length}, minmax(280px, 350px))`,
               maxWidth: '100%'
             }}>
-              {stages.map(stage => (
-                <PipelineColumn
-                  key={stage.id}
-                  stage={stage}
-                  deals={localDealsByStage[stage.id] || []}
-                  onAddDealClick={() => handleAddDealClick(stage.id)}
-                  onDealClick={handleDealClick}
+              {statuses.map(status => (
+                <RoadmapColumn
+                  key={status.id}
+                  status={status}
+                  suggestions={localSuggestionsByStatus[status.id] || []}
+                  onAddSuggestionClick={() => handleAddSuggestionClick(status.id)}
+                  onSuggestionClick={handleSuggestionClick}
                 />
               ))}
             </div>
             <DragOverlay>
-              {activeDeal && (
-                <DealCard
-                  key={`overlay-${activeDeal.id}`}
-                  deal={activeDeal}
+              {activeSuggestion && (
+                <SuggestionCard
+                  key={`overlay-${activeSuggestion.id}`}
+                  suggestion={activeSuggestion}
                   onClick={() => {}}
                   isDragOverlay={true}
                 />
@@ -494,35 +490,31 @@ function PipelineContent() {
           </DndContext>
         </>
       ) : (
-        <PipelineTable
-          onDealClick={handleDealClick}
-          onDeleteDeal={handleDeleteDeal}
+        <RoadmapTable
+          onSuggestionClick={handleSuggestionClick}
+          onDeleteSuggestion={handleDeleteSuggestion}
         />
       )}
 
-      <EditDealModal
-        key={selectedDeal?.id}
-        open={isEditModalOpen}
-        setOpen={setIsEditModalOpen}
-        deal={selectedDeal}
-        onSave={handleSaveDeal}
-        onDelete={handleDeleteDeal}
-      />
-
       <Modal
-        isOpen={showDealForm && !isEditModalOpen} // Ensure only one modal opens
-        onClose={() => setShowDealForm(false)}
+        isOpen={showSuggestionForm || isEditModalOpen}
+        onClose={() => {
+          setShowSuggestionForm(false);
+          setIsEditModalOpen(false);
+        }}
       >
-        <DealForm
-          key={initialStageId || 'new-deal'} // Add key for reset
-          deal={selectedDeal}
-          onSave={handleSaveDeal}
+        <SuggestionForm
+          key={selectedSuggestion?.id || initialStatusId || 'new-suggestion'}
+          suggestion={selectedSuggestion}
+          onSave={handleSaveSuggestion}
           onCancel={() => {
-            setShowDealForm(false);
-            setSelectedDeal(null);
-            setInitialStageId(null);
+            setShowSuggestionForm(false);
+            setIsEditModalOpen(false);
+            setSelectedSuggestion(null);
+            setInitialStatusId(null);
           }}
-          initialStageId={initialStageId}
+          onDelete={selectedSuggestion ? handleDeleteSuggestion : undefined}
+          initialStatusId={initialStatusId}
         />
       </Modal>
     </>
@@ -531,8 +523,8 @@ function PipelineContent() {
 
 export function RoadmapKanban() {
   return (
-    <PipelineProvider>
-      <PipelineContent />
-    </PipelineProvider>
+    <RoadmapProvider>
+      <RoadmapContent />
+    </RoadmapProvider>
   );
 }

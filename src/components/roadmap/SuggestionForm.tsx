@@ -1,58 +1,89 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Plus, Lightbulb, Bug, ArrowUp, AlertTriangle } from 'lucide-react';
-import { toast } from 'sonner';
-import { useRoadmap, RoadmapSuggestion } from '@/lib/hooks/useRoadmap';
+import React, { useState, useEffect } from 'react';
+import { Plus, Lightbulb, Bug, ArrowUp, AlertTriangle, Settings, HelpCircle, Trash2, X } from 'lucide-react';
+import { RoadmapSuggestion } from '@/lib/hooks/useRoadmap';
+import { useUser } from '@/lib/hooks/useUser';
 
 interface SuggestionFormProps {
-  trigger?: React.ReactNode;
-  onSuccess?: () => void;
+  suggestion?: RoadmapSuggestion | null;
+  onSave: (data: any) => Promise<void>;
+  onCancel: () => void;
+  onDelete?: (id: string) => Promise<void>;
+  initialStatusId?: string | null;
 }
 
-export function SuggestionForm({ trigger, onSuccess }: SuggestionFormProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function SuggestionForm({ suggestion, onSave, onCancel, onDelete, initialStatusId }: SuggestionFormProps) {
+  const { userData } = useUser();
+  const isAdmin = userData?.is_admin || false;
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     type: 'feature' as RoadmapSuggestion['type'],
     priority: 'medium' as RoadmapSuggestion['priority'],
+    status: 'submitted' as RoadmapSuggestion['status'],
+    estimated_effort: undefined as RoadmapSuggestion['estimated_effort'],
+    target_version: '',
+    admin_notes: '',
+    assigned_to: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { createSuggestion } = useRoadmap();
+
+  useEffect(() => {
+    if (suggestion) {
+      setFormData({
+        title: suggestion.title || '',
+        description: suggestion.description || '',
+        type: suggestion.type || 'feature',
+        priority: suggestion.priority || 'medium',
+        status: suggestion.status || 'submitted',
+        estimated_effort: suggestion.estimated_effort,
+        target_version: suggestion.target_version || '',
+        admin_notes: suggestion.admin_notes || '',
+        assigned_to: suggestion.assigned_to || '',
+      });
+    } else if (initialStatusId) {
+      setFormData(prev => ({ ...prev, status: initialStatusId as any }));
+    }
+  }, [suggestion, initialStatusId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title.trim() || !formData.description.trim()) {
-      toast.error('Please fill in all required fields');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await createSuggestion(formData);
       
-      toast.success('Your suggestion has been submitted successfully!');
-      setFormData({
-        title: '',
-        description: '',
-        type: 'feature',
-        priority: 'medium',
-      });
-      setIsOpen(false);
-      onSuccess?.();
+      // Only include fields that the user can update
+      const dataToSave = isAdmin ? formData : {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        priority: formData.priority,
+        status: initialStatusId || formData.status,
+      };
+      
+      await onSave(dataToSave);
     } catch (error) {
-      console.error('Error creating suggestion:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit suggestion');
+      console.error('Error saving suggestion:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!suggestion || !onDelete) return;
+    
+    if (window.confirm('Are you sure you want to delete this suggestion?')) {
+      try {
+        setIsSubmitting(true);
+        await onDelete(suggestion.id);
+      } catch (error) {
+        console.error('Error deleting suggestion:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -63,9 +94,9 @@ export function SuggestionForm({ trigger, onSuccess }: SuggestionFormProps) {
       case 'bug':
         return <Bug className="w-4 h-4" />;
       case 'improvement':
-        return <ArrowUp className="w-4 h-4" />;
+        return <Settings className="w-4 h-4" />;
       case 'other':
-        return <AlertTriangle className="w-4 h-4" />;
+        return <HelpCircle className="w-4 h-4" />;
       default:
         return <Lightbulb className="w-4 h-4" />;
     }
@@ -87,21 +118,18 @@ export function SuggestionForm({ trigger, onSuccess }: SuggestionFormProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-            <Plus className="w-4 h-4 mr-2" />
-            New Suggestion
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="bg-gray-900/95 backdrop-blur-xl border-gray-800/50 text-white max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            Submit a Feature Request or Bug Report
-          </DialogTitle>
-        </DialogHeader>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-white">
+          {suggestion ? 'Edit Suggestion' : 'Submit a Feature Request or Bug Report'}
+        </h2>
+        <button
+          onClick={onCancel}
+          className="text-gray-400 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
@@ -194,27 +222,102 @@ export function SuggestionForm({ trigger, onSuccess }: SuggestionFormProps) {
             </ul>
           </div>
 
+          {/* Admin-only fields */}
+          {isAdmin && suggestion && (
+            <div className="space-y-4 border-t border-gray-800 pt-4">
+              <h3 className="text-sm font-medium text-gray-300">Admin Controls</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                    className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="submitted">Submitted</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="testing">Testing</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-300">Estimated Effort</label>
+                  <select
+                    value={formData.estimated_effort || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, estimated_effort: e.target.value as any || undefined }))}
+                    className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="">Not set</option>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="large">Large</option>
+                    <option value="extra_large">Extra Large</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Target Version</label>
+                <input
+                  type="text"
+                  value={formData.target_version}
+                  onChange={(e) => setFormData(prev => ({ ...prev, target_version: e.target.value }))}
+                  placeholder="e.g., 2.0.0"
+                  className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Admin Notes</label>
+                <textarea
+                  value={formData.admin_notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, admin_notes: e.target.value }))}
+                  placeholder="Internal notes about this suggestion..."
+                  rows={3}
+                  className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setIsOpen(false)}
-              disabled={isSubmitting}
-              className="text-gray-400 hover:text-white"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Suggestion'}
-            </Button>
+          <div className="flex items-center justify-between pt-4">
+            <div>
+              {suggestion && onDelete && isAdmin && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-4 py-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isSubmitting}
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting || !formData.title.trim() || !formData.description.trim()}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Saving...' : (suggestion ? 'Update Suggestion' : 'Submit Suggestion')}
+              </button>
+            </div>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
   );
 }
