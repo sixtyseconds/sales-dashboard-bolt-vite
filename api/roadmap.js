@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.VITE_SUPABASE_URL,
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY
 );
 
 export default async function handler(req, res) {
@@ -39,28 +39,58 @@ export default async function handler(req, res) {
     const isAdmin = profile?.is_admin || false;
 
     if (req.method === 'GET') {
-      // Get all roadmap suggestions with user details and vote counts
+      // Get all roadmap suggestions
       const { data: suggestions, error } = await supabase
         .from('roadmap_suggestions')
-        .select(`
-          *,
-          submitted_by_profile:profiles!submitted_by(id, full_name, email),
-          assigned_to_profile:profiles!assigned_to(id, full_name, email),
-          user_vote:roadmap_votes(id)
-        `)
-        .eq('roadmap_votes.user_id', user.id)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
 
-      // Transform the data to include user's vote status
-      const transformedSuggestions = suggestions.map(suggestion => ({
-        ...suggestion,
-        hasUserVoted: suggestion.user_vote && suggestion.user_vote.length > 0,
-        user_vote: undefined // Remove the raw user_vote data
-      }));
+      // Get profile information for submitters and assignees
+      const submitterIds = [...new Set(suggestions.map(s => s.submitted_by).filter(Boolean))];
+      const assigneeIds = [...new Set(suggestions.map(s => s.assigned_to).filter(Boolean))];
+      const allUserIds = [...new Set([...submitterIds, ...assigneeIds])];
+
+      let profiles = [];
+      if (allUserIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', allUserIds);
+        profiles = profileData || [];
+      }
+
+      // Get user's votes
+      const { data: userVotes } = await supabase
+        .from('roadmap_votes')
+        .select('suggestion_id')
+        .eq('user_id', user.id);
+      
+      const userVoteIds = new Set((userVotes || []).map(v => v.suggestion_id));
+
+      // Transform the data to include user's vote status and profile information
+      const transformedSuggestions = suggestions.map(suggestion => {
+        const submitterProfile = profiles.find(p => p.id === suggestion.submitted_by);
+        const assigneeProfile = profiles.find(p => p.id === suggestion.assigned_to);
+        
+        return {
+          ...suggestion,
+          hasUserVoted: userVoteIds.has(suggestion.id),
+          submitted_by_profile: submitterProfile ? {
+            id: submitterProfile.id,
+            full_name: `${submitterProfile.first_name || ''} ${submitterProfile.last_name || ''}`.trim() || 'Unknown User',
+            email: submitterProfile.email
+          } : null,
+          assigned_to_profile: assigneeProfile ? {
+            id: assigneeProfile.id,
+            full_name: `${assigneeProfile.first_name || ''} ${assigneeProfile.last_name || ''}`.trim() || 'Unknown User',
+            email: assigneeProfile.email
+          } : null
+        };
+      });
 
       return res.status(200).json(transformedSuggestions);
     }
@@ -81,20 +111,29 @@ export default async function handler(req, res) {
           priority: priority || 'medium',
           submitted_by: user.id
         })
-        .select(`
-          *,
-          submitted_by_profile:profiles!submitted_by(id, full_name, email)
-        `)
+        .select('*')
         .single();
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
 
+      // Get submitter profile
+      const { data: submitterProfile } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', user.id)
+        .single();
+
       return res.status(201).json({
         ...suggestion,
         hasUserVoted: false,
-        votes_count: 0
+        votes_count: 0,
+        submitted_by_profile: submitterProfile ? {
+          id: submitterProfile.id,
+          full_name: `${submitterProfile.first_name || ''} ${submitterProfile.last_name || ''}`.trim() || 'Unknown User',
+          email: submitterProfile.email
+        } : null
       });
     }
 
@@ -140,18 +179,39 @@ export default async function handler(req, res) {
         .from('roadmap_suggestions')
         .update(allowedUpdates)
         .eq('id', id)
-        .select(`
-          *,
-          submitted_by_profile:profiles!submitted_by(id, full_name, email),
-          assigned_to_profile:profiles!assigned_to(id, full_name, email)
-        `)
+        .select('*')
         .single();
 
       if (error) {
         return res.status(500).json({ error: error.message });
       }
 
-      return res.status(200).json(suggestion);
+      // Get profile information
+      const submitterProfile = suggestion.submitted_by ? await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', suggestion.submitted_by)
+        .single() : { data: null };
+
+      const assigneeProfile = suggestion.assigned_to ? await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .eq('id', suggestion.assigned_to)
+        .single() : { data: null };
+
+      return res.status(200).json({
+        ...suggestion,
+        submitted_by_profile: submitterProfile.data ? {
+          id: submitterProfile.data.id,
+          full_name: `${submitterProfile.data.first_name || ''} ${submitterProfile.data.last_name || ''}`.trim() || 'Unknown User',
+          email: submitterProfile.data.email
+        } : null,
+        assigned_to_profile: assigneeProfile.data ? {
+          id: assigneeProfile.data.id,
+          full_name: `${assigneeProfile.data.first_name || ''} ${assigneeProfile.data.last_name || ''}`.trim() || 'Unknown User',
+          email: assigneeProfile.data.email
+        } : null
+      });
     }
 
     if (req.method === 'DELETE') {
