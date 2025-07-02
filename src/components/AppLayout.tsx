@@ -24,7 +24,8 @@ import {
   MailWarning,
   MailCheck,
   Building2,
-  Shield
+  Shield,
+  Map
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser } from '@/lib/hooks/useUser';
@@ -78,6 +79,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { icon: FileText, label: 'Activity Log', href: '/activity' },
     { icon: MailWarning, label: 'Activity Processing', href: '/activity-processing' },
     { icon: LineChart, label: 'Sales Funnel', href: '/funnel' },
+    { icon: Map, label: 'Roadmap', href: '/roadmap' },
     ...(userData?.is_admin ? [
       { 
         icon: UserCog, 
